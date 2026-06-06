@@ -952,29 +952,99 @@ class CalendarSettingsTab extends obsidian.PluginSettingTab {
         });
     }
     addMacOSCalendarNamesSetting() {
-        new obsidian.Setting(this.containerEl)
-            .setName("Calendar names to sync")
-            .setDesc("Comma-separated list of macOS Calendar names. Leave empty to show all calendars.")
-            .addText((textfield) => {
-            textfield.setValue((this.plugin.options.macOSCalendarNames || []).join(", "));
-            textfield.setPlaceholder("All calendars");
-            textfield.onChange(async (value) => {
-                const names = value.split(",").map(function(s) { return s.trim(); }).filter(Boolean);
-                this.plugin.writeOptions(() => ({ macOSCalendarNames: names }));
+        const container = this.containerEl.createDiv();
+        new obsidian.Setting(container)
+            .setName("Calendar sources")
+            .setDesc("Click 'Discover' to list your macOS calendars, then toggle which ones to show.")
+            .addButton((btn) => {
+                btn.setButtonText("Discover");
+                btn.setClass("mod-cta");
+                btn.onClick(async () => {
+                    btn.setButtonText("Loading...");
+                    btn.setDisabled(true);
+                    const view = this.plugin.view;
+                    if (view && view.macosIntegration) {
+                        const names = await view.macosIntegration.discoverCalendars();
+                        this.renderCalendarToggles(container, names);
+                    }
+                    btn.setButtonText("Refresh");
+                    btn.setDisabled(false);
+                });
             });
+        // Show current selection if exists
+        const currentNames = this.plugin.options.macOSCalendarNames || [];
+        if (currentNames.length > 0) {
+            this.renderCalendarToggles(container, currentNames);
+        }
+    }
+    renderCalendarToggles(container, names) {
+        // Remove old toggles
+        container.querySelectorAll(".macos-cal-toggle").forEach((el) => el.remove());
+        const enabled = this.plugin.options.macOSCalendarNames || [];
+        const showAll = enabled.length === 0;
+        names.forEach((name) => {
+            const setting = new obsidian.Setting(container.createDiv("macos-cal-toggle"))
+                .setName(name)
+                .setDesc("Calendar")
+                .addToggle((toggle) => {
+                    toggle.setValue(showAll || enabled.includes(name));
+                    toggle.onChange(async (value) => {
+                        let current = this.plugin.options.macOSCalendarNames || [];
+                        if (value) {
+                            if (!current.includes(name)) current.push(name);
+                        } else {
+                            current = current.filter(function(n) { return n !== name; });
+                        }
+                        await this.plugin.writeOptions(() => ({ macOSCalendarNames: current }));
+                    });
+                });
         });
     }
     addMacOSReminderListNamesSetting() {
-        new obsidian.Setting(this.containerEl)
-            .setName("Reminder lists to sync")
-            .setDesc("Comma-separated list of Reminders list names. Leave empty to show all lists.")
-            .addText((textfield) => {
-            textfield.setValue((this.plugin.options.macOSReminderListNames || []).join(", "));
-            textfield.setPlaceholder("All reminder lists");
-            textfield.onChange(async (value) => {
-                const names = value.split(",").map(function(s) { return s.trim(); }).filter(Boolean);
-                this.plugin.writeOptions(() => ({ macOSReminderListNames: names }));
+        const container = this.containerEl.createDiv();
+        new obsidian.Setting(container)
+            .setName("Reminder sources")
+            .setDesc("Click 'Discover' to list your macOS Reminder lists, then toggle which ones to show.")
+            .addButton((btn) => {
+                btn.setButtonText("Discover");
+                btn.setClass("mod-cta");
+                btn.onClick(async () => {
+                    btn.setButtonText("Loading...");
+                    btn.setDisabled(true);
+                    const view = this.plugin.view;
+                    if (view && view.macosIntegration) {
+                        const names = await view.macosIntegration.discoverReminderLists();
+                        this.renderReminderToggles(container, names);
+                    }
+                    btn.setButtonText("Refresh");
+                    btn.setDisabled(false);
+                });
             });
+        const currentNames = this.plugin.options.macOSReminderListNames || [];
+        if (currentNames.length > 0) {
+            this.renderReminderToggles(container, currentNames);
+        }
+    }
+    renderReminderToggles(container, names) {
+        container.querySelectorAll(".macos-rem-toggle").forEach((el) => el.remove());
+        const enabled = this.plugin.options.macOSReminderListNames || [];
+        const showAll = enabled.length === 0;
+        names.forEach((name) => {
+            const setting = new obsidian.Setting(container.createDiv("macos-rem-toggle"))
+                .setName(name)
+                .setDesc("Reminder list")
+                .addToggle((toggle) => {
+                    toggle.setValue(showAll || enabled.includes(name));
+                    toggle.onChange(async (value) => {
+                        let current = this.plugin.options.macOSReminderListNames || [];
+                        if (value) {
+                            if (!current.includes(name)) current.push(name);
+                        } else {
+                            current = current.filter(function(n) { return n !== name; });
+                        }
+                        await this.plugin.writeOptions(() => ({ macOSReminderListNames: current }));
+                    });
+                });
         });
     }
     addMacOSRefreshIntervalSetting() {
