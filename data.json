@@ -1,0 +1,15 @@
+{
+  "shouldConfirmBeforeCreate": true,
+  "weekStart": "locale",
+  "wordsPerDot": 250,
+  "showWeeklyNote": false,
+  "weeklyNoteFormat": "",
+  "weeklyNoteTemplate": "",
+  "weeklyNoteFolder": "",
+  "localeOverride": "system-default",
+  "showMacOSCalendar": true,
+  "showMacOSReminders": true,
+  "macOSCalendarNames": [],
+  "macOSReminderListNames": [],
+  "macOSRefreshInterval": 5
+}

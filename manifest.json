@@ -1,0 +1,9 @@
+{
+  "id": "calendar-macos-sync",
+  "name": "Calendar (macOS Sync)",
+  "description": "Calendar view with macOS Calendar and Reminders integration",
+  "version": "1.0.0",
+  "author": "Custom",
+  "isDesktopOnly": true,
+  "minAppVersion": "0.9.11"
+}
