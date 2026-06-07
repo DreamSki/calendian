@@ -2406,23 +2406,23 @@ async function callAIForParsing(text, settings, refDate) {
     var todayStr = window.moment().format('YYYY-MM-DD');
 
     var systemPrompt = [
-        'You are a date/time parser. Extract event details from the user\'s natural language input.',
+        'You are a date/time parser. Extract event details from the user\'s natural language input as JSON.',
         'Today is ' + todayStr + ' (' + refDateStr + ').',
-        'Return ONLY a JSON object with these fields:',
-        '  title: string — the event description/title (required)',
-        '  date: string — ISO date "YYYY-MM-DD", or null if not found',
-        '  time: string — "HH:MM" in 24h format, or null',
-        '  endTime: string — "HH:MM" in 24h format, or null (if duration is specified)',
-        '  allDay: boolean — true if the event is all-day',
-        '  confidence: "high" | "medium" | "low"',
+        'Output a JSON object with exactly these fields:',
+        '  "title": string — the event description/title (required)',
+        '  "date": string|null — ISO date "YYYY-MM-DD", or null if not found',
+        '  "time": string|null — "HH:MM" in 24h format, or null',
+        '  "endTime": string|null — "HH:MM" in 24h format, or null (only if duration specified)',
+        '  "allDay": boolean — true only if explicitly all-day',
+        '  "confidence": "high"|"medium"|"low"',
         'Rules:',
-        '- Support both English and Chinese input.',
-        '- For vague times: "morning" = 09:00, "afternoon" = 14:00, "evening" = 18:00, "noon" = 12:00.',
-        '- Chinese: "早上"=09:00, "上午"=09:00, "中午"=12:00, "下午"=14:00, "晚上"=19:00, "凌晨"=03:00.',
-        '- "tomorrow" / "明天" = ' + todayStr + ' + 1 day.',
-        '- If duration is given ("1 hour", "30min", "一小时"), compute endTime from time+duration.',
-        '- If no time is specified, leave time and endTime as null.',
-        '- Return valid JSON only, no explanation, no markdown.',
+        '- Support both English and Chinese.',
+        '- Vague times: morning=09:00 afternoon=14:00 evening=18:00 noon=12:00.',
+        '- Chinese: 早上/上午=09:00 中午=12:00 下午=14:00 晚上=19:00 凌晨=03:00.',
+        '- tomorrow/明天 = ' + todayStr + ' + 1 day.',
+        '- If duration given, compute endTime from time+duration.',
+        '- If no time specified, set time and endTime to null.',
+        '- Output ONLY the JSON object, no other text.',
     ].join('\n');
 
     try {
@@ -2439,27 +2439,57 @@ async function callAIForParsing(text, settings, refDate) {
                     { role: 'user', content: text },
                 ],
                 temperature: 0,
-                max_tokens: 256,
+                max_tokens: 512,
+                response_format: { type: "json_object" },
             }),
         });
 
+        // Read response as text first (so we can log it on parse failure)
+        var respText = await resp.text();
         if (!resp.ok) {
-            console.log('[Calendian] AI parsing: HTTP ' + resp.status);
+            console.log('[Calendian] AI HTTP ' + resp.status + ': ' + respText.substring(0, 300));
             return null;
         }
 
-        var data = await resp.json();
+        var data;
+        try {
+            data = JSON.parse(respText);
+        } catch (jsonErr) {
+            console.log('[Calendian] AI response is not valid JSON: ' + respText.substring(0, 500));
+            return null;
+        }
+
         var content = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
-        if (!content) return null;
+        if (!content) {
+            console.log('[Calendian] AI returned empty content. Full response:', JSON.stringify(data).substring(0, 500));
+            return null;
+        }
+
+        console.log('[Calendian] AI raw content (' + content.length + ' chars):', content.substring(0, 300));
 
         // Extract JSON from response (may have markdown fences)
         var jsonStr = content.trim();
+
+        // Strategy 1: strip ```json ... ``` fences
         var jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-        if (jsonMatch) jsonStr = jsonMatch[1].trim();
+        if (jsonMatch && jsonMatch[1].trim()) {
+            jsonStr = jsonMatch[1].trim();
+        } else {
+            // Strategy 2: find first { ... } JSON object in the text
+            var braceMatch = jsonStr.match(/\{[\s\S]*\}/);
+            if (braceMatch) {
+                jsonStr = braceMatch[0];
+            }
+        }
+
+        if (!jsonStr) {
+            console.log('[Calendian] AI content has no JSON:', content.substring(0, 200));
+            return null;
+        }
 
         var parsed = JSON.parse(jsonStr);
 
-        console.log('[Calendian] AI raw output:', jsonStr);
+        console.log('[Calendian] AI parsed OK:', jsonStr.substring(0, 200));
 
         // Convert to internal format
         var result = {
@@ -2844,9 +2874,11 @@ class QuickEventModal extends obsidian.Modal {
         });
 
         // ── Enter key → AI parse (only when enabled & configured) ─
+        var aiRunning = false;
         inputEl.addEventListener('keydown', async function(e) {
             if (e.key !== 'Enter') return;
             e.preventDefault();
+            if (aiRunning) return; // prevent concurrent requests from rapid Enter
             var text = inputEl.value.trim();
             if (!text) return;
 
@@ -2858,6 +2890,7 @@ class QuickEventModal extends obsidian.Modal {
             previewEl.style.display = 'block';
             previewEl.innerHTML = '<div style="color:var(--text-muted);font-style:italic">🤖 AI parsing...</div>';
 
+            aiRunning = true;
             try {
                 var aiResult = await callAIForParsing(text, {
                     aiEndpoint: opts.aiEndpoint,
@@ -2868,11 +2901,13 @@ class QuickEventModal extends obsidian.Modal {
                     self._aiResult = aiResult;
                     self._parsedResult = aiResult; // sync for _getOrParse
                     self._renderPreview(previewEl, aiResult, integ);
+                    aiRunning = false;
                     return;
                 }
             } catch (err) {
                 console.log('[Calendian] AI parse error:', err.message || err);
             }
+            aiRunning = false;
 
             // AI failed — fall back to regex, clear any stale AI result
             self._aiResult = null;
