@@ -17,6 +17,10 @@ Calendian uses Specification-Driven Development (SDD): the specification is the 
 | Traceability matrix | [`TRACEABILITY.md`](./TRACEABILITY.md) | Mapping from goals → capabilities → requirements → tasks → tests → release gates. |
 | Task backlog | [`TASKS.md`](./TASKS.md) | Sequenced implementation tasks with dependencies and Definition of Done. |
 | Risk register | [`RISKS.md`](./RISKS.md) | Product, technical, UX, privacy, and schedule risks with mitigations. |
+| Privacy model | [`../PRIVACY.md`](../PRIVACY.md) | Data read, stored, logged; diagnostics redaction; external API policy. |
+| Architecture | [`../ARCHITECTURE.md`](../ARCHITECTURE.md) | Target module structure, data flow, safety boundaries, design decisions. |
+| Settings schema | [`../SETTINGS_SCHEMA.md`](../SETTINGS_SCHEMA.md) | Settings data structure, defaults, source identity model, migration policy. |
+| Release checklist | [`../RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md) | Per-release execution checklist with version-specific gates. |
 
 ## SDD rules
 

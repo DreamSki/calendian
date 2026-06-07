@@ -20,7 +20,7 @@ This matrix links product goals to requirements, implementation tasks, acceptanc
 
 | Goal | Requirement groups |
 |---|---|
-| GOAL-001 | `REQ-PLAT-*`, `REQ-PERM-*`, `REQ-CAL-*`, `REQ-REM-*`, `REQ-SRC-*`, `REQ-CACHE-*`, `REQ-UX-*` |
+| GOAL-001 | `REQ-PLAT-*`, `REQ-PERM-*`, `REQ-CAL-*`, `REQ-REM-*`, `REQ-SRC-*`, `REQ-CACHE-*`, `REQ-UX-*`, `REQ-TIME-*`, `REQ-DATA-*` |
 | GOAL-002 | `REQ-PRIV-*`, `REQ-ERR-*`, `REQ-DIAG-*` |
 | GOAL-003 | `REQ-WRITE-*`, `REQ-REC-*`, `REQ-NL-*`, `REQ-ERR-*` |
 | GOAL-004 | `REQ-NOTE-*`, `REQ-TASK-*`, `REQ-NOTIF-*` |
@@ -31,8 +31,8 @@ This matrix links product goals to requirements, implementation tasks, acceptanc
 
 | Version | Primary requirement IDs | Acceptance gates | Test suites |
 |---|---|---|---|
-| v0.1 Read-only MVP | `REQ-PLAT-001..004`, `REQ-PERM-001..004`, `REQ-CAL-001..006`, `REQ-REM-001..004`, `REQ-SRC-001..004`, `REQ-CACHE-001..005`, `REQ-UX-001..004`, `REQ-PRIV-001..002`, `REQ-ERR-001..004` | `GATE-V001-*` | `TS-001` to `TS-006` |
-| v0.2 Read-only polish | `REQ-CAL-007..012`, `REQ-REM-005..009`, `REQ-DIAG-001..002`, `REQ-CACHE-006..008`, `REQ-UX-006`, `REQ-UX-010`, `REQ-ERR-003` | v0.2 gates | `TS-003` to `TS-006` |
+| v0.1 Read-only MVP | `REQ-PLAT-001..004`, `REQ-PERM-001..004`, `REQ-DATA-001..002`, `REQ-DATA-005`, `REQ-DATA-007`, `REQ-CAL-001..006`, `REQ-REM-001..004`, `REQ-SRC-001..004`, `REQ-CACHE-001..005`, `REQ-UX-001..004`, `REQ-PRIV-001..002`, `REQ-ERR-001..004` | `GATE-V001-*` | `TS-001` to `TS-006` |
+| v0.2 Read-only polish | `REQ-CAL-007..012`, `REQ-REM-005..009`, `REQ-DIAG-001..002`, `REQ-CACHE-006..008`, `REQ-UX-006`, `REQ-UX-010`, `REQ-ERR-003`, `REQ-DATA-003` | v0.2 gates | `TS-003` to `TS-006` |
 | v0.3 Safe create | `REQ-WRITE-001..010`, `REQ-NL-001..005`, `REQ-ERR-005..006`, `REQ-REC-001..003`, `REQ-ARCH-001` | v0.3 gates | `TS-007` |
 | v0.4 Safe edit/delete | `REQ-WRITE-011..020`, `REQ-REC-004..008` | v0.4 gates | `TS-008` |
 | v0.5 Note association & notifications | `REQ-NOTE-001..010`, `REQ-TASK-001..004`, `REQ-NOTIF-001..005`, `REQ-PRIV-003` | v0.5 gates | `TS-009` |
@@ -46,6 +46,8 @@ This matrix links product goals to requirements, implementation tasks, acceptanc
 |---|---|
 | `REQ-PLAT-*` | `TASK-001` packaging and compatibility alignment |
 | `REQ-PERM-*` | `TASK-002` permission state model and recovery UI |
+| `REQ-DATA-*` | `TASK-003`, `TASK-004`, `TASK-009` data identity and parse isolation |
+| `REQ-TIME-*` | `TASK-003`, `TASK-004` time/date/DST handling |
 | `REQ-CAL-*` | `TASK-003` event read model and rendering |
 | `REQ-REM-*` | `TASK-004` reminder read model and rendering |
 | `REQ-SRC-*` | `TASK-005` source discovery and filtering |

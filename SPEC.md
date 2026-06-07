@@ -19,6 +19,10 @@ See also:
 - [`docs/sdd/TASKS.md`](./docs/sdd/TASKS.md) — implementation backlog
 - [`docs/sdd/TESTING.md`](./docs/sdd/TESTING.md) — test strategy
 - [`docs/sdd/RISKS.md`](./docs/sdd/RISKS.md) — risk register
+- [`docs/PRIVACY.md`](./docs/PRIVACY.md) — privacy model and data handling
+- [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) — target architecture and module boundaries
+- [`docs/SETTINGS_SCHEMA.md`](./docs/SETTINGS_SCHEMA.md) — settings data structure and migration
+- [`docs/RELEASE_CHECKLIST.md`](./docs/RELEASE_CHECKLIST.md) — per-release execution checklist
 
 ---
 
@@ -736,41 +740,89 @@ Goal, habit, intention, nudge, and review data SHALL reside exclusively in Obsid
 | REQ-REVIEW-006 | THE SYSTEM SHOULD link review notes to associated goals, habits, or events using stable metadata. | P2 | v0.6 | Planned |
 | REQ-REVIEW-007 | THE SYSTEM SHALL compute review content locally and SHALL NOT send reflection content to external services. | P0 | v0.5 | Planned |
 
+### 7.26 Data identity and parsing requirements
+
+> Foundational requirements for stable identity, parse isolation, and display-only fallback. These are cross-cutting across Calendar and Reminder reads, writes, and note association.
+
+| ID | Requirement | Priority | Target | Status |
+|---|---|---|---|---|
+| REQ-DATA-001 | THE SYSTEM SHALL assign each Calendar event a stable source identity where available from JXA. | P0 | v0.1 | Partial |
+| REQ-DATA-002 | THE SYSTEM SHALL assign each Reminder a stable source identity where available from JXA. | P0 | v0.1 | Partial |
+| REQ-DATA-003 | IF stable identity is unavailable for a source item, THE SYSTEM SHALL mark that item as display-only and SHALL NOT permit write, delete, or note-association operations on it. | P0 | v0.2 | Planned |
+| REQ-DATA-004 | THE SYSTEM SHALL NOT use fallback display identity (derived from title/time/calendar) for write, delete, or note-association operations. | P0 | v0.3 | Planned |
+| REQ-DATA-005 | THE SYSTEM SHALL isolate parse failures to individual records so that one malformed item does not prevent display of valid items. | P0 | v0.1 | Planned |
+| REQ-DATA-006 | THE SYSTEM SHALL distinguish stable series identity from occurrence identity for recurring events where the source provides both. | P0 | Future | Planned |
+| REQ-DATA-007 | THE SYSTEM SHALL treat optional JXA fields as optional and SHALL NOT fail when fields are missing, null, or of unexpected type. | P0 | v0.1 | Planned |
+
+**Identity stability grades** (informative):
+
+| Grade | Meaning | Permitted operations |
+|---|---|---|
+| Stable | Source-provided persistent ID (e.g., Calendar event UID, Reminder persistent ID). | Read, display, write, delete, note association. |
+| Semi-stable | Composite key from source properties that may change on edit. | Display hints only. |
+| Display-only fallback | Derived from title/time/calendar; not durable. | Display hints only; MUST NOT be used for mutation or association. |
+
+### 7.27 Time, date, and timezone requirements
+
+> Calendar plugins are prone to bugs around all-day events, DST transitions, multi-day spans, and locale settings. These requirements define the expected behavior.
+
+| ID | Requirement | Priority | Target | Status |
+|---|---|---|---|---|
+| REQ-TIME-001 | THE SYSTEM SHALL treat all-day event end dates as exclusive (an all-day event on June 7 has start=June 7, end=June 8, and SHALL display on June 7 only). | P0 | v0.1 | Partial |
+| REQ-TIME-002 | THE SYSTEM SHALL display a timed event that spans midnight on both calendar days (e.g., 23:00–01:00 appears on both the start date and the end date). | P0 | v0.2 | Planned |
+| REQ-TIME-003 | THE SYSTEM SHALL display a multi-day event on every calendar day that intersects [start, end). | P0 | v0.2 | Planned |
+| REQ-TIME-004 | THE SYSTEM SHALL use the user's local timezone for all time calculations and display. | P0 | v0.1 | Planned |
+| REQ-TIME-005 | THE SYSTEM SHALL handle DST transition days correctly (23-hour and 25-hour days SHALL NOT cause event misplacement). | P1 | v0.2 | Planned |
+| REQ-TIME-006 | THE SYSTEM SHALL respect the Obsidian-configured week start day for calendar grid rendering. | P1 | v0.1 | Planned |
+| REQ-TIME-007 | THE SYSTEM SHALL format times according to the user's system locale (12h/24h). | P1 | v0.1 | Planned |
+| REQ-TIME-008 | THE SYSTEM SHALL store dates internally as ISO 8601 date strings (YYYY-MM-DD) and times as ISO 8601 datetime strings in local time. | P0 | v0.1 | Planned |
+
 ---
 
 ## 8. Target architecture
 
-Current implementation may be bundled. This is the target architecture, not a claim that all files already exist.
+> **Detailed architecture**: See [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) for the full module structure, data flow diagrams, layer descriptions, performance targets, and design decisions. This section provides a summary only.
+
+Current implementation may be bundled in `main.js`. This is the target structure, not a claim that all files already exist.
 
 ```text
 calendian/
-├── main.js                      # plugin entry, view registration, lifecycle
+├── main.ts                      # plugin entry, view registration, lifecycle
 ├── src/
 │   ├── macos/
 │   │   ├── calendar-reader.ts   # Calendar.app JXA read adapter
 │   │   ├── reminder-reader.ts   # Reminders.app JXA read adapter
-│   │   ├── writer.ts            # future write adapter, safety-gated
+│   │   ├── writer.ts            # write adapter, safety-gated (v0.3+)
+│   │   ├── jxa-executor.ts      # shared JXA execution, timeout, error handling
 │   │   └── permissions.ts       # permission/error classification
 │   ├── domain/
-│   │   ├── event.ts             # internal event model
-│   │   ├── reminder.ts          # internal reminder model
-│   │   └── association.ts       # note association model
+│   │   ├── event.ts             # CalendianEvent model
+│   │   ├── reminder.ts          # CalendianReminder model
+│   │   ├── association.ts       # note association model
+│   │   ├── goal.ts              # CalendianGoal, CalendianStep (v0.5.5)
+│   │   ├── habit.ts             # CalendianHabit (v0.5.5)
+│   │   └── review.ts            # CalendianReview (v0.5.5)
 │   ├── cache/
-│   │   └── schedule-cache.ts
+│   │   └── schedule-cache.ts    # in-memory cache with range management
 │   ├── ui/
-│   │   ├── calendar-panel.ts
+│   │   ├── calendar-panel.ts    # main sidebar view
 │   │   ├── event-list.ts
 │   │   ├── reminder-list.ts
-│   │   ├── details-panel.ts
-│   │   └── settings-tab.ts
-│   ├── notes/
+│   │   ├── details-panel.ts     # expandable details (v0.2+)
+│   │   ├── settings-tab.ts
+│   │   └── diagnostics.ts       # diagnostic panel (v0.2+)
+│   ├── notes/                   # v0.5+
 │   │   ├── frontmatter.ts
-│   │   └── templates.ts
-│   └── diagnostics/
-│       └── diagnostics.ts
+│   │   ├── templates.ts
+│   │   └── note-link-resolver.ts
+│   └── self-direction/          # v0.5.5
+│       ├── goals.ts
+│       ├── habits.ts
+│       ├── nudges.ts
+│       └── reviews.ts
 ├── styles.css
 ├── manifest.json
-└── docs/sdd/
+└── docs/
 ```
 
 ---

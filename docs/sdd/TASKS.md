@@ -113,6 +113,21 @@ Tasks are ordered by dependency and release target. Every task references requir
 - Definition of Done:
   - README privacy claim is accurate and bounded.
 
+### TASK-009 — Error classification and recovery
+
+- Requirements: `REQ-ERR-001` to `REQ-ERR-004`
+- Status: Todo
+- Priority: P0
+- Deliverables:
+  - Classify JXA errors: permission denied, timeout, empty source, parse failure, unknown.
+  - Show appropriate error state per classification with recovery guidance.
+  - Independent Calendar and Reminders error states (one failure does not block the other).
+  - Distinguish empty data from failure states in the UI.
+  - Retain previous data on refresh failure; do not show false empty state.
+- Definition of Done:
+  - `TS-002` covers permission error states.
+  - Each error class has a distinct user-visible state.
+
 ## v0.2 — Read-only polish
 
 ### TASK-010 — Event details panel

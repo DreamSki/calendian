@@ -58,11 +58,16 @@ Create fixture events:
 
 Expected:
 
-- correct sorting;
-- correct time formatting;
-- correct all-day placement;
-- correct status styling;
-- no data mutation.
+- All-day events render above timed events in a separated section.
+- Timed events sort ascending by start time.
+- Events with same start time sort by calendar name, then title.
+- Event starting within 30 minutes has `.calendian-event-soon` class.
+- Currently ongoing event has `.calendian-event-now` class.
+- Past event has `.calendian-event-past` class (or is hidden per settings).
+- Multi-day event appears on selected day if selected date intersects [start, end).
+- Recurring event displays recurrence summary (e.g., "Weekly on Monday").
+- Event with location/URL/notes shows those fields in expanded detail (v0.2).
+- No Calendar.app data is modified by the read operation.
 
 ### TS-004 — Reminder read display
 
