@@ -26,7 +26,7 @@ This document records the actual repository state. It intentionally separates im
 | Month cell event dots | Implemented | Calendar-colored dots on month cells showing event presence per calendar. Hollow reminder dot. Multi-day event span support. Uses in-memory cache only (no helper calls). Respects source filters. Dynamic CSS injection for per-calendar colors. |
 | Refresh / sync | Implemented | Timer-driven refresh (configurable interval, default 5min). Manual refresh button. Window focus refresh (REQ-SYNC-004). `_refreshRunning` concurrency guard. EKEventStoreChanged notification watch (REQ-SYNC-005). Post-write refresh (REQ-SYNC-006). Watch fallback to timer (REQ-SYNC-007). See SPEC.md §7.6.1. |
 | Right-click actions | Planned | Current day/week context menu is inherited from calendar note behavior; Calendian event/reminder actions are not complete. |
-| Write operations | **Implemented (v0.3)** | Event/reminder creation via `EventCreateModal`/`ReminderCreateModal`. NL quick-create with English + Chinese regex + optional AI backend. QuickEventModal dual-path (Event/Reminder). Post-write refresh. Write error handling. Default calendar/list. Edit/delete planned for v0.4. |
+| Write operations | **Implemented (v0.4)** | Event/reminder creation, edit, and delete. Edit/delete for simple non-recurring events and all reminders. Completion toggle for reminders. Recurring event mutations blocked with Calendar.app redirect. `ConfirmActionModal` for destructive operations. Mutation safety guards (`canMutateEvent`, `canMutateReminder`). Post-write refresh. Write error handling. Default calendar/list. NL quick-create with English + Chinese regex + optional AI backend. |
 | Note association | Planned | Existing daily/weekly note integration comes from the base calendar plugin behavior; Calendian event/reminder frontmatter association is not complete. |
 | Tasks integration | Planned | Current task dots for daily notes exist from base plugin behavior; macOS Reminders sync with Obsidian Tasks is not implemented. |
 | Timeline / week / statistics views | Planned | Not current behavior. |
@@ -38,7 +38,7 @@ This document records the actual repository state. It intentionally separates im
 
 ## Current release label
 
-Current repository state: **v0.3 safe create — complete**. All v0.3 requirements implemented. 8/8 acceptance gates passed. 11/11 deferred v0.2 items resolved. Code split via `cat` concatenation (REQ-ARCH-001). Only recurring safety UX and subtask display deferred to v0.4 / blocked by Apple API.
+Current repository state: **v0.4 safe edit/delete — complete**. All v0.4 requirements implemented. Event/reminder edit, delete, and completion toggle working. Recurring event mutations blocked with Calendar.app redirect. Code split via `cat` concatenation (REQ-ARCH-001). Subtask display blocked by Apple API (REQ-REM-009).
 
 ## README policy
 
@@ -63,6 +63,10 @@ README may list the following as current behavior:
 - month cell event dots (calendar-colored, hollow reminder dot, multi-day span);
 - diagnostic export with consent modal and field redaction;
 - event/reminder creation with validation and post-write refresh;
+- event/reminder editing with pre-filled forms and post-write refresh;
+- event/reminder deletion with confirmation dialog and post-write refresh;
+- reminder completion toggle via clickable checkbox;
+- recurring event edit/delete blocked with redirect to Calendar.app;
 - natural language quick-create (English + Chinese regex parser);
 - optional AI-powered NL parsing via configurable API (Enter-triggered, privacy-controlled).
 
@@ -83,13 +87,19 @@ Everything else must be marked as planned, experimental, or future.
 
 > Updated by AI after every meaningful step. Next session reads this to continue without re-explaining context.
 
-- **Doing:** v0.3 完成 —— 最终文档审计 + commit + push。
+- **Doing:** v0.4 safe edit/delete — code complete, docs update in progress.
 - **Decisions:**
-  - 同前，已记录。
-- **v0.3 final state:**
-  - 8/8 acceptance gates passed.
-  - 11/11 deferred v0.2 items resolved.
-  - REQ-ARCH-001 code split done (`cat` concatenation).
-  - only REQ-REC-002/003/007 deferred to v0.4, REQ-REM-009 blocked by Apple API.
-- **Next:** v0.4 edit/delete.
-- **Last action:** 2026-06-08 — 最终文档审计完成。所有文档版本状态、deliverables、requirement status 已对齐。
+  - writer.js `module.exports` code guarded with `typeof module !== 'undefined'` check — Node.js-only code skipped in Obsidian concatenation.
+  - writer.js added to `build-main.sh` concatenation order (was documented but not actually included).
+  - No-date reminder loop wrapped in IIFE to fix `var` closure issue.
+  - `ConfirmActionModal` reused for both event and reminder delete confirmations (instead of separate dialogs).
+  - `RecurringBlockModal` uses `x-apple-calevent:` URL scheme for Calendar.app redirect with file:// fallback.
+- **v0.4 changes:**
+  - Helper binary: `edit-event`, `delete-event`, `edit-reminder`, `delete-reminder` commands added.
+  - Writer module: `canMutateEvent`, `canMutateReminder`, `editEvent`, `deleteEvent`, `confirmDeleteEvent`, `toggleReminder`, `editReminder`, `deleteReminder`, `confirmDeleteReminder` prototype methods.
+  - UI modals: `EventEditModal`, `ReminderEditModal`, `RecurringBlockModal`, `ConfirmActionModal`.
+  - Event detail panel: Edit/Delete action buttons (guard checks isDisplayOnly, isRecurring).
+  - Reminder rendering: clickable ○ checkbox for completion toggle, hover-visible Edit/Delete buttons.
+  - CSS: `.calendian-detail-actions`, `.calendian-action-danger`, `.calendian-reminder-checkbox`, `.calendian-item-actions`.
+- **Next:** v0.5 note association.
+- **Last action:** 2026-06-08 — v0.4 code complete, docs update in progress.

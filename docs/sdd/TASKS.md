@@ -186,7 +186,7 @@ Tasks are ordered by dependency and release target. Every task references requir
 ### TASK-024 — Recurring event safety UX (REQ-REC-002/003/007)
 
 - Requirements: `REQ-REC-002`, `REQ-REC-003`, `REQ-REC-007`
-- Status: Todo
+- Status: Done
 - Priority: P0
 - Deliverables:
   - Detect recurring events on edit/delete entry points and block the operation with a clear message.
@@ -197,6 +197,7 @@ Tasks are ordered by dependency and release target. Every task references requir
   - Edit/delete entry points check `isRecurring` flag → if true, show safe block dialog with reason.
   - User can click "Open in Calendar.app" to handle the event natively.
   - Limitation documented in README Planned / Known limitations section.
+- Evidence: `RecurringBlockModal` class in main-head.js explains why recurring mutation is blocked. `canMutateEvent()` guard returns `{ safe: false, canOpenCalendar: true }` for recurring events. Edit/delete buttons in event detail panel call guard before opening modal or proceeding. Helper binary `edit-event`/`delete-event` also reject recurring events at data layer.
 
 ### TASK-025 — Subtask display (REQ-REM-009)
 
@@ -259,20 +260,23 @@ Tasks are ordered by dependency and release target. Every task references requir
 ### TASK-030 — Recurring event safety model
 
 - Requirements: `REQ-REC-001` to `REQ-REC-008`
-- Status: Todo
+- Status: Done
 - Priority: P0
+- Evidence: `canMutateEvent()` in writer.js guards all event mutation paths. Helper binary `edit-event`/`delete-event` reject `hasRecurrenceRules` at data layer. `RecurringBlockModal` provides user-facing explanation and Calendar.app redirect. REQ-REC-004/005/006/008 (scope selection) deferred to future version.
 
 ### TASK-031 — Event edit/delete
 
 - Requirements: `REQ-WRITE-011` to `REQ-WRITE-015`
-- Status: Todo
+- Status: Done
 - Priority: P0
+- Evidence: `edit-event`/`delete-event` commands in helper binary. `editEvent()`/`deleteEvent()`/`confirmDeleteEvent()` prototype methods in writer.js. `EventEditModal` class pre-fills all event fields. Edit/Delete buttons in expanded event detail panel. Post-edit/delete refresh via `init(true)`.
 
 ### TASK-032 — Reminder edit/delete/complete
 
 - Requirements: `REQ-WRITE-016` to `REQ-WRITE-020`
-- Status: Todo
+- Status: Done
 - Priority: P0
+- Evidence: `edit-reminder`/`delete-reminder` commands in helper binary. `toggleReminder()` wires existing helper command to UI. `editReminder()`/`deleteReminder()`/`confirmDeleteReminder()` prototype methods in writer.js. `ReminderEditModal` pre-fills all reminder fields. Clickable ○ checkbox for completion toggle. Hover-visible Edit/Delete buttons on reminder items.
 
 ## v0.5 — Note association and Tasks integration
 

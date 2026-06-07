@@ -27,7 +27,7 @@ All code in `main.js` (concatenated from `main-head.js` + `src/*.js` modules). T
 | main-head.js | `MacOSIntegration` (skeleton) | Constructor, state init, constants |
 | src/macos/helper-executor.js | `MacOSIntegration` (prototype) | Spawns native Swift helper (`execHelper`), caches events/reminders, renders sidebar panel. Contains legacy `execJXA`/`parseEvents` — not used by primary data paths. |
 | src/cache/schedule-cache.js | `MacOSIntegration` (prototype) | Cache save/load, preload, date queries |
-| src/macos/writer.js | `MacOSIntegration` (prototype) | Event/reminder create via helper |
+| src/macos/writer.js | `MacOSIntegration` (prototype) | Event/reminder create, edit, delete via helper. Mutation safety guards (`canMutateEvent`, `canMutateReminder`). Completion toggle. Node.js-only code guarded with `typeof module` check. |
 | main-head.js (end) | `CalendarView` | Obsidian `ItemView`. Bridges Svelte calendar to `MacOSIntegration`. Owns cache read/write helpers. |
 | main-head.js (end) | `CalendarPlugin` | Lifecycle, settings, discovers helper binary path, view registration. |
 
@@ -43,14 +43,14 @@ Data flow: `calendian-helper` (EventKit) → JSON stdout → `execHelper()` → 
 - **Source filter toggle** — calls `render()` only (in-memory filter, no helper call)
 - **Deferred to v0.3**: Window focus refresh (`window.onfocus` → `init()`)
 - **Deferred to v0.3**: `calendian-helper watch` — subscribes `EKEventStoreChangedNotification`, writes signal file on change, JS polls signal → calls `init()`
-- **Planned v0.3**: Post-write refresh — after create/edit/delete → `init()` immediately
+- **Implemented (v0.3+)**: Post-write refresh — after create/edit/delete → `init(true)` immediately
 
 See SPEC.md §7.6.1 and ARCHITECTURE.md §3 for full refresh architecture.
 
 ## What NOT to do
 
 - **Do not introduce npm or external package dependencies.** The project is plain JS with zero `node_modules`.
-- **Do not implement write operations** (create/edit/delete events or reminders) beyond what v0.3 already supports (safe create). REQ-ARCH-001 gates further writes behind safety requirements.
+- **Do not implement write operations** (create/edit/delete events or reminders) beyond what v0.4 already supports (safe create, edit, delete for simple non-recurring events and reminders). Recurring event mutation is blocked — scope selection is deferred.
 - **Do not change code without updating docs.** See SDD workflow below — this is the #1 cause of project drift.
 - **Do not remove legacy JXA code** (`execJXA`, `parseEvents`, `parseReminders`). It's unused but kept as fallback reference.
 - **Do not log event titles, notes, locations, or reminder text.** Use `console.log("[Calendian] ...")` prefix for all logging.
