@@ -96,7 +96,7 @@ The following features are currently implemented in the codebase. All macOS data
 - ✅ Configurable auto-refresh (default 5 minutes)
 - ✅ Manual refresh button (`↻`) in date header
 - ✅ Last refresh time + duration in panel footer
-- ✅ Anti-concurrent guard (`_jxaRunning`) prevents stacked queries
+- ✅ Anti-concurrent guard (`_refreshRunning`) prevents stacked queries
 - ✅ Timer cleanup on plugin unload
 
 #### Source filtering
@@ -121,8 +121,6 @@ The following features are currently implemented in the codebase. All macOS data
 - Event URL, notes, and attendees are parsed from the helper but not exposed in the event list UI (REQ-CAL-007)
 - Cache range miss triggers a "Go to Today" prompt rather than automatic background reload (REQ-CACHE-002)
 - Diagnostic panel exists as basic text in settings; full panel deferred to v0.2 (REQ-DIAG-001)
-- Refresh duration is logged but not in a dedicated diagnostics view (REQ-CACHE-008)
-- PLAT-001/002/003 — metadata alignment between manifest, README, and SPEC needs final verification
 - DOC-001/002/003 — documentation has been updated for v0.1 but may need post-review polish
 - No automated tests; all testing is manual (see `docs/sdd/TESTING.md`)
 - Performance targets (cache switch <100ms, init <3s) have not been benchmarked
@@ -169,7 +167,7 @@ Calendian will not send event titles, reminder text, attendees, notes, locations
 
 | Platform | Status | Notes |
 |---|---|---|
-| macOS desktop | Target | Uses `/usr/bin/osascript` and JXA. |
+| macOS desktop | Target | Uses native Swift EventKit helper (`calendian-helper`). |
 | Obsidian desktop | Target | Plugin runs inside Obsidian desktop. |
 | iOS / iPadOS | Rejected for current architecture | JXA and macOS automation unavailable. |
 | Windows / Linux | Deferred | Requires non-JXA architecture. |
@@ -423,7 +421,7 @@ Goal, habit, intention, nudge, and review data SHALL reside exclusively in Obsid
 |---|---|---|---|---|
 | REQ-PLAT-001 | THE SYSTEM SHALL run as an Obsidian desktop plugin. | P0 | v0.1 | Implemented |
 | REQ-PLAT-002 | THE SYSTEM SHALL clearly communicate macOS-only support for early releases. | P0 | v0.1 | Implemented |
-| REQ-PLAT-003 | THE SYSTEM SHALL keep manifest metadata consistent with documentation. | P0 | v0.1 | Partial |
+| REQ-PLAT-003 | THE SYSTEM SHALL keep manifest metadata consistent with documentation. | P0 | v0.1 | Implemented |
 | REQ-PLAT-004 | IF the platform is unsupported, THE SYSTEM SHALL show an unsupported-platform message instead of crashing. | P0 | v0.1 | Implemented |
 
 ### 7.2 Permission requirements
@@ -451,7 +449,7 @@ Goal, habit, intention, nudge, and review data SHALL reside exclusively in Obsid
 | REQ-CAL-009 | THE SYSTEM SHALL display multi-day events on every overlapping day. | P1 | v0.2 | Planned |
 | REQ-CAL-010 | THE SYSTEM SHALL visibly mark past events or hide them according to user settings. | P1 | v0.2 | Planned |
 | REQ-CAL-011 | THE SYSTEM SHALL treat recurring events as read-only until recurring mutation is specified. | P0 | v0.1 | Planned |
-| REQ-CAL-012 | THE SYSTEM SHOULD display source calendar colors where available. | P1 | v0.2 | Partial |
+| REQ-CAL-012 | THE SYSTEM SHOULD display source calendar colors where available. | P1 | v0.1 | Implemented |
 
 ### 7.4 Reminder read requirements
 
@@ -514,7 +512,7 @@ Goal, habit, intention, nudge, and review data SHALL reside exclusively in Obsid
 | REQ-CACHE-005 | THE SYSTEM SHALL clear refresh timers when the plugin unloads. | P0 | v0.1 | Implemented |
 | REQ-CACHE-006 | THE SYSTEM SHOULD provide manual refresh. | P1 | v0.1 | Implemented |
 | REQ-CACHE-007 | THE SYSTEM SHOULD display last refresh time. | P1 | v0.1 | Implemented |
-| REQ-CACHE-008 | THE SYSTEM SHOULD measure refresh duration for diagnostics. | P2 | v0.1 | Partial |
+| REQ-CACHE-008 | THE SYSTEM SHOULD measure refresh duration for diagnostics. | P2 | v0.1 | Implemented |
 | REQ-PERF-001 | Date switching from cache SHOULD complete in under 100ms for normal datasets. | P1 | v0.1 | Planned |
 | REQ-PERF-002 | Initial read SHOULD not block the Obsidian UI. | P0 | v0.1 | Implemented |
 | REQ-PERF-003 | Large calendars SHOULD degrade gracefully. | P1 | v0.2 | Planned |
@@ -818,8 +816,8 @@ All refresh paths go through `init()`, which has a `_refreshRunning` boolean gat
 
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
-| REQ-DATA-001 | THE SYSTEM SHALL assign each Calendar event a stable source identity where available from JXA. | P0 | v0.1 | Partial |
-| REQ-DATA-002 | THE SYSTEM SHALL assign each Reminder a stable source identity where available from JXA. | P0 | v0.1 | Partial |
+| REQ-DATA-001 | THE SYSTEM SHALL assign each Calendar event a stable source identity where available. | P0 | v0.1 | Implemented |
+| REQ-DATA-002 | THE SYSTEM SHALL assign each Reminder a stable source identity where available. | P0 | v0.1 | Implemented |
 | REQ-DATA-003 | IF stable identity is unavailable for a source item, THE SYSTEM SHALL mark that item as display-only and SHALL NOT permit write, delete, or note-association operations on it. | P0 | v0.2 | Planned |
 | REQ-DATA-004 | THE SYSTEM SHALL NOT use fallback display identity (derived from title/time/calendar) for write, delete, or note-association operations. | P0 | v0.3 | Planned |
 | REQ-DATA-005 | THE SYSTEM SHALL isolate parse failures to individual records so that one malformed item does not prevent display of valid items. | P0 | v0.1 | Implemented |

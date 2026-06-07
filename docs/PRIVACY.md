@@ -1,7 +1,7 @@
 # Calendian Privacy Model
 
 > Status: normative privacy document
-> Last updated: 2026-06-07
+> Last updated: 2026-06-08
 > Plugin ID: `calendian`
 
 Calendian is local-first by construction. This document defines exactly what data is read, stored, displayed, logged, and under what conditions data could leave the user's machine.
@@ -51,7 +51,9 @@ Calendian reads from Calendar.app and Reminders.app through a native Swift Event
 
 ### Obsidian plugin settings (`data.json`)
 
-Stored in `<vault>/.obsidian/plugins/calendian/data.json`:
+Stored in `<vault>/.obsidian/plugins/calendian/data.json`.
+
+**Current fields (v0.1):**
 
 ```json
 {
@@ -60,21 +62,16 @@ Stored in `<vault>/.obsidian/plugins/calendian/data.json`:
   "selectedCalendarIds": ["..."],
   "selectedReminderListIds": ["..."],
   "refreshIntervalMinutes": 5,
-  "cacheRangeMonthsPast": 1,
-  "cacheRangeMonthsFuture": 3,
-  "showPastEvents": "gray",
-  "reminderRange": "selected-day",
-  "showCompletedReminders": false,
-  "nudgeEnabled": true,
-  "nudgeTone": "gentle",
-  "nudgeMorningPrompt": true,
-  "nudgeEveningCheckin": false,
-  "nudgeReEngageAfterMissDays": 3,
-  "nudgeQuickStartMinutes": 5
+  "_eventsCache": { "events": [...], "colors": {...}, "cacheStart": "...", "cacheEnd": "...", "savedAt": "..." },
+  "_remindersCache": { "reminders": [...], "savedAt": "..." }
 }
 ```
 
-No event titles, reminder text, attendee names, locations, URLs, or notes are persisted to `data.json`.
+The disk cache (`_eventsCache`, `_remindersCache`) stores event/reminder fields (title, time, calendar name, location, notes, etc.) for fast cold-start — see §1 for the full field list. This cache is stored inside the vault and never leaves the device.
+
+**Planned fields (v0.2+):** `cacheRangeMonthsPast`, `cacheRangeMonthsFuture`, `showPastEvents`, `reminderRange`, `showCompletedReminders`, and self-direction fields (nudge config, etc.) will be added as the corresponding features ship. See [`SETTINGS_SCHEMA.md`](./SETTINGS_SCHEMA.md) for the full target schema.
+
+Event titles, locations, URLs, notes, and calendar/list names are stored in the disk cache inside `data.json` for cold-start performance. This data stays inside the Obsidian vault and is never sent to external services. See §1 for the full per-field storage matrix.
 
 ### Note frontmatter
 
@@ -120,7 +117,7 @@ This is a hard boundary enforced by design: Calendian's architecture has no netw
 
 ### Default behavior
 
-Diagnostic information available in the diagnostic panel (v0.2) is **redacted by default**:
+Diagnostic information available in the diagnostic panel is **redacted by default**:
 
 **Always safe to show:**
 - Platform supported (yes/no)

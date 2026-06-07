@@ -62,7 +62,7 @@ Everything else must be marked as planned, experimental, or future.
 3. ~~Mark multi-file structure in documentation as target architecture until code is actually split.~~ ✅ Architecture includes native helper module.
 4. ~~Move unimplemented README feature claims into Planned Features.~~ ✅ Done.
 5. ~~Add stable event/reminder IDs before any write, delete, or note-association feature is considered release-ready.~~ ✅ EventKit provides stable UUIDs.
-6. ~~Rename plugin folder from `calendar-macos-sync` to `calendian` or update all path references to match actual folder name.~~ ✅ Done (2026-06-08). VIEW_TYPE_CALENDAR and helper path updated in main.js.
+6. ~~Rename plugin folder from `calendar-macos-sync` to `calendian`~~ ✅ Done (2026-06-08). Folder renamed, VIEW_TYPE_CALENDAR and helper path updated in main.js.
 7. ~~Update ARCHITECTURE.md to document the native Swift EventKit helper module.~~ ✅ Done (2026-06-08).
 8. Split `main.js` into multiple `.js` modules per target architecture (REQ-ARCH-001, target v0.3).
 
@@ -70,8 +70,6 @@ Everything else must be marked as planned, experimental, or future.
 
 > Updated by AI after every meaningful step. Next session reads this to continue without re-explaining context.
 
-- **Doing:** v0.1 cleanup — folder rename, TASK-001/TASK-008 review. Next: rename physical folder with user confirmation.
-- **Done this session:** Updated VIEW_TYPE_CALENDAR and helper path from "calendar-macos-sync" to "calendian" in main.js. Replaced placeholder diagnostic info with real REQ-DIAG-001 diagnostic panel (permissions, source counts, cache stats, errors, refresh timing). Updated docs.
-- **Decisions:** Used `require("os")` inline in settings tab to avoid scoping issue with `nodeOS` const declared later in file. Diagnostic panel is read-only display (no export — REQ-DIAG-002 deferred to v0.2).
-- **Files changed:** main.js, docs/sdd/CURRENT_STATUS.md, docs/sdd/TASKS.md, CLAUDE.md
-- **Last action:** 2026-06-08 — v0.1 cleanup code and doc changes, pending physical folder rename.
+- **Doing:** N/A (v0.1 doc audit complete).
+- **Done this session:** Full v0.1 audit: code vs SPEC vs docs vs README. Fixed 6 classes of discrepancies — fake build steps in README, stale v0.2 claims in WORKFLOWS.md, `_jxaRunning`→`_refreshRunning` in SPEC.md, outdated JXA platform description, inflated fields in PRIVACY.md, and 5 stale requirement statuses (PLAT-003, CAL-012, DATA-001, DATA-002, CACHE-008 → Implemented).
+- **Last action:** 2026-06-08 — doc audit complete. All v0.1 tasks Done, all docs honest.

@@ -149,11 +149,11 @@
 4. **Verify It Works**
    - You should now see events/reminders in the panel
 
-### Future Improvements (Planned)
+### Current Recovery Features
 
-- In-app permission status indicator (v0.2)
-- Direct link to System Settings from error message (v0.2)
-- Better error state UI (v0.2)
+- Permission status banners with actionable guidance
+- Retry buttons that refresh after permission changes
+- Error/denied/timeout states with recovery UI
 
 ---
 
@@ -196,13 +196,13 @@
    - Reminders panel shows incomplete reminders due today
    - Each reminder shows title and list source
 
-2. **View Overdue Reminders** (Basic)
+2. **View Overdue Reminders**
    - Reminders past their due date appear in the panel
-   - No visual distinction yet (styling planned for v0.2)
+   - Overdue visual distinction planned for v0.2
 
 3. **No-Date Reminders**
    - Reminders without due dates show on today's panel
-   - Future versions will have a dedicated section (v0.2)
+   - Dedicated section planned for v0.2
 
 ### Limitations
 
@@ -226,11 +226,10 @@ For now, use Reminders.app to create/edit reminders, and use Calendian to view t
 - Calendian auto-refreshes every 5 minutes (configurable in settings)
 - No action required; data updates automatically
 
-### Manual Refresh (Not Yet Available)
+### Manual Refresh
 
-- Planned for v0.2
-- Will add a refresh button in the events panel header
-- Will also show last refresh time
+- Click the `↻` button in the date header to refresh immediately
+- Last refresh time and duration are displayed in the panel footer
 
 ### Settings
 

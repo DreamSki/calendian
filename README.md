@@ -92,18 +92,19 @@ v0.1 is read-only. It does **not** include:
 - Obsidian desktop ≥ 0.15.0.
 - Calendar.app configured if you want events.
 - Reminders.app configured if you want reminders.
-- Node.js and npm (for building from source).
+- Swift compiler (`swiftc`) for building the native EventKit helper.
 
 ### Build from source
 
 ```bash
 git clone https://github.com/DreamSki/calendian.git
 cd calendian
-npm install
-npm run build
+
+# Compile the native EventKit helper (required — plugin produces no data without it)
+swiftc helper/Sources/main.swift -o calendian-helper
 ```
 
-The build produces `main.js` and `styles.css` in the plugin root.
+The plugin is plain JavaScript loaded directly by Obsidian. No npm, no bundler. The only build step is compiling the Swift helper binary.
 
 ### Manual installation
 
@@ -123,20 +124,21 @@ The build produces `main.js` and `styles.css` in the plugin root.
 
 ### First-time setup
 
-When the calendar view first tries to access system data, macOS may ask for automation permission:
+When the calendar view first tries to access system data, macOS requests Calendar and/or Reminders access through the standard EventKit permission prompt:
 
-- `Obsidian wants to control Calendar.app`
-- `Obsidian wants to control Reminders.app`
+- `"Obsidian" Would Like to Access Your Calendar`
+- `"Obsidian" Would Like to Access Your Reminders`
 
 Click **Allow** if you want Calendian to read those sources.
 
 If permission is denied accidentally, go to:
 
 ```text
-System Settings → Privacy & Security → Automation
+System Settings → Privacy & Security → Calendars
+System Settings → Privacy & Security → Reminders
 ```
 
-Then re-enable Obsidian's access to Calendar and/or Reminders.
+Then re-enable Obsidian's access.
 
 ---
 
@@ -173,19 +175,6 @@ Calendian uses SDD so that implementation stays aligned with requirements and re
 | [`docs/sdd/TRACEABILITY.md`](./docs/sdd/TRACEABILITY.md) | Mapping from goals to requirements, tasks, tests, and releases. |
 | [`docs/sdd/TASKS.md`](./docs/sdd/TASKS.md) | Requirement-driven implementation backlog. |
 | [`docs/sdd/RISKS.md`](./docs/sdd/RISKS.md) | Risk register and mitigations. |
-
----
-
-## Requirements
-
-Current intended target:
-
-- macOS desktop.
-- Obsidian desktop.
-- Calendar.app configured if Calendar events are desired.
-- Reminders.app configured if reminders are desired.
-
-The exact minimum Obsidian version must be aligned between `manifest.json`, `SPEC.md`, and release notes before public release.
 
 ---
 
