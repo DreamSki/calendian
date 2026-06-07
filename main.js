@@ -1547,6 +1547,357 @@ async function tryToCreateDailyNote(date, inNewSplit, settings, cb) {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════
+// v0.3 Event & Reminder creation modals (REQ-WRITE-001..010)
+// ═══════════════════════════════════════════════════════════════
+
+class EventCreateModal extends obsidian.Modal {
+    constructor(app, macosIntegration) {
+        super(app);
+        this.integ = macosIntegration;
+    }
+
+    onOpen() {
+        var self = this;
+        var integ = this.integ;
+        var selDate = integ.selectedDate ? integ.selectedDate.clone() : window.moment();
+
+        this.titleEl.setText("Create Event");
+
+        // ── Title ──────────────────────────────────────────
+        var titleSetting = new obsidian.Setting(this.contentEl)
+            .setName("Title")
+            .setDesc("Event name (required)");
+        var titleInput;
+        titleSetting.addText(function(cmp) {
+            titleInput = cmp.inputEl;
+            cmp.setPlaceholder("e.g. Meeting with team");
+        });
+
+        // ── All-day toggle ────────────────────────────────
+        var allDayToggle;
+        new obsidian.Setting(this.contentEl)
+            .setName("All-day event")
+            .addToggle(function(cmp) {
+                allDayToggle = cmp;
+            });
+
+        // ── Start date ────────────────────────────────────
+        var startDateInput;
+        new obsidian.Setting(this.contentEl)
+            .setName("Start date")
+            .setDesc("YYYY-MM-DD")
+            .addText(function(cmp) {
+                startDateInput = cmp.inputEl;
+                cmp.setValue(selDate.format("YYYY-MM-DD"));
+            });
+
+        // ── Start time ────────────────────────────────────
+        var startTimeInput;
+        new obsidian.Setting(this.contentEl)
+            .setName("Start time")
+            .setDesc("HH:MM (ignored if all-day)")
+            .addText(function(cmp) {
+                startTimeInput = cmp.inputEl;
+                cmp.setPlaceholder("e.g. 14:00");
+            });
+
+        // ── End date ──────────────────────────────────────
+        var endDateInput;
+        new obsidian.Setting(this.contentEl)
+            .setName("End date")
+            .setDesc("YYYY-MM-DD")
+            .addText(function(cmp) {
+                endDateInput = cmp.inputEl;
+                cmp.setValue(selDate.format("YYYY-MM-DD"));
+            });
+
+        // ── End time ──────────────────────────────────────
+        var endTimeInput;
+        new obsidian.Setting(this.contentEl)
+            .setName("End time")
+            .setDesc("HH:MM (ignored if all-day)")
+            .addText(function(cmp) {
+                endTimeInput = cmp.inputEl;
+                cmp.setPlaceholder("e.g. 15:00");
+            });
+
+        // ── Calendar ──────────────────────────────────────
+        var calendarSelect;
+        var calendarSetting = new obsidian.Setting(this.contentEl)
+            .setName("Calendar")
+            .setDesc("Loading calendars...");
+        var calendarsPromise = integ.discoverCalendars().then(function(cals) {
+            calendarSetting.setDesc("Choose a calendar");
+            calendarSetting.addDropdown(function(cmp) {
+                calendarSelect = cmp;
+                for (var i = 0; i < cals.length; i++) {
+                    cmp.addOption(cals[i].id, cals[i].name);
+                }
+            });
+        });
+
+        // ── Location (optional) ───────────────────────────
+        var locationInput;
+        new obsidian.Setting(this.contentEl)
+            .setName("Location")
+            .addText(function(cmp) {
+                locationInput = cmp.inputEl;
+                cmp.setPlaceholder("Optional");
+            });
+
+        // ── URL (optional) ────────────────────────────────
+        var urlInput;
+        new obsidian.Setting(this.contentEl)
+            .setName("URL")
+            .addText(function(cmp) {
+                urlInput = cmp.inputEl;
+                cmp.setPlaceholder("Optional");
+            });
+
+        // ── Notes (optional) ──────────────────────────────
+        var notesInput;
+        new obsidian.Setting(this.contentEl)
+            .setName("Notes")
+            .addTextArea(function(cmp) {
+                notesInput = cmp.inputEl;
+                cmp.setPlaceholder("Optional");
+            });
+
+        // ── Buttons ───────────────────────────────────────
+        var errorEl = this.contentEl.createDiv("calendian-form-error");
+        errorEl.style.display = "none";
+
+        new obsidian.Setting(this.contentEl)
+            .addButton(function(btn) {
+                btn.setButtonText("Create")
+                    .setCta()
+                    .onClick(async function() {
+                        var title = (titleInput.value || "").trim();
+                        var startDateStr = (startDateInput.value || "").trim();
+                        var endDateStr = (endDateInput.value || "").trim();
+                        var startTimeStr = (startTimeInput.value || "").trim();
+                        var endTimeStr = (endTimeInput.value || "").trim();
+                        var isAllDay = allDayToggle.getValue();
+                        var calendarId = calendarSelect ? calendarSelect.getValue() : "";
+                        var location = (locationInput.value || "").trim();
+                        var url = (urlInput.value || "").trim();
+                        var notes = (notesInput.value || "").trim();
+
+                        // Validate
+                        if (!title) {
+                            errorEl.textContent = "Title is required.";
+                            errorEl.style.display = "block";
+                            return;
+                        }
+                        if (!calendarId) {
+                            errorEl.textContent = "Please select a calendar.";
+                            errorEl.style.display = "block";
+                            return;
+                        }
+
+                        // Build ISO dates
+                        var startMoment = window.moment(startDateStr + (startTimeStr ? " " + startTimeStr : ""), "YYYY-MM-DD HH:mm");
+                        var endMoment = window.moment(endDateStr + (endTimeStr ? " " + endTimeStr : ""), "YYYY-MM-DD HH:mm");
+
+                        if (!startMoment.isValid()) {
+                            errorEl.textContent = "Invalid start date/time.";
+                            errorEl.style.display = "block";
+                            return;
+                        }
+                        if (!endMoment.isValid()) {
+                            errorEl.textContent = "Invalid end date/time.";
+                            errorEl.style.display = "block";
+                            return;
+                        }
+                        var startISO = startMoment.toISOString();
+                        var endISO = endMoment.toISOString();
+
+                        var args = ["create-event", title, startISO, endISO, calendarId, isAllDay ? "true" : "false"];
+                        if (location) args.push(location);
+                        if (notes) args.push(notes);
+                        if (url) args.push(url);
+
+                        try {
+                            var result = await integ.execHelper(args);
+                            if (result && result.ok) {
+                                new obsidian.Notice("Event created: " + title);
+                                console.log("[Calendian] Created event: " + title + " (id=" + result.id + ")");
+                                integ.init(true);
+                                self.close();
+                            } else {
+                                errorEl.textContent = "Failed to create event.";
+                                errorEl.style.display = "block";
+                            }
+                        } catch (err) {
+                            console.error("[Calendian] Event creation failed:", err);
+                            errorEl.textContent = "Error: " + ((err.stderr || err.error?.message || err.message || "Unknown error"));
+                            errorEl.style.display = "block";
+                        }
+                    });
+            })
+            .addButton(function(btn) {
+                btn.setButtonText("Cancel")
+                    .onClick(function() { self.close(); });
+            });
+    }
+}
+
+// ── Reminder Create Modal ──────────────────────────────────
+
+class ReminderCreateModal extends obsidian.Modal {
+    constructor(app, macosIntegration) {
+        super(app);
+        this.integ = macosIntegration;
+    }
+
+    onOpen() {
+        var self = this;
+        var integ = this.integ;
+        var selDate = integ.selectedDate ? integ.selectedDate.clone() : window.moment();
+
+        this.titleEl.setText("Create Reminder");
+
+        // ── Title ──────────────────────────────────────────
+        var titleInput;
+        new obsidian.Setting(this.contentEl)
+            .setName("Title")
+            .setDesc("Reminder text (required)")
+            .addText(function(cmp) {
+                titleInput = cmp.inputEl;
+                cmp.setPlaceholder("e.g. Buy groceries");
+            });
+
+        // ── List ───────────────────────────────────────────
+        var listSelect;
+        var listSetting = new obsidian.Setting(this.contentEl)
+            .setName("List")
+            .setDesc("Loading lists...");
+        var listsPromise = integ.discoverReminderLists().then(function(lists) {
+            listSetting.setDesc("Choose a reminder list");
+            listSetting.addDropdown(function(cmp) {
+                listSelect = cmp;
+                for (var i = 0; i < lists.length; i++) {
+                    cmp.addOption(lists[i].id, lists[i].name);
+                }
+            });
+        });
+
+        // ── Due date ──────────────────────────────────────
+        var dueDateInput;
+        new obsidian.Setting(this.contentEl)
+            .setName("Due date")
+            .setDesc("YYYY-MM-DD (optional — defaults to none)")
+            .addText(function(cmp) {
+                dueDateInput = cmp.inputEl;
+                cmp.setPlaceholder("e.g. " + selDate.format("YYYY-MM-DD"));
+            });
+
+        // ── Due time ──────────────────────────────────────
+        var dueTimeInput;
+        new obsidian.Setting(this.contentEl)
+            .setName("Due time")
+            .setDesc("HH:MM (optional)")
+            .addText(function(cmp) {
+                dueTimeInput = cmp.inputEl;
+                cmp.setPlaceholder("e.g. 14:00");
+            });
+
+        // ── Priority ──────────────────────────────────────
+        var prioritySelect;
+        new obsidian.Setting(this.contentEl)
+            .setName("Priority")
+            .addDropdown(function(cmp) {
+                prioritySelect = cmp;
+                cmp.addOption("none", "None");
+                cmp.addOption("low", "Low");
+                cmp.addOption("medium", "Medium");
+                cmp.addOption("high", "High");
+                cmp.setValue("none");
+            });
+
+        // ── Notes ──────────────────────────────────────────
+        var notesInput;
+        new obsidian.Setting(this.contentEl)
+            .setName("Notes")
+            .addTextArea(function(cmp) {
+                notesInput = cmp.inputEl;
+                cmp.setPlaceholder("Optional");
+            });
+
+        // ── Buttons ───────────────────────────────────────
+        var errorEl = this.contentEl.createDiv("calendian-form-error");
+        errorEl.style.display = "none";
+
+        new obsidian.Setting(this.contentEl)
+            .addButton(function(btn) {
+                btn.setButtonText("Create")
+                    .setCta()
+                    .onClick(async function() {
+                        var title = (titleInput.value || "").trim();
+                        var listId = listSelect ? listSelect.getValue() : "";
+                        var dueDateStr = (dueDateInput.value || "").trim();
+                        var dueTimeStr = (dueTimeInput.value || "").trim();
+                        var priority = prioritySelect ? prioritySelect.getValue() : "none";
+                        var notes = (notesInput.value || "").trim();
+
+                        if (!title) {
+                            errorEl.textContent = "Title is required.";
+                            errorEl.style.display = "block";
+                            return;
+                        }
+                        if (!listId) {
+                            errorEl.textContent = "Please select a reminder list.";
+                            errorEl.style.display = "block";
+                            return;
+                        }
+
+                        // Build args for create-reminder
+                        var args = ["create-reminder", title, listId];
+
+                        // Add due date if provided and valid
+                        if (dueDateStr) {
+                            var dueMoment = window.moment(dueDateStr, "YYYY-MM-DD");
+                            if (dueMoment.isValid()) {
+                                args.push(dueMoment.toISOString());
+                            } else {
+                                errorEl.textContent = "Invalid due date format. Use YYYY-MM-DD.";
+                                errorEl.style.display = "block";
+                                return;
+                            }
+                        } else {
+                            args.push("");  // no due date
+                        }
+
+                        if (dueTimeStr) args.push(dueTimeStr);
+                        if (priority) args.push(priority);
+                        if (notes) args.push(notes);
+
+                        try {
+                            var result = await integ.execHelper(args);
+                            if (result && result.ok) {
+                                new obsidian.Notice("Reminder created: " + title);
+                                console.log("[Calendian] Created reminder: " + title + " (id=" + result.id + ")");
+                                integ.init(true);
+                                self.close();
+                            } else {
+                                errorEl.textContent = "Failed to create reminder.";
+                                errorEl.style.display = "block";
+                            }
+                        } catch (err) {
+                            console.error("[Calendian] Reminder creation failed:", err);
+                            errorEl.textContent = "Error: " + ((err.stderr || err.error?.message || err.message || "Unknown error"));
+                            errorEl.style.display = "block";
+                        }
+                    });
+            })
+            .addButton(function(btn) {
+                btn.setButtonText("Cancel")
+                    .onClick(function() { self.close(); });
+            });
+    }
+}
+
 /**
  * Create a Weekly Note for a given date.
  */
@@ -5593,6 +5944,26 @@ class MacOSIntegration {
         refreshBtn.textContent = "↻";
         refreshBtn.setAttribute("title", "Refresh calendar data");
         refreshBtn.addEventListener("click", () => { this.init(true); });
+
+        // v0.3: Create buttons (REQ-WRITE-001, REQ-WRITE-006)
+        if (showCal && calPerm === 'granted') {
+            const addEventBtn = headerRow.createDiv("macos-refresh-btn");
+            addEventBtn.textContent = "+Event";
+            addEventBtn.setAttribute("title", "Create event on " + this.selectedDate.format("YYYY-MM-DD"));
+            addEventBtn.style.marginLeft = "4px";
+            addEventBtn.addEventListener("click", () => {
+                new EventCreateModal(this.plugin.app, this).open();
+            });
+        }
+        if (showRem && remPerm === 'granted') {
+            const addRemBtn = headerRow.createDiv("macos-refresh-btn");
+            addRemBtn.textContent = "+Remind";
+            addRemBtn.setAttribute("title", "Create reminder");
+            addRemBtn.style.marginLeft = "4px";
+            addRemBtn.addEventListener("click", () => {
+                new ReminderCreateModal(this.plugin.app, this).open();
+            });
+        }
 
         // REQ-PERM-003: Partial permission banner
         if (showCal && calPerm === 'denied') {

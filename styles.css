@@ -539,3 +539,18 @@
 .calendian-reminder-dot.hollow {
     stroke: var(--text-muted) !important;
 }
+
+/* v0.3: Form error messages in create modals */
+.calendian-form-error {
+    color: var(--text-error);
+    background: var(--background-modifier-error);
+    padding: 8px 12px;
+    border-radius: 4px;
+    margin: 8px 0;
+    font-size: 0.9em;
+}
+
+/* v0.3: Create buttons in header row — match refresh button style */
+.macos-refresh-btn + .macos-refresh-btn {
+    margin-left: 6px;
+}
