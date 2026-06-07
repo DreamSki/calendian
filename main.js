@@ -1850,17 +1850,17 @@ function parseNaturalLanguage(text, refDate) {
         }
     }
 
-    // Chinese: "X月Y日" or "X月Y号" (REQ-NL-005)
+    // Chinese: "X月Y日" or "X月Y号" — supports both digits and Chinese numerals (REQ-NL-005)
     if (!date) {
-        var cnMDRe = /(\d{1,2})\s*月\s*(\d{1,2})\s*(?:日|号)/;
+        // Match: "6月15日", "12月25号", "六月十五日", "六月中" (mid-month)
+        var cnMDRe = /(?:(\d{1,2})|(一|二|三|四|五|六|七|八|九|十|十一|十二|冬|腊))\s*月\s*(?:(\d{1,2})|(一|二|三|四|五|六|七|八|九|十|二十|二十一|二十二|二十三|二十四|二十五|二十六|二十七|二十八|二十九|三十|三十一|廿一|廿二|廿三|廿四|廿五|廿六|廿七|廿八|廿九|三十|三十一|初一|初二|初三|初四|初五|初六|初七|初八|初九|初十|十一|十二|十三|十四|十五|十六|十七|十八|十九|二十|廿|廿一|廿二|廿三|廿四|廿五|廿六|廿七|廿八|廿九|三十))?\s*(?:日|号)?/;
         var cnMDMatch = working.match(cnMDRe);
         if (cnMDMatch) {
-            var cnMonth = parseInt(cnMDMatch[1], 10);
-            var cnDay = parseInt(cnMDMatch[2], 10);
+            var cnMonth = cnMDMatch[1] ? parseInt(cnMDMatch[1], 10) : mapCnNumber(cnMDMatch[2]);
+            var cnDay = cnMDMatch[3] ? parseInt(cnMDMatch[3], 10) : (cnMDMatch[4] ? mapCnNumber(cnMDMatch[4]) : 1);
             if (cnMonth >= 1 && cnMonth <= 12 && cnDay >= 1 && cnDay <= 31) {
                 var now = refDate.clone();
                 date = window.moment([now.year(), cnMonth - 1, cnDay]);
-                // If the date is before today, assume next year
                 if (date.isBefore(refDate, 'day')) {
                     date.add(1, 'years');
                 }
@@ -1870,6 +1870,46 @@ function parseNaturalLanguage(text, refDate) {
                 } else {
                     date = null;
                 }
+            }
+        }
+    }
+
+    // Chinese: bare "X号" or "X日" — day of current month
+    if (!date) {
+        var cnDayOnlyRe = /(?:(\d{1,2})|(一|二|三|四|五|六|七|八|九|十|二十|二十一|二十二|二十三|二十四|二十五|二十六|二十七|二十八|二十九|三十|三十一))\s*(?:号|日)\b/;
+        var cnDayMatch = working.match(cnDayOnlyRe);
+        if (cnDayMatch) {
+            var cnDay2 = cnDayMatch[1] ? parseInt(cnDayMatch[1], 10) : mapCnNumber(cnDayMatch[2]);
+            if (cnDay2 >= 1 && cnDay2 <= 31) {
+                date = window.moment([refDate.year(), refDate.month(), cnDay2]);
+                if (date.isBefore(refDate, 'day')) {
+                    date.add(1, 'months');
+                }
+                if (date.isValid()) {
+                    working = working.replace(cnDayMatch[0], ' ');
+                    confidenceScore += 3;
+                } else {
+                    date = null;
+                }
+            }
+        }
+    }
+
+    // YYMMDD compact: "260608" → 2026-06-08
+    if (!date) {
+        var yymmddRe = /\b(\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\b/;
+        var yymmddMatch = working.match(yymmddRe);
+        if (yymmddMatch) {
+            var yy = parseInt(yymmddMatch[1], 10);
+            var mm = parseInt(yymmddMatch[2], 10);
+            var dd = parseInt(yymmddMatch[3], 10);
+            // Treat 00-99 as 2000-2099
+            var fullYear = 2000 + yy;
+            var yymmddParsed = window.moment([fullYear, mm - 1, dd]);
+            if (yymmddParsed.isValid()) {
+                date = yymmddParsed;
+                working = working.replace(yymmddMatch[0], ' ');
+                confidenceScore += 4;
             }
         }
     }
@@ -1914,22 +1954,21 @@ function parseNaturalLanguage(text, refDate) {
         working = working.replace(ftMatch[0], ' ');
     }
 
-    // Chinese: "X点到Y点" (range detection)
+    // Chinese: "X点到Y点" (range detection, supports both digits and Chinese numerals)
     if (!time || !endTime) {
-        var cnRangeRe = /(凌晨|早上|上午|中午|下午|晚上|傍晚|夜里)?(\d{1,2})点(?:一刻|三刻|半)?(?:(\d{1,2})分?)?\s*(?:到|至|~|～|-)\s*(凌晨|早上|上午|中午|下午|晚上|傍晚|夜里)?(\d{1,2})点(?:一刻|三刻|半)?(?:(\d{1,2})分?)?/;
+        var cnRangeRe = /(凌晨|早上|上午|中午|下午|晚上|傍晚|夜里)?(?:(\d{1,2})|(一|二|三|四|五|六|七|八|九|十|十一|十二))点(?:一刻|三刻|半)?(?:(\d{1,2})分?)?\s*(?:到|至|~|～|-)\s*(凌晨|早上|上午|中午|下午|晚上|傍晚|夜里)?(?:(\d{1,2})|(一|二|三|四|五|六|七|八|九|十|十一|十二))点(?:一刻|三刻|半)?(?:(\d{1,2})分?)?/;
         var cnRangeMatch = working.match(cnRangeRe);
         if (cnRangeMatch) {
             var p1 = cnRangeMatch[1] || getChinesePeriodHint(working);
-            var cnT1 = parseInt(cnRangeMatch[2], 10);
-            var p2 = cnRangeMatch[4] || p1;
-            var cnT2 = parseInt(cnRangeMatch[5], 10);
-            time = cnHourTo24(cnT1, p1);
-            endTime = cnHourTo24(cnT2, p2);
-            if (endTime && time && parseInt(endTime.split(':')[0]) < parseInt(time.split(':')[0]) && p1 === p2) {
-                // e.g., "3点到5点" both in same period → fine
+            // hour1: either digit (group 2) or Chinese numeral (group 3)
+            var cnT1 = cnRangeMatch[2] ? parseInt(cnRangeMatch[2], 10) : (cnRangeMatch[3] ? mapCnNumber(cnRangeMatch[3]) : 0);
+            var p2 = cnRangeMatch[5] || p1;
+            // hour2: either digit (group 6) or Chinese numeral (group 7)
+            var cnT2 = cnRangeMatch[6] ? parseInt(cnRangeMatch[6], 10) : (cnRangeMatch[7] ? mapCnNumber(cnRangeMatch[7]) : 0);
+            if (cnT1 > 0 && cnT2 > 0) {
+                time = cnHourTo24(cnT1, p1);
+                endTime = cnHourTo24(cnT2, p2);
             }
-            // After extracting the range, also strip any nearby period hint that was part of the match
-            var rangeMatchText = cnRangeMatch[0];
             working = working.replace(cnRangeMatch[0], ' ');
             // Also strip orphaned period hints left adjacent to where the match was
             working = stripOrphanPeriodHints(working);
@@ -2002,14 +2041,15 @@ function parseNaturalLanguage(text, refDate) {
     // ── Single time detection ───────────────────────────────
 
     // Chinese time: 凌晨/早上/上午/中午/下午/晚上/傍晚/夜里 + N点/N点半/N点一刻/N点三刻
+    // Supports both digits (3点) and Chinese numerals (三点)
     if (!time) {
-        var cnTimeRe = /(凌晨|早上|上午|中午|下午|晚上|傍晚|夜里)?(\d{1,2})点(?:(一刻|三刻|半)|(\d{1,2})分?)?/;
+        var cnTimeRe = /(凌晨|早上|上午|中午|下午|晚上|傍晚|夜里)?(?:(\d{1,2})|(一|二|三|四|五|六|七|八|九|十|十一|十二))点(?:(一刻|三刻|半)|(\d{1,2})分?)?/;
         var cnTimeMatch = working.match(cnTimeRe);
         if (cnTimeMatch) {
             var cnPeriod = cnTimeMatch[1] || '';
-            var cnHour = parseInt(cnTimeMatch[2], 10);
-            var cnQuarter = cnTimeMatch[3]; // '一刻', '三刻', '半'
-            var cnMin = cnTimeMatch[4] ? parseInt(cnTimeMatch[4], 10) : 0;
+            var cnHour = cnTimeMatch[2] ? parseInt(cnTimeMatch[2], 10) : (cnTimeMatch[3] ? mapCnNumber(cnTimeMatch[3]) : 0);
+            var cnQuarter = cnTimeMatch[4]; // '一刻', '三刻', '半'
+            var cnMin = cnTimeMatch[5] ? parseInt(cnTimeMatch[5], 10) : 0;
             if (cnQuarter === '半') cnMin = 30;
             else if (cnQuarter === '一刻') cnMin = 15;
             else if (cnQuarter === '三刻') cnMin = 45;
@@ -2167,6 +2207,14 @@ function parseNaturalLanguage(text, refDate) {
 function mapCnNumber(str) {
     if (!str) return 0;
     if (/^\d+$/.test(str)) return parseInt(str, 10);
+    // Special traditional month names
+    if (str === '冬') return 11;
+    if (str === '腊') return 12;
+    // "初X" prefix → strip and parse
+    if (/^初/.test(str)) str = str.replace('初', '');
+    // "廿" = 20
+    if (str === '廿') return 20;
+    if (/^廿/.test(str)) return 20 + mapCnNumber(str.replace('廿', ''));
     var cnDigits = { '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10, '两': 2, '半': 0.5 };
     if (str === '十') return 10;
     if (str.length === 1) return cnDigits[str] || 0;
