@@ -125,6 +125,31 @@ struct CalendianHelper {
             case "watch":
                 let signalFile = args.count > 2 ? args[2] : "/tmp/calendian-watch-signal"
                 try await watchChanges(signalFile: signalFile)
+            // v0.4: edit/delete commands (REQ-WRITE-011 to REQ-WRITE-020)
+            case "edit-event":
+                guard args.count >= 8 else { printUsage(); exit(1) }
+                let editLocation = args.count > 8 ? args[8] : ""
+                let editNotes = args.count > 9 ? args[9] : ""
+                let editUrl = args.count > 10 ? args[10] : ""
+                try await editEvent(eventID: args[2], title: args[3], startISO: args[4],
+                                    endISO: args[5], calendarID: args[6],
+                                    isAllDay: args[7] == "true",
+                                    location: editLocation, notes: editNotes, url: editUrl)
+            case "delete-event":
+                guard args.count >= 3 else { printUsage(); exit(1) }
+                try await deleteEvent(eventID: args[2])
+            case "edit-reminder":
+                guard args.count >= 5 else { printUsage(); exit(1) }
+                let editDueDate = args.count > 5 ? args[5] : ""
+                let editDueTime = args.count > 6 ? args[6] : ""
+                let editPriority = args.count > 7 ? args[7] : "none"
+                let editRemNotes = args.count > 8 ? args[8] : ""
+                try await editReminder(reminderID: args[2], title: args[3], listID: args[4],
+                                       dueDate: editDueDate, dueTime: editDueTime,
+                                       priority: editPriority, notes: editRemNotes)
+            case "delete-reminder":
+                guard args.count >= 3 else { printUsage(); exit(1) }
+                try await deleteReminder(reminderID: args[2])
             default:
                 printUsage()
                 exit(1)
@@ -413,6 +438,133 @@ struct CalendianHelper {
         printJSON(WriteResult(ok: true, id: ekReminder.calendarItemIdentifier, completed: nil))
     }
 
+    // MARK: - Edit Event (v0.4, REQ-WRITE-011)
+
+    static func editEvent(eventID: String, title: String, startISO: String, endISO: String,
+                          calendarID: String, isAllDay: Bool,
+                          location: String, notes: String, url: String) async throws {
+        _ = try await requestEventsAccessIfNeeded()
+
+        guard let ekEvent = store.event(withIdentifier: eventID) else {
+            fputs("{\"error\":\"Event not found: \(eventID)\"}\n", stderr)
+            exit(1)
+        }
+
+        // Double-safety: reject recurring events at data layer
+        if ekEvent.hasRecurrenceRules {
+            fputs("{\"error\":\"Cannot edit recurring events from Calendian\"}\n", stderr)
+            exit(1)
+        }
+
+        let fmt = ISO8601DateFormatter()
+        if let startDate = fmt.date(from: startISO) { ekEvent.startDate = startDate }
+        if let endDate = fmt.date(from: endISO) { ekEvent.endDate = endDate }
+
+        ekEvent.title = title
+        ekEvent.isAllDay = isAllDay
+
+        // Move to different calendar if changed
+        if let cal = store.calendars(for: .event).first(where: { $0.calendarIdentifier == calendarID }) {
+            ekEvent.calendar = cal
+        }
+
+        ekEvent.location = location
+        ekEvent.notes = notes
+        if !url.isEmpty, let eventURL = URL(string: url) { ekEvent.url = eventURL }
+        else { ekEvent.url = nil }
+
+        try store.save(ekEvent, span: .thisEvent, commit: true)
+        printJSON(WriteResult(ok: true, id: ekEvent.eventIdentifier ?? eventID, completed: nil))
+    }
+
+    // MARK: - Delete Event (v0.4, REQ-WRITE-012)
+
+    static func deleteEvent(eventID: String) async throws {
+        _ = try await requestEventsAccessIfNeeded()
+
+        guard let ekEvent = store.event(withIdentifier: eventID) else {
+            fputs("{\"error\":\"Event not found: \(eventID)\"}\n", stderr)
+            exit(1)
+        }
+
+        if ekEvent.hasRecurrenceRules {
+            fputs("{\"error\":\"Cannot delete recurring events from Calendian\"}\n", stderr)
+            exit(1)
+        }
+
+        try store.remove(ekEvent, span: .thisEvent, commit: true)
+        printJSON(WriteResult(ok: true, id: eventID, completed: nil))
+    }
+
+    // MARK: - Edit Reminder (v0.4, REQ-WRITE-017)
+
+    static func editReminder(reminderID: String, title: String, listID: String,
+                             dueDate: String, dueTime: String, priority: String,
+                             notes: String) async throws {
+        _ = try await requestRemindersAccessIfNeeded()
+
+        guard let ekReminder = store.calendarItem(withIdentifier: reminderID) as? EKReminder else {
+            fputs("{\"error\":\"Reminder not found: \(reminderID)\"}\n", stderr)
+            exit(1)
+        }
+
+        ekReminder.title = title
+
+        // Move to different list if changed
+        if let cal = store.calendars(for: .reminder).first(where: { $0.calendarIdentifier == listID }) {
+            ekReminder.calendar = cal
+        }
+
+        // Due date handling (same pattern as createReminder)
+        if !dueDate.isEmpty {
+            let fmt = ISO8601DateFormatter()
+            if let date = fmt.date(from: dueDate) {
+                let cal = Calendar.current
+                var comps = cal.dateComponents([.year, .month, .day], from: date)
+                if !dueTime.isEmpty {
+                    let parts = dueTime.split(separator: ":")
+                    if parts.count == 2,
+                       let h = Int(parts[0]), let m = Int(parts[1]),
+                       h >= 0 && h < 24 && m >= 0 && m < 60 {
+                        comps.hour = h
+                        comps.minute = m
+                    }
+                }
+                ekReminder.dueDateComponents = comps
+            }
+        } else {
+            ekReminder.dueDateComponents = nil  // clear due date
+        }
+
+        // Priority
+        switch priority.lowercased() {
+        case "high": ekReminder.priority = 1
+        case "medium": ekReminder.priority = 5
+        case "low": ekReminder.priority = 9
+        default: ekReminder.priority = 0
+        }
+
+        if !notes.isEmpty { ekReminder.notes = notes }
+        else { ekReminder.notes = nil }
+
+        try store.save(ekReminder, commit: true)
+        printJSON(WriteResult(ok: true, id: reminderID, completed: ekReminder.isCompleted))
+    }
+
+    // MARK: - Delete Reminder (v0.4, REQ-WRITE-018)
+
+    static func deleteReminder(reminderID: String) async throws {
+        _ = try await requestRemindersAccessIfNeeded()
+
+        guard let ekReminder = store.calendarItem(withIdentifier: reminderID) as? EKReminder else {
+            fputs("{\"error\":\"Reminder not found: \(reminderID)\"}\n", stderr)
+            exit(1)
+        }
+
+        try store.remove(ekReminder, commit: true)
+        printJSON(WriteResult(ok: true, id: reminderID, completed: nil))
+    }
+
     // MARK: - Permissions
 
     static func printPermissions() {
@@ -524,6 +676,10 @@ struct CalendianHelper {
               toggle-reminder <id>               Toggle reminder completion
               create-event <title> <start> <end> <calId> <isAllDay> [location] [notes] [url]
               create-reminder <title> <listId> [dueDate] [dueTime] [priority] [notes]
+              edit-event <id> <title> <start> <end> <calId> <isAllDay> [location] [notes] [url]
+              delete-event <id>                  Delete a non-recurring event
+              edit-reminder <id> <title> <listId> [dueDate] [dueTime] [priority] [notes]
+              delete-reminder <id>               Delete a reminder
               watch [signal-file]                Watch for Calendar/Reminders changes (long-running)
 
             """, stderr)

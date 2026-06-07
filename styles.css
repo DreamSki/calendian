@@ -626,3 +626,51 @@
     display: inline-block;
     min-width: 80px;
 }
+
+/* ── v0.4: Edit/Delete action styles ────────────────────────────── */
+
+/* Action buttons row in expanded event detail panel */
+.calendian-detail-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px solid var(--background-modifier-border);
+}
+
+/* Danger style for delete buttons */
+.calendian-action-danger {
+    color: var(--text-error) !important;
+}
+
+.calendian-action-danger:hover {
+    background-color: color-mix(in srgb, var(--text-error) 10%, transparent) !important;
+}
+
+/* Clickable reminder checkbox */
+.calendian-reminder-checkbox {
+    cursor: pointer;
+    font-size: 1.1em;
+    line-height: 1;
+    flex-shrink: 0;
+    padding: 0 4px 0 0;
+    user-select: none;
+    transition: color 0.15s;
+}
+
+.calendian-reminder-checkbox:hover {
+    color: var(--text-accent);
+}
+
+/* Hover-visible action buttons for reminders */
+.calendian-item-actions {
+    display: none;
+    gap: 4px;
+    align-items: center;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.macos-item:hover .calendian-item-actions {
+    display: flex;
+}

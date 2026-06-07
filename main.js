@@ -2773,6 +2773,206 @@ class EventCreateModal extends obsidian.Modal {
     }
 }
 
+// ── Event Edit Modal (v0.4, REQ-WRITE-011) ────────────────────────────────
+
+class EventEditModal extends obsidian.Modal {
+    constructor(app, macosIntegration, event) {
+        super(app);
+        this.integ = macosIntegration;
+        this.event = event; // CalendianEvent from cache
+    }
+
+    onOpen() {
+        var self = this;
+        var integ = this.integ;
+        var evt = this.event;
+
+        this.titleEl.setText("Edit Event");
+
+        // ── Title (pre-filled) ─────────────────────────
+        var titleInput;
+        new obsidian.Setting(this.contentEl)
+            .setName("Title")
+            .setDesc("Event name (required)")
+            .addText(function(cmp) {
+                titleInput = cmp.inputEl;
+                cmp.setValue(evt.title || "");
+            });
+
+        // ── All-day toggle (pre-filled) ────────────────
+        var allDayToggle;
+        new obsidian.Setting(this.contentEl)
+            .setName("All-day event")
+            .addToggle(function(cmp) {
+                allDayToggle = cmp;
+                cmp.setValue(evt.isAllDay || false);
+            });
+
+        // ── Start date/time (pre-filled) ───────────────
+        var startDateInput, startTimeInput, endDateInput, endTimeInput;
+        var startMoment = evt.start ? window.moment(evt.start) : window.moment();
+        var endMoment = evt.end ? window.moment(evt.end) : window.moment();
+
+        new obsidian.Setting(this.contentEl)
+            .setName("Start date").setDesc("YYYY-MM-DD")
+            .addText(function(cmp) {
+                startDateInput = cmp.inputEl;
+                cmp.setValue(startMoment.format("YYYY-MM-DD"));
+            });
+        new obsidian.Setting(this.contentEl)
+            .setName("Start time").setDesc("HH:MM (ignored if all-day)")
+            .addText(function(cmp) {
+                startTimeInput = cmp.inputEl;
+                cmp.setValue(evt.isAllDay ? "" : startMoment.format("HH:mm"));
+            });
+        new obsidian.Setting(this.contentEl)
+            .setName("End date").setDesc("YYYY-MM-DD")
+            .addText(function(cmp) {
+                endDateInput = cmp.inputEl;
+                cmp.setValue(endMoment.format("YYYY-MM-DD"));
+            });
+        new obsidian.Setting(this.contentEl)
+            .setName("End time").setDesc("HH:MM (ignored if all-day)")
+            .addText(function(cmp) {
+                endTimeInput = cmp.inputEl;
+                cmp.setValue(evt.isAllDay ? "" : endMoment.format("HH:mm"));
+            });
+
+        // ── Calendar dropdown (pre-selected) ───────────
+        var calendarSelect = null;
+        var calendarSetting = new obsidian.Setting(this.contentEl)
+            .setName("Calendar")
+            .setDesc("Loading calendars...");
+        integ.discoverCalendars().then(function(cals) {
+            calendarSetting.addDropdown(function(cmp) {
+                calendarSelect = cmp;
+                for (var i = 0; i < cals.length; i++) {
+                    cmp.addOption(cals[i].id, cals[i].name);
+                }
+                // Pre-select the event's current calendar
+                if (evt.calendarId) {
+                    cmp.setValue(evt.calendarId);
+                } else if (cals.length > 0) {
+                    cmp.setValue(cals[0].id);
+                }
+            });
+            calendarSetting.setDesc(cals.length > 0 ? "Choose a calendar" : "No calendars found");
+        }).catch(function() {
+            calendarSetting.setDesc("Failed to load calendars");
+        });
+
+        // ── Location, URL, Notes (pre-filled) ──────────
+        var locationInput, urlInput, notesInput;
+        new obsidian.Setting(this.contentEl)
+            .setName("Location")
+            .addText(function(cmp) {
+                locationInput = cmp.inputEl;
+                cmp.setValue(evt.location || "");
+            });
+        new obsidian.Setting(this.contentEl)
+            .setName("URL")
+            .addText(function(cmp) {
+                urlInput = cmp.inputEl;
+                cmp.setValue(evt.url || "");
+            });
+        new obsidian.Setting(this.contentEl)
+            .setName("Notes")
+            .addTextArea(function(cmp) {
+                notesInput = cmp.inputEl;
+                cmp.setValue(evt.notes || "");
+            });
+
+        // ── Buttons: Save / Cancel ──────────────────────
+        var errorEl = this.contentEl.createDiv("calendian-form-error");
+        errorEl.style.display = "none";
+
+        new obsidian.Setting(this.contentEl)
+            .addButton(function(btn) {
+                btn.setButtonText("Save")
+                    .setCta()
+                    .onClick(async function() {
+                        var title = (titleInput.value || "").trim();
+                        var startDateStr = (startDateInput.value || "").trim();
+                        var endDateStr = (endDateInput.value || "").trim();
+                        var startTimeStr = (startTimeInput.value || "").trim();
+                        var endTimeStr = (endTimeInput.value || "").trim();
+                        var isAllDay = allDayToggle.getValue();
+                        var calendarId = calendarSelect ? calendarSelect.getValue() : "";
+                        var location = (locationInput.value || "").trim();
+                        var url = (urlInput.value || "").trim();
+                        var notes = (notesInput.value || "").trim();
+
+                        // Validate
+                        if (!title) {
+                            errorEl.textContent = "Title is required.";
+                            errorEl.style.display = "block";
+                            return;
+                        }
+                        if (!calendarId) {
+                            errorEl.textContent = "Please select a calendar.";
+                            errorEl.style.display = "block";
+                            return;
+                        }
+
+                        // Build dates (same pattern as EventCreateModal)
+                        var startMoment2, endMoment2;
+                        if (startTimeStr) {
+                            startMoment2 = window.moment(startDateStr + " " + startTimeStr, "YYYY-MM-DD HH:mm");
+                        } else {
+                            startMoment2 = window.moment(startDateStr, "YYYY-MM-DD");
+                        }
+                        if (endTimeStr) {
+                            endMoment2 = window.moment(endDateStr + " " + endTimeStr, "YYYY-MM-DD HH:mm");
+                        } else {
+                            endMoment2 = window.moment(endDateStr, "YYYY-MM-DD").endOf("day");
+                        }
+
+                        if (!startMoment2.isValid()) {
+                            errorEl.textContent = "Invalid start date/time.";
+                            errorEl.style.display = "block";
+                            return;
+                        }
+                        if (!endMoment2.isValid()) {
+                            errorEl.textContent = "Invalid end date/time.";
+                            errorEl.style.display = "block";
+                            return;
+                        }
+
+                        try {
+                            var result = await integ.editEvent(evt, {
+                                title: title,
+                                startDate: startMoment2.toDate(),
+                                endDate: endMoment2.toDate(),
+                                calendarId: calendarId,
+                                isAllDay: isAllDay,
+                                location: location,
+                                notes: notes,
+                                url: url
+                            });
+                            if (result && result.ok) {
+                                new obsidian.Notice("Event updated");
+                                console.log("[Calendian] Updated event (id=" + evt.id + ")");
+                                integ.init(true);
+                                self.close();
+                            } else {
+                                errorEl.textContent = "Failed to update event.";
+                                errorEl.style.display = "block";
+                            }
+                        } catch (err) {
+                            var errMsg = err.stderr || (err.error && err.error.message) || err.message || JSON.stringify(err);
+                            console.error("[Calendian] Event update failed:", errMsg);
+                            errorEl.textContent = "Error: " + errMsg;
+                            errorEl.style.display = "block";
+                        }
+                    });
+            })
+            .addButton(function(btn) {
+                btn.setButtonText("Cancel")
+                    .onClick(function() { self.close(); });
+            });
+    }
+}
+
 // ── Quick Event Modal (NL parsing, REQ-NL-001..005) ─────────
 
 class QuickEventModal extends obsidian.Modal {
@@ -3260,6 +3460,242 @@ class ReminderCreateModal extends obsidian.Modal {
                 btn.setButtonText("Cancel")
                     .onClick(function() { self.close(); });
             });
+    }
+}
+
+// ── Reminder Edit Modal (v0.4, REQ-WRITE-017) ──────────────────────────────
+
+class ReminderEditModal extends obsidian.Modal {
+    constructor(app, macosIntegration, reminder) {
+        super(app);
+        this.integ = macosIntegration;
+        this.reminder = reminder; // CalendianReminder from cache
+    }
+
+    onOpen() {
+        var self = this;
+        var integ = this.integ;
+        var rem = this.reminder;
+
+        this.titleEl.setText("Edit Reminder");
+
+        // ── Title (pre-filled) ─────────────────────────
+        var titleInput;
+        new obsidian.Setting(this.contentEl)
+            .setName("Title")
+            .setDesc("Reminder name (required)")
+            .addText(function(cmp) {
+                titleInput = cmp.inputEl;
+                cmp.setValue(rem.title || "");
+            });
+
+        // ── List dropdown (pre-selected) ───────────────
+        var listSelect = null;
+        var listSetting = new obsidian.Setting(this.contentEl)
+            .setName("List")
+            .setDesc("Loading lists...");
+        integ.discoverReminderLists().then(function(lists) {
+            listSetting.addDropdown(function(cmp) {
+                listSelect = cmp;
+                for (var i = 0; i < lists.length; i++) {
+                    cmp.addOption(lists[i].id, lists[i].name);
+                }
+                // Pre-select the reminder's current list
+                if (rem.listId) {
+                    cmp.setValue(rem.listId);
+                } else if (lists.length > 0) {
+                    cmp.setValue(lists[0].id);
+                }
+            });
+            listSetting.setDesc(lists.length > 0 ? "Choose a list" : "No lists found");
+        }).catch(function() {
+            listSetting.setDesc("Failed to load lists");
+        });
+
+        // ── Due date (pre-filled) ──────────────────────
+        var dueDateInput, dueTimeInput;
+        var dueMoment = rem.due ? window.moment(rem.due) : null;
+        new obsidian.Setting(this.contentEl)
+            .setName("Due date")
+            .setDesc("YYYY-MM-DD (optional)")
+            .addText(function(cmp) {
+                dueDateInput = cmp.inputEl;
+                if (dueMoment && dueMoment.isValid()) {
+                    cmp.setValue(dueMoment.format("YYYY-MM-DD"));
+                }
+            });
+        new obsidian.Setting(this.contentEl)
+            .setName("Due time")
+            .setDesc("HH:MM (optional)")
+            .addText(function(cmp) {
+                dueTimeInput = cmp.inputEl;
+                if (dueMoment && dueMoment.isValid()) {
+                    cmp.setValue(dueMoment.format("HH:mm"));
+                }
+            });
+
+        // ── Priority (pre-selected) ────────────────────
+        var prioritySelect;
+        new obsidian.Setting(this.contentEl)
+            .setName("Priority")
+            .addDropdown(function(cmp) {
+                prioritySelect = cmp;
+                cmp.addOption("none", "None");
+                cmp.addOption("low", "Low");
+                cmp.addOption("medium", "Medium");
+                cmp.addOption("high", "High");
+                cmp.setValue(rem.priority || "none");
+            });
+
+        // ── Notes (pre-filled) ─────────────────────────
+        var notesInput;
+        new obsidian.Setting(this.contentEl)
+            .setName("Notes")
+            .addTextArea(function(cmp) {
+                notesInput = cmp.inputEl;
+                cmp.setValue(rem.notes || "");
+            });
+
+        // ── Buttons: Save / Cancel ──────────────────────
+        var errorEl = this.contentEl.createDiv("calendian-form-error");
+        errorEl.style.display = "none";
+
+        new obsidian.Setting(this.contentEl)
+            .addButton(function(btn) {
+                btn.setButtonText("Save")
+                    .setCta()
+                    .onClick(async function() {
+                        var title = (titleInput.value || "").trim();
+                        var listId = listSelect ? listSelect.getValue() : "";
+                        var dueDateStr = (dueDateInput.value || "").trim();
+                        var dueTimeStr = (dueTimeInput.value || "").trim();
+                        var priority = prioritySelect ? prioritySelect.getValue() : "none";
+                        var notes = (notesInput.value || "").trim();
+
+                        if (!title) {
+                            errorEl.textContent = "Title is required.";
+                            errorEl.style.display = "block";
+                            return;
+                        }
+                        if (!listId) {
+                            errorEl.textContent = "Please select a list.";
+                            errorEl.style.display = "block";
+                            return;
+                        }
+
+                        // Build due date
+                        var dueDate = null;
+                        if (dueDateStr) {
+                            if (dueTimeStr) {
+                                dueDate = window.moment(dueDateStr + " " + dueTimeStr, "YYYY-MM-DD HH:mm").toDate();
+                            } else {
+                                dueDate = window.moment(dueDateStr, "YYYY-MM-DD").toDate();
+                            }
+                        }
+
+                        try {
+                            var result = await integ.editReminder(rem, {
+                                title: title,
+                                listId: listId,
+                                dueDate: dueDate,
+                                dueTime: dueTimeStr,
+                                priority: priority,
+                                notes: notes
+                            });
+                            if (result && result.ok) {
+                                new obsidian.Notice("Reminder updated");
+                                console.log("[Calendian] Updated reminder (id=" + rem.id + ")");
+                                integ.init(true);
+                                self.close();
+                            } else {
+                                errorEl.textContent = "Failed to update reminder.";
+                                errorEl.style.display = "block";
+                            }
+                        } catch (err) {
+                            var errMsg = err.stderr || (err.error && err.error.message) || err.message || JSON.stringify(err);
+                            console.error("[Calendian] Reminder update failed:", errMsg);
+                            errorEl.textContent = "Error: " + errMsg;
+                            errorEl.style.display = "block";
+                        }
+                    });
+            })
+            .addButton(function(btn) {
+                btn.setButtonText("Cancel")
+                    .onClick(function() { self.close(); });
+            });
+    }
+}
+
+// ── RecurringBlockModal (v0.4, REQ-REC-002, REQ-REC-003) ─────────────────────
+
+class RecurringBlockModal extends obsidian.Modal {
+    constructor(app, eventTitle, eventId) {
+        super(app);
+        this.eventTitle = eventTitle;
+        this.eventId = eventId;
+    }
+
+    onOpen() {
+        var self = this;
+        this.titleEl.setText("Recurring Event");
+
+        this.contentEl.createEl("p", {
+            text: "This is a recurring event. Editing recurring events requires choosing which occurrences to modify (this event only, this and future events, or all events). This choice is not yet supported in Calendian."
+        });
+
+        this.contentEl.createEl("p", {
+            text: "Please edit this event directly in Calendar.app.",
+            cls: "setting-item-description"
+        });
+
+        this.contentEl.createDiv("modal-button-container", function(buttonsEl) {
+            buttonsEl.createEl("button", { text: "Cancel" })
+                .addEventListener("click", function() { self.close(); });
+            buttonsEl.createEl("button", { cls: "mod-cta", text: "Open in Calendar.app" })
+                .addEventListener("click", function() {
+                    if (self.eventId) {
+                        obsidian.openExternal("x-apple-calevent:" + self.eventId);
+                    } else {
+                        // Fallback: just open Calendar.app
+                        obsidian.openExternal("file:///Applications/Calendar.app");
+                    }
+                    self.close();
+                });
+        });
+    }
+}
+
+// ── ConfirmActionModal (v0.4, REQ-ERR-006) ───────────────────────────────────
+// Reusable confirmation dialog for destructive operations.
+// Uses the same pattern as createConfirmationDialog() but with danger styling.
+
+class ConfirmActionModal extends obsidian.Modal {
+    constructor(app, opts) {
+        super(app);
+        this.opts = opts || {}; // { title, message, ctaLabel, isDangerous, onConfirm }
+    }
+
+    onOpen() {
+        var self = this;
+        var opts = this.opts;
+        this.titleEl.setText(opts.title || "Confirm");
+
+        this.contentEl.createEl("p", {
+            text: opts.message || "Are you sure?"
+        });
+
+        this.contentEl.createDiv("modal-button-container", function(buttonsEl) {
+            buttonsEl.createEl("button", { text: "Cancel" })
+                .addEventListener("click", function() { self.close(); });
+            var ctaBtn = buttonsEl.createEl("button", {
+                cls: opts.isDangerous ? "mod-warning" : "mod-cta",
+                text: opts.ctaLabel || "Confirm"
+            });
+            ctaBtn.addEventListener("click", function() {
+                self.close();
+                if (opts.onConfirm) opts.onConfirm();
+            });
+        });
     }
 }
 
@@ -7154,6 +7590,45 @@ class MacOSIntegration {
                     field.createEl("strong").textContent = "Recurrence";
                     field.appendText(": " + evt.recurrenceSummary);
                 }
+
+                // v0.4: Edit/Delete action buttons (REQ-WRITE-011, REQ-WRITE-012)
+                if (!evt.isDisplayOnly && evt.id) {
+                    var actionsEl = detailEl.createDiv("calendian-detail-actions");
+
+                    // Edit button
+                    var editBtn = actionsEl.createDiv("macos-refresh-btn");
+                    editBtn.textContent = "Edit";
+                    editBtn.addEventListener("click", function(e) {
+                        e.stopPropagation();
+                        var guard = self.canMutateEvent(evt);
+                        if (!guard.safe) {
+                            if (guard.canOpenCalendar) {
+                                new RecurringBlockModal(self.plugin.app, evt.title, evt.id).open();
+                            } else {
+                                new obsidian.Notice(guard.reason);
+                            }
+                            return;
+                        }
+                        new EventEditModal(self.plugin.app, self, evt).open();
+                    });
+
+                    // Delete button
+                    var deleteBtn = actionsEl.createDiv("macos-refresh-btn calendian-action-danger");
+                    deleteBtn.textContent = "Delete";
+                    deleteBtn.addEventListener("click", function(e) {
+                        e.stopPropagation();
+                        var guard = self.canMutateEvent(evt);
+                        if (!guard.safe) {
+                            if (guard.canOpenCalendar) {
+                                new RecurringBlockModal(self.plugin.app, evt.title, evt.id).open();
+                            } else {
+                                new obsidian.Notice(guard.reason);
+                            }
+                            return;
+                        }
+                        self.confirmDeleteEvent(evt);
+                    });
+                }
             }
         }
     }
@@ -7214,9 +7689,27 @@ class MacOSIntegration {
                 itemEl.addClass("calendian-reminder-overdue");
             }
 
-            // Checkbox + title
+            // Checkbox + title (v0.4: clickable checkbox for completion toggle, REQ-WRITE-016)
+            if (!rem.isDisplayOnly && rem.id) {
+                var checkbox = itemEl.createDiv("calendian-reminder-checkbox");
+                checkbox.textContent = "○";
+                checkbox.setAttribute("title", "Mark complete");
+                checkbox.addEventListener("click", function(e) {
+                    e.stopPropagation();
+                    self.toggleReminder(rem).then(function(result) {
+                        if (result && result.ok) {
+                            new obsidian.Notice(result.completed ? "Reminder completed" : "Reminder uncompleted");
+                            self.init(true);
+                        }
+                    }).catch(function(err) {
+                        var errMsg = err.stderr || (err.error && err.error.message) || err.message || JSON.stringify(err);
+                        console.error("[Calendian] Toggle reminder failed:", errMsg);
+                        new obsidian.Notice("Failed to update reminder");
+                    });
+                });
+            }
             const titleEl = itemEl.createDiv("macos-item-title");
-            titleEl.textContent = "○ " + (rem.title || rem.name || "");
+            titleEl.textContent = (rem.title || rem.name || "");
 
             // REQ-REM-005: Overdue badge
             if (isOverdue) {
@@ -7255,6 +7748,23 @@ class MacOSIntegration {
                 badgeEl.textContent = listName;
             }
 
+            // v0.4: Edit/Delete action buttons (REQ-WRITE-017, REQ-WRITE-018)
+            if (!rem.isDisplayOnly && rem.id) {
+                var remActionsEl = itemEl.createDiv("calendian-item-actions");
+                var remEditBtn = remActionsEl.createDiv("macos-refresh-btn");
+                remEditBtn.textContent = "Edit";
+                remEditBtn.addEventListener("click", function(e) {
+                    e.stopPropagation();
+                    new ReminderEditModal(self.plugin.app, self, rem).open();
+                });
+                var remDeleteBtn = remActionsEl.createDiv("macos-refresh-btn calendian-action-danger");
+                remDeleteBtn.textContent = "Delete";
+                remDeleteBtn.addEventListener("click", function(e) {
+                    e.stopPropagation();
+                    self.confirmDeleteReminder(rem);
+                });
+            }
+
             // REQ-REM-009: Subtasks — render child reminders indented under parent
             // TODO: Subtask display is data-dependent. The helper provides parentId field
             // but does not yet populate it. Once the helper fetches subtasks, this code
@@ -7289,11 +7799,29 @@ class MacOSIntegration {
             });
 
             for (var k = 0; k < noDateReminders.length; k++) {
-                var nr = noDateReminders[k];
+                (function(nr) {
                 var nrItemEl = nodateList.createDiv("macos-item");
 
+                // v0.4: Clickable checkbox for no-date reminders
+                if (!nr.isDisplayOnly && nr.id) {
+                    var nrCheckbox = nrItemEl.createDiv("calendian-reminder-checkbox");
+                    nrCheckbox.textContent = "○";
+                    nrCheckbox.setAttribute("title", "Mark complete");
+                    nrCheckbox.addEventListener("click", function(e) {
+                        e.stopPropagation();
+                        self.toggleReminder(nr).then(function(result) {
+                            if (result && result.ok) {
+                                new obsidian.Notice(result.completed ? "Reminder completed" : "Reminder uncompleted");
+                                self.init(true);
+                            }
+                        }).catch(function(err) {
+                            console.error("[Calendian] Toggle reminder failed:", err);
+                            new obsidian.Notice("Failed to update reminder");
+                        });
+                    });
+                }
                 var nrTitleEl = nrItemEl.createDiv("macos-item-title");
-                nrTitleEl.textContent = "○ " + (nr.title || nr.name || "");
+                nrTitleEl.textContent = (nr.title || nr.name || "");
 
                 if (nr.priority && nr.priority !== "none") {
                     const prEl = nrItemEl.createDiv("macos-priority");
@@ -7314,6 +7842,24 @@ class MacOSIntegration {
                     const nrBadgeEl = nrItemEl.createDiv("macos-item-badge");
                     nrBadgeEl.textContent = nrListName;
                 }
+
+                // v0.4: Edit/Delete buttons for no-date reminders
+                if (!nr.isDisplayOnly && nr.id) {
+                    var nrActionsEl = nrItemEl.createDiv("calendian-item-actions");
+                    var nrEditBtn = nrActionsEl.createDiv("macos-refresh-btn");
+                    nrEditBtn.textContent = "Edit";
+                    nrEditBtn.addEventListener("click", function(e) {
+                        e.stopPropagation();
+                        new ReminderEditModal(self.plugin.app, self, nr).open();
+                    });
+                    var nrDeleteBtn = nrActionsEl.createDiv("macos-refresh-btn calendian-action-danger");
+                    nrDeleteBtn.textContent = "Delete";
+                    nrDeleteBtn.addEventListener("click", function(e) {
+                        e.stopPropagation();
+                        self.confirmDeleteReminder(nr);
+                    });
+                }
+                })(noDateReminders[k]);
             }
         }
     }
@@ -8038,6 +8584,308 @@ MacOSIntegration.prototype.countReminderLists = function(reminders) {
         return Object.keys(lists).length;
     }
 
+// src/macos/writer.js — write adapter for EventKit helper, safety-gated (v0.3+)
+// REQ-WRITE-001 to REQ-WRITE-010, REQ-WRITE-011 to REQ-WRITE-020 (v0.4)
+
+// ── Node.js-only helper functions (not used in Obsidian concatenation) ──
+// Guarded: these are only available when loaded via require() in Node.js context.
+// The Obsidian-side code uses MacOSIntegration.prototype.execHelper() instead.
+
+if (typeof module !== 'undefined' && module.exports) {
+    var nodeChildProcess = require('child_process');
+
+    function callHelper(helperPath, args) {
+        if (!helperPath) return Promise.reject(new Error('Helper not available'));
+        return new Promise((resolve, reject) => {
+            var proc = nodeChildProcess.spawn(helperPath, args);
+            var stdout = '';
+            var stderr = '';
+            proc.stdout.on('data', function(d) { stdout += d.toString(); });
+            proc.stderr.on('data', function(d) { stderr += d.toString(); });
+            proc.on('close', function(code) {
+                if (code !== 0) {
+                    reject({ error: new Error('Helper exited with code ' + code), stderr: stderr, stdout: stdout });
+                    return;
+                }
+                try {
+                    resolve(JSON.parse(stdout.trim()));
+                } catch (e) {
+                    reject({ error: e, stderr: stderr, stdout: stdout });
+                }
+            });
+            proc.on('error', function(err) {
+                reject({ error: err, stderr: stderr, stdout: stdout });
+            });
+        });
+    }
+
+    function classifyError(err) {
+        const msg = ((err.stderr || '') + ' ' + (err.error?.message || '')).toLowerCase();
+        if (msg.includes('not allowed') || msg.includes('permission') ||
+            msg.includes('automation') || msg.includes('-1743') || msg.includes('-10004')) {
+            return 'permission_denied';
+        }
+        if (msg.includes('timed out') || msg.includes('timeout') || msg.includes('killed')) {
+            return 'timeout';
+        }
+        return 'error';
+    }
+
+    module.exports = {
+        callHelper,
+        classifyError,
+        validateEvent(title, calendarId, startDate, endDate) {
+            var errors = [];
+            if (!title || !title.trim()) errors.push("Event title is required.");
+            if (!calendarId) errors.push("A calendar must be selected.");
+            if (!startDate || isNaN(startDate.getTime())) errors.push("Valid start date is required.");
+            if (!endDate || isNaN(endDate.getTime())) errors.push("Valid end date is required.");
+            if (startDate && endDate && startDate.getTime() > endDate.getTime()) {
+                errors.push("Start date must be before end date.");
+            }
+            return { valid: errors.length === 0, errors: errors };
+        },
+        validateReminder(title, listId) {
+            var errors = [];
+            if (!title || !title.trim()) errors.push("Reminder title is required.");
+            if (!listId) errors.push("A reminder list must be selected.");
+            return { valid: errors.length === 0, errors: errors };
+        },
+        async createEvent(helperPath, title, startDate, endDate, calendarId, opts) {
+            opts = opts || {};
+            var validation = this.validateEvent(title, calendarId, startDate, endDate);
+            if (!validation.valid) throw new Error('Validation failed: ' + validation.errors.join(' '));
+            var isAllDay = opts.isAllDay === true;
+            var startISO = startDate.toISOString();
+            var endISO = endDate.toISOString();
+            var args = ['create-event', title, startISO, endISO, calendarId, isAllDay ? 'true' : 'false'];
+            if (opts.location) args.push(opts.location);
+            if (opts.notes) args.push(opts.notes);
+            if (opts.url) args.push(opts.url);
+            console.log("[Calendian] Creating event: " + title);
+            return callHelper(helperPath, args);
+        },
+        async createReminder(helperPath, title, listId, opts) {
+            opts = opts || {};
+            var validation = this.validateReminder(title, listId);
+            if (!validation.valid) throw new Error('Validation failed: ' + validation.errors.join(' '));
+            var dueDateISO = opts.dueDate ? opts.dueDate.toISOString() : '';
+            var args = ['create-reminder', title, listId];
+            if (dueDateISO) args.push(dueDateISO);
+            if (opts.dueTime) args.push(opts.dueTime);
+            if (opts.priority) args.push(opts.priority);
+            if (opts.notes) args.push(opts.notes);
+            console.log("[Calendian] Creating reminder: " + title);
+            return callHelper(helperPath, args);
+        }
+    };
+}
+
+// ── Mutation safety guards (v0.4, REQ-WRITE-015, REQ-WRITE-019, REQ-REC-002) ─
+
+/**
+ * Check if an event can be safely mutated.
+ * @param {object} evt - CalendianEvent from cache
+ * @returns {{ safe: boolean, reason?: string, canOpenCalendar?: boolean }}
+ */
+MacOSIntegration.prototype.canMutateEvent = function(evt) {
+    // REQ-WRITE-015: stable source identity required
+    if (!evt.id || evt.isDisplayOnly) {
+        return { safe: false, reason: "This event has no stable Calendar.app identifier and cannot be safely edited.", canOpenCalendar: false };
+    }
+    // REQ-REC-002: recurring event mutation blocked
+    if (evt.isRecurring) {
+        return { safe: false, reason: "Recurring event editing requires choosing which occurrences to modify. Please edit in Calendar.app.", canOpenCalendar: true };
+    }
+    return { safe: true };
+};
+
+/**
+ * Check if a reminder can be safely mutated.
+ * @param {object} rem - CalendianReminder from cache
+ * @returns {{ safe: boolean, reason?: string }}
+ */
+MacOSIntegration.prototype.canMutateReminder = function(rem) {
+    // REQ-WRITE-019: stable source identity required
+    if (!rem.id || rem.isDisplayOnly) {
+        return { safe: false, reason: "This reminder has no stable Reminders.app identifier and cannot be safely edited." };
+    }
+    return { safe: true };
+};
+
+// ── Event edit/delete (v0.4, REQ-WRITE-011 to REQ-WRITE-015) ────────────
+
+/**
+ * Edit a simple non-recurring event. REQ-WRITE-011.
+ * @param {object} evt - CalendianEvent from cache
+ * @param {object} updates - { title, startDate, endDate, calendarId, isAllDay, location, notes, url }
+ * @returns {Promise<{ok: boolean, id: string}>}
+ */
+MacOSIntegration.prototype.editEvent = async function(evt, updates) {
+    var guard = this.canMutateEvent(evt);
+    if (!guard.safe) {
+        throw new Error(guard.reason);
+    }
+
+    // Validate
+    var errors = [];
+    if (!updates.title || !updates.title.trim()) errors.push("Title is required.");
+    if (!updates.calendarId) errors.push("A calendar must be selected.");
+    if (!updates.startDate || isNaN(updates.startDate.getTime())) errors.push("Valid start date is required.");
+    if (!updates.endDate || isNaN(updates.endDate.getTime())) errors.push("Valid end date is required.");
+    if (updates.startDate && updates.endDate && updates.startDate.getTime() > updates.endDate.getTime()) {
+        errors.push("Start date must be before end date.");
+    }
+    if (errors.length > 0) {
+        throw new Error("Validation failed: " + errors.join(" "));
+    }
+
+    var startISO = updates.startDate.toISOString().replace(/\.\d{3}Z$/, 'Z');
+    var endISO = updates.endDate.toISOString().replace(/\.\d{3}Z$/, 'Z');
+
+    var args = ['edit-event', evt.id, updates.title, startISO, endISO, updates.calendarId,
+                updates.isAllDay ? 'true' : 'false',
+                updates.location || '', updates.notes || '', updates.url || ''];
+
+    console.log("[Calendian] Editing event (id=" + evt.id + ")");
+    return this.execHelper(args);
+};
+
+/**
+ * Delete a simple non-recurring event. REQ-WRITE-012.
+ * @param {object} evt - CalendianEvent from cache
+ * @returns {Promise<{ok: boolean, id: string}>}
+ */
+MacOSIntegration.prototype.deleteEvent = async function(evt) {
+    var guard = this.canMutateEvent(evt);
+    if (!guard.safe) {
+        throw new Error(guard.reason);
+    }
+    console.log("[Calendian] Deleting event (id=" + evt.id + ")");
+    return this.execHelper(['delete-event', evt.id]);
+};
+
+/**
+ * Show delete confirmation for an event. REQ-ERR-006.
+ * @param {object} evt - CalendianEvent from cache
+ */
+MacOSIntegration.prototype.confirmDeleteEvent = function(evt) {
+    var self = this;
+    new ConfirmActionModal(this.plugin.app, {
+        title: "Delete Event",
+        message: "Are you sure you want to delete this event? This cannot be undone.",
+        ctaLabel: "Delete",
+        isDangerous: true,
+        onConfirm: async function() {
+            try {
+                var result = await self.deleteEvent(evt);
+                if (result && result.ok) {
+                    new obsidian.Notice("Event deleted");
+                    console.log("[Calendian] Deleted event (id=" + evt.id + ")");
+                    self.init(true);
+                } else {
+                    new obsidian.Notice("Failed to delete event");
+                }
+            } catch (err) {
+                var errMsg = err.stderr || (err.error && err.error.message) || err.message || JSON.stringify(err);
+                console.error("[Calendian] Event deletion failed:", errMsg);
+                new obsidian.Notice("Error: " + errMsg);
+            }
+        }
+    }).open();
+};
+
+// ── Reminder edit/delete/complete (v0.4, REQ-WRITE-016 to REQ-WRITE-020) ─
+
+/**
+ * Toggle reminder completion. REQ-WRITE-016.
+ * @param {object} rem - CalendianReminder from cache
+ * @returns {Promise<{ok: boolean, id: string, completed: boolean}>}
+ */
+MacOSIntegration.prototype.toggleReminder = async function(rem) {
+    var guard = this.canMutateReminder(rem);
+    if (!guard.safe) {
+        throw new Error(guard.reason);
+    }
+    console.log("[Calendian] Toggling reminder (id=" + rem.id + ")");
+    return this.execHelper(['toggle-reminder', rem.id]);
+};
+
+/**
+ * Edit a reminder. REQ-WRITE-017.
+ * @param {object} rem - CalendianReminder from cache
+ * @param {object} updates - { title, listId, dueDate, dueTime, priority, notes }
+ * @returns {Promise<{ok: boolean, id: string}>}
+ */
+MacOSIntegration.prototype.editReminder = async function(rem, updates) {
+    var guard = this.canMutateReminder(rem);
+    if (!guard.safe) {
+        throw new Error(guard.reason);
+    }
+
+    var errors = [];
+    if (!updates.title || !updates.title.trim()) errors.push("Title is required.");
+    if (!updates.listId) errors.push("A list must be selected.");
+    if (errors.length > 0) {
+        throw new Error("Validation failed: " + errors.join(" "));
+    }
+
+    var dueDateISO = '';
+    if (updates.dueDate && !isNaN(updates.dueDate.getTime())) {
+        dueDateISO = updates.dueDate.toISOString().replace(/\.\d{3}Z$/, 'Z');
+    }
+
+    var args = ['edit-reminder', rem.id, updates.title, updates.listId,
+                dueDateISO, updates.dueTime || '', updates.priority || 'none',
+                updates.notes || ''];
+
+    console.log("[Calendian] Editing reminder (id=" + rem.id + ")");
+    return this.execHelper(args);
+};
+
+/**
+ * Delete a reminder. REQ-WRITE-018.
+ * @param {object} rem - CalendianReminder from cache
+ * @returns {Promise<{ok: boolean, id: string}>}
+ */
+MacOSIntegration.prototype.deleteReminder = async function(rem) {
+    var guard = this.canMutateReminder(rem);
+    if (!guard.safe) {
+        throw new Error(guard.reason);
+    }
+    console.log("[Calendian] Deleting reminder (id=" + rem.id + ")");
+    return this.execHelper(['delete-reminder', rem.id]);
+};
+
+/**
+ * Show delete confirmation for a reminder. REQ-ERR-006.
+ * @param {object} rem - CalendianReminder from cache
+ */
+MacOSIntegration.prototype.confirmDeleteReminder = function(rem) {
+    var self = this;
+    new ConfirmActionModal(this.plugin.app, {
+        title: "Delete Reminder",
+        message: "Are you sure you want to delete this reminder? This cannot be undone.",
+        ctaLabel: "Delete",
+        isDangerous: true,
+        onConfirm: async function() {
+            try {
+                var result = await self.deleteReminder(rem);
+                if (result && result.ok) {
+                    new obsidian.Notice("Reminder deleted");
+                    console.log("[Calendian] Deleted reminder (id=" + rem.id + ")");
+                    self.init(true);
+                } else {
+                    new obsidian.Notice("Failed to delete reminder");
+                }
+            } catch (err) {
+                var errMsg = err.stderr || (err.error && err.error.message) || err.message || JSON.stringify(err);
+                console.error("[Calendian] Reminder deletion failed:", errMsg);
+                new obsidian.Notice("Error: " + errMsg);
+            }
+        }
+    }).open();
+};
 // build-main.sh: prototype methods from src/ are inserted here by cat
 
 class CalendarView extends obsidian.ItemView {
