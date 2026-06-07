@@ -18,7 +18,7 @@ This document records the actual repository state. It intentionally separates im
 | Cache | Implemented | ±6 month preload via EventKit predicate (date-filtered server-side). Disk cache in data.json (`_eventsCache`, `_remindersCache`). Cache freshness check (2x refresh interval, min 15min). Manual refresh button. No-block background refresh. |
 | Calendar source discovery | Implemented | EventKit `calendar.calendarIdentifier` (UUID), account name (`source.title`), color, type. Display name includes account suffix ("日历 — chengbo.sun123@outlook.com"). |
 | Reminder list discovery | Implemented | EventKit lists with UUID, account name, color. |
-| Event display | Implemented | Title, time range, all-day handling, calendar badge with color, location, recurrence indicator, ongoing/soon highlights. |
+| Event display | Implemented | Title, time range, all-day handling, calendar badge with color, location, recurrence indicator, ongoing/soon highlights. Expandable detail panel (click to show location, URL, notes, attendees, calendar source, recurrence summary). Multi-day events shown on all overlapping days. Past events dimmed/hidden per setting. Recurring events marked with read-only indicator. |
 | Reminder display | Implemented | Title, due time, list badge, priority indicator (high/medium/low). Completed reminders hidden by default. |
 | Source filtering | Implemented | Toggle individual calendars/lists via settings. Filter by stable UUID (EventKit `calendarIdentifier`). In-memory instant apply via `render()`. Persisted in `data.json`. |
 | Permission handling | Implemented | Independent calendar/reminder permission states with recovery guidance and retry buttons. Partial permission support (show available data + banner for denied source). |
@@ -37,7 +37,7 @@ This document records the actual repository state. It intentionally separates im
 
 ## Current release label
 
-Current repository state: **v0.1 read-only MVP — mostly complete**. Core read path is stable with EventKit.
+Current repository state: **v0.2 read-only polish — in progress**. Core read path stable, event details and multi-day support implemented.
 
 ## README policy
 
@@ -51,7 +51,11 @@ README may list the following as current behavior:
 - calendar/reminder source discovery with account names;
 - source filtering by individual calendar/list;
 - configurable auto-refresh with disk cache;
-- permission/error/empty/loading UI states.
+- permission/error/empty/loading UI states;
+- expandable event details (location, URL, notes, attendees, recurrence summary);
+- multi-day events shown on all overlapping days;
+- past event display (normal/dimmed/hidden) setting;
+- recurring event read-only indicator.
 
 Everything else must be marked as planned, experimental, or future.
 
@@ -70,6 +74,20 @@ Everything else must be marked as planned, experimental, or future.
 
 > Updated by AI after every meaningful step. Next session reads this to continue without re-explaining context.
 
-- **Doing:** N/A (v0.1 doc audit complete).
-- **Done this session:** Full v0.1 audit: code vs SPEC vs docs vs README. Fixed 6 classes of discrepancies — fake build steps in README, stale v0.2 claims in WORKFLOWS.md, `_jxaRunning`→`_refreshRunning` in SPEC.md, outdated JXA platform description, inflated fields in PRIVACY.md, and 5 stale requirement statuses (PLAT-003, CAL-012, DATA-001, DATA-002, CACHE-008 → Implemented).
-- **Last action:** 2026-06-08 — doc audit complete. All v0.1 tasks Done, all docs honest.
+- **Doing:** N/A (TASK-010 and TASK-011 complete).
+- **Done this session:** Implemented TASK-010 (event details panel) and TASK-011 (multi-day/past events):
+  - **REQ-CAL-007**: Expandable event detail panel showing location, URL (clickable link), notes (truncated to 200 chars), attendees list, calendar source name with account, and recurrence summary.
+  - **REQ-CAL-008**: Click-to-expand/collapse via `_expandedEvents` Set on MacOSIntegration. Click toggles membership and re-renders.
+  - **REQ-CAL-009**: `getEventsForDate()` rewritten to use overlap-based filter (`evtStart <= dayEnd && evtEnd >= dayStart`) so multi-day events appear on every overlapping day.
+  - **REQ-CAL-010**: New `pastEventDisplay` setting (`normal`/`dimmed`/`hidden`, default `dimmed`). Past events get `opacity: 0.5` via `.calendian-event-past` class or are excluded from render entirely.
+  - **REQ-CAL-011**: Recurring events show ⟳ indicator in title row with tooltip. No click actions (read-only visual indicator).
+  - Added `pastEventDisplay` dropdown to settings panel after refresh interval.
+  - Added CSS classes for `.calendian-event-item`, `.calendian-event-detail`, `.calendian-event-past`, `.calendian-event-recurring`, `.calendian-event-title-row`.
+  - Updated SPEC.md §7 statuses (CAL-007 through CAL-011 → Implemented).
+  - Updated TASKS.md (TASK-010 and TASK-011 → Done).
+- **Decisions:**
+  - Multi-day filter uses simple overlap check for both timed and all-day events (removed the separate all-day branch since the overlap logic handles both).
+  - Past event detection checks `evtEnd < now` for timed events; for all-day events on past days, compares `selectedDate` against today.
+  - Event detail panel rendered as a sibling div after the event item (not nested) to avoid flex layout issues.
+- **Next:** Eye-check in Obsidian (requires Bash permission to compile helper and reload).
+- **Last action:** 2026-06-08 — TASK-010 and TASK-011 code + docs complete.

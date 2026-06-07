@@ -92,17 +92,19 @@ Tasks are ordered by dependency and release target. Every task references requir
 ### TASK-010 — Event details panel
 
 - Requirements: `REQ-CAL-007`, `REQ-CAL-008`, `REQ-UX-005`
-- Status: Todo
+- Status: Done
 - Priority: P1
 - Deliverables:
   - Expandable event details.
   - Location/link/notes/recurrence summary where available.
+- Evidence: `renderEventsSection()` at main.js~5325. Click-to-expand with `_expandedEvents` Set. Detail panel shows location, URL, notes, attendees, calendar source, recurrence summary.
 
 ### TASK-011 — Multi-day and past event behavior
 
 - Requirements: `REQ-CAL-009`, `REQ-CAL-010`, `REQ-CAL-011`
-- Status: Todo
+- Status: Done
 - Priority: P1
+- Evidence: `getEventsForDate()` uses overlap-based filter for multi-day events. `pastEventDisplay` setting (normal/dimmed/hidden) with `calendian-event-past` CSS class. Recurring indicator (⟳) in title row.
 
 ### TASK-012 — Reminder polish
 
