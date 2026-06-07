@@ -8588,11 +8588,11 @@ MacOSIntegration.prototype.countReminderLists = function(reminders) {
 // REQ-WRITE-001 to REQ-WRITE-010, REQ-WRITE-011 to REQ-WRITE-020 (v0.4)
 
 // ── Node.js-only helper functions (not used in Obsidian concatenation) ──
-// Guarded: these are only available when loaded via require() in Node.js context.
-// The Obsidian-side code uses MacOSIntegration.prototype.execHelper() instead.
+// Only execute when loaded directly via Node.js require(), not in Obsidian/Electron.
+// Check: obsidian global exists in plugin context but not in plain Node.js.
 
 (function() {
-if (typeof module !== 'undefined' && module.exports) {
+if (typeof obsidian === 'undefined' && typeof module !== 'undefined' && module.exports) {
     var nodeChildProcess = require('child_process');
 
     function callHelper(helperPath, args) {
