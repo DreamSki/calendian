@@ -1625,11 +1625,19 @@ async function tryToCreateDailyNote(date, inNewSplit, settings, cb) {
  *   "3pm team sync for 1 hour"
  *   "on 2026-12-25 Christmas dinner"
  *
- * Supported patterns (Chinese):
+ * Supported patterns (Chinese — REQ-NL-005):
  *   "明天下午3点开会" / "明天3点开会"
- *   "周五上午10点看牙医"
- *   "今天中午吃饭" / "晚上8点跑步"
- *   "下周一早上9点评审"
+ *   "周五上午10点看牙医" / "下周三下午2点评审"
+ *   "今天中午吃饭" / "晚上8点跑步" / "凌晨3点出发"
+ *   "下周一早上9点评审" / "下下周五晚8点"
+ *   "6月15日下午3点看牙医" / "12月25号聚餐"
+ *   "3天后下午4点call" / "一周后开会"
+ *   "明早9点跑步" / "明晚聚餐" / "今早8点会议"
+ *   "周末下午3点逛街" / "下周周末爬山"
+ *   "下个月5号复查" / "明年3月体检"
+ *   "3点到5点开会" / "下午2点开2小时"
+ *   "3点半下午茶" / "2点一刻出发" / "5点三刻收工"
+ *   "下午3点1小时30分钟" / "一个半小时讨论"
  *
  * @param {string} text - Natural language input
  * @param {moment} refDate - Reference date (defaults to today)
@@ -1654,28 +1662,68 @@ function parseNaturalLanguage(text, refDate) {
 
     // ── Chinese date detection ──────────────────────────────
 
-    var cnAbsDate = { '今天': 0, '明天': 1, '后天': 2, '大后天': 3, '昨天': -1, '前天': -2 };
-    for (var cnKey in cnAbsDate) {
-        if (working.indexOf(cnKey) !== -1) {
-            date = refDate.clone().add(cnAbsDate[cnKey], 'days');
-            working = working.split(cnKey).join(' ');
-            confidenceScore += 3;
+    // Combined day+period shorthands (before absolute dates so they're consumed whole)
+    var cnShortcuts = [
+        { re: /明早/, add: 1, time: '09:00' },
+        { re: /明晚/, add: 1, time: '19:00' },
+        { re: /今早/, add: 0, time: '09:00' },
+        { re: /今晚/, add: 0, time: '19:00' },
+        { re: /后天早上/, add: 2, time: '09:00' },
+        { re: /后天晚上/, add: 2, time: '19:00' },
+        { re: /后天中午/, add: 2, time: '12:00' },
+    ];
+    for (var si = 0; si < cnShortcuts.length; si++) {
+        var sc = cnShortcuts[si];
+        if (sc.re.test(working)) {
+            date = refDate.clone().add(sc.add, 'days');
+            if (!time) time = sc.time;
+            working = working.replace(sc.re, ' ');
+            confidenceScore += 4;
             break;
         }
     }
 
-    // Chinese weekday: 下周一, 周一, 星期一, 下星期一
+    var cnAbsDate = { '今天': 0, '明天': 1, '后天': 2, '大后天': 3, '昨天': -1, '前天': -2 };
+    if (!date) {
+        for (var cnKey in cnAbsDate) {
+            if (working.indexOf(cnKey) !== -1) {
+                date = refDate.clone().add(cnAbsDate[cnKey], 'days');
+                working = working.split(cnKey).join(' ');
+                confidenceScore += 3;
+                break;
+            }
+        }
+    }
+
+    // Chinese weekday: 下周一, 周一, 星期一, 下星期一, 下下周一
     if (!date) {
         var cnDayNum = { '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '日': 0, '天': 0 };
-        var cnWdRe = /(下)?周\s*([一二三四五六日天])|星期\s*([一二三四五六日天])/;
+        var cnWdRe = /(下下|下)?(?:周|星期|礼拜)\s*([一二三四五六日天])|星期\s*([一二三四五六日天])/;
         var cnWdMatch = working.match(cnWdRe);
         if (cnWdMatch) {
             var targetDow = cnDayNum[cnWdMatch[2] || cnWdMatch[3]];
-            var cnNextWeek = !!cnWdMatch[1];
-            date = refDate.clone().day(targetDow + (cnNextWeek ? 7 : 0));
-            if (date.isBefore(refDate, 'day') && !cnNextWeek) date.add(7, 'days');
-            if (date.isSame(refDate, 'day') && !cnNextWeek) date.add(7, 'days');
+            var weekOffset = cnWdMatch[1] === '下下' ? 14 : (cnWdMatch[1] === '下' ? 7 : 0);
+            date = refDate.clone().day(targetDow + weekOffset);
+            if (date.isBefore(refDate, 'day') && weekOffset === 0) date.add(7, 'days');
+            if (date.isSame(refDate, 'day') && weekOffset === 0) date.add(7, 'days');
             working = working.replace(cnWdMatch[0], ' ');
+            confidenceScore += 3;
+        }
+    }
+
+    // Chinese: "周末", "下周周末"
+    if (!date) {
+        if (/下周(的)?(周末|末)/.test(working)) {
+            date = refDate.clone().day(6 + 7); // next Saturday
+            working = working.replace(/下周(的)?(周末|末)/, ' ');
+            confidenceScore += 3;
+        } else if (/(这(个)?)?(周末|周木|週末)/.test(working)) {
+            // "这周末" or "周末" → this coming Saturday
+            date = refDate.clone().day(6);
+            if (date.isSame(refDate, 'day') || date.isBefore(refDate, 'day')) {
+                date.add(7, 'days');
+            }
+            working = working.replace(/(这(个)?)?(周末|周木|週末)/, ' ');
             confidenceScore += 3;
         }
     }
@@ -1759,6 +1807,73 @@ function parseNaturalLanguage(text, refDate) {
         }
     }
 
+    // Chinese: "X天后", "X周后", "X个月后", "X星期后" (REQ-NL-005)
+    if (!date) {
+        var cnRelRe = /(\d+|一|二|三|四|五|六|七|八|九|十|半|两)\s*(天|周|个?月|个?(?:星期)|年)后/;
+        var cnRelMatch = working.match(cnRelRe);
+        if (cnRelMatch) {
+            var cnNumStr = cnRelMatch[1];
+            var cnUnit = cnRelMatch[2];
+            var cnNum = mapCnNumber(cnNumStr);
+            if (cnNum > 0) {
+                date = refDate.clone();
+                if (cnUnit === '天') date.add(cnNum, 'days');
+                else if (cnUnit === '周' || cnUnit.indexOf('星期') !== -1) date.add(cnNum * 7, 'days');
+                else if (cnUnit === '个月' || cnUnit === '月') date.add(cnNum, 'months');
+                else if (cnUnit === '年') date.add(cnNum, 'years');
+                working = working.replace(cnRelMatch[0], ' ');
+                confidenceScore += 3;
+            }
+        }
+    }
+
+    // Chinese: "下个月", "下下个月", "上个月", "明年", "后年", "去年"
+    if (!date) {
+        var cnMacroDate = [
+            { re: /下下个?月/, addMonths: 2 },
+            { re: /下个?月/, addMonths: 1 },
+            { re: /上个?月/, addMonths: -1 },
+            { re: /后年/, addYears: 2 },
+            { re: /明年/, addYears: 1 },
+            { re: /去年/, addYears: -1 },
+        ];
+        for (var mdi = 0; mdi < cnMacroDate.length; mdi++) {
+            var md = cnMacroDate[mdi];
+            if (md.re.test(working)) {
+                date = refDate.clone();
+                if (md.addMonths) date.add(md.addMonths, 'months');
+                if (md.addYears) date.add(md.addYears, 'years');
+                working = working.replace(md.re, ' ');
+                confidenceScore += 3;
+                break;
+            }
+        }
+    }
+
+    // Chinese: "X月Y日" or "X月Y号" (REQ-NL-005)
+    if (!date) {
+        var cnMDRe = /(\d{1,2})\s*月\s*(\d{1,2})\s*(?:日|号)/;
+        var cnMDMatch = working.match(cnMDRe);
+        if (cnMDMatch) {
+            var cnMonth = parseInt(cnMDMatch[1], 10);
+            var cnDay = parseInt(cnMDMatch[2], 10);
+            if (cnMonth >= 1 && cnMonth <= 12 && cnDay >= 1 && cnDay <= 31) {
+                var now = refDate.clone();
+                date = window.moment([now.year(), cnMonth - 1, cnDay]);
+                // If the date is before today, assume next year
+                if (date.isBefore(refDate, 'day')) {
+                    date.add(1, 'years');
+                }
+                if (date.isValid()) {
+                    working = working.replace(cnMDMatch[0], ' ');
+                    confidenceScore += 4;
+                } else {
+                    date = null;
+                }
+            }
+        }
+    }
+
     // "on YYYY-MM-DD" or "on MM/DD"
     if (!date) {
         var isoDateRe = /\b(on\s+)?(\d{4})-(\d{2})-(\d{2})\b/;
@@ -1799,22 +1914,25 @@ function parseNaturalLanguage(text, refDate) {
         working = working.replace(ftMatch[0], ' ');
     }
 
-    // Chinese: "X点到Y点"
+    // Chinese: "X点到Y点" (range detection)
     if (!time || !endTime) {
-        var cnRangeRe = /(\d{1,2})点(?:到|至|~|～)(\d{1,2})点/;
+        var cnRangeRe = /(凌晨|早上|上午|中午|下午|晚上|傍晚|夜里)?(\d{1,2})点(?:一刻|三刻|半)?(?:(\d{1,2})分?)?\s*(?:到|至|~|～|-)\s*(凌晨|早上|上午|中午|下午|晚上|傍晚|夜里)?(\d{1,2})点(?:一刻|三刻|半)?(?:(\d{1,2})分?)?/;
         var cnRangeMatch = working.match(cnRangeRe);
         if (cnRangeMatch) {
-            var cnT1 = parseInt(cnRangeMatch[1], 10);
-            var cnT2 = parseInt(cnRangeMatch[2], 10);
-            // Determine AM/PM from context
-            var periodHint = getChinesePeriodHint(working);
-            time = cnHourTo24(cnT1, periodHint);
-            endTime = cnHourTo24(cnT2, periodHint);
-            if (endTime && time && parseInt(endTime.split(':')[0]) < parseInt(time.split(':')[0])) {
-                // e.g., "3点到5点" in afternoon context → both PM
-                // cross-noon case: if t1<t2 and both in PM, fine; if t2<t1, t2 is next day
+            var p1 = cnRangeMatch[1] || getChinesePeriodHint(working);
+            var cnT1 = parseInt(cnRangeMatch[2], 10);
+            var p2 = cnRangeMatch[4] || p1;
+            var cnT2 = parseInt(cnRangeMatch[5], 10);
+            time = cnHourTo24(cnT1, p1);
+            endTime = cnHourTo24(cnT2, p2);
+            if (endTime && time && parseInt(endTime.split(':')[0]) < parseInt(time.split(':')[0]) && p1 === p2) {
+                // e.g., "3点到5点" both in same period → fine
             }
+            // After extracting the range, also strip any nearby period hint that was part of the match
+            var rangeMatchText = cnRangeMatch[0];
             working = working.replace(cnRangeMatch[0], ' ');
+            // Also strip orphaned period hints left adjacent to where the match was
+            working = stripOrphanPeriodHints(working);
             confidenceScore += 2;
         }
     }
@@ -1836,40 +1954,76 @@ function parseNaturalLanguage(text, refDate) {
                 durMinutes = Math.round(durNum);
             }
             if (durMinutes > 0) {
-                var timeParts = time.split(':');
-                var startMin = parseInt(timeParts[0], 10) * 60 + parseInt(timeParts[1], 10);
-                var endMin = startMin + durMinutes;
-                var endH = Math.floor(endMin / 60) % 24;
-                var endM = endMin % 60;
-                endTime = ('0' + endH).slice(-2) + ':' + ('0' + endM).slice(-2);
+                endTime = addMinutesToTime(time, durMinutes);
                 confidenceScore += 1;
             }
             working = working.replace(durMatch[0], ' ');
         }
     }
 
+    // Chinese duration: "X小时", "X个小时", "X分钟", "X小时Y分钟", "X个半小时"
+    if (time && !endTime) {
+        var cnDurRe = /(?:约|大约|大概)?\s*(\d+|一|二|三|四|五|六|七|八|九|十|半|两)\s*(?:个(?:半|多)?)?\s*(小时|钟头|分钟|刻钟?)(?:\s*(\d+)\s*(分钟))?/;
+        var cnDurMatch = working.match(cnDurRe);
+        if (cnDurMatch) {
+            var cnDurNum = mapCnNumber(cnDurMatch[1]);
+            var cnDurUnit = cnDurMatch[2];
+            var cnDurMin2 = cnDurMatch[3] ? parseInt(cnDurMatch[3], 10) : 0;
+            var durMinutesTotal = 0;
+            if (cnDurUnit === '小时' || cnDurUnit === '钟头') {
+                durMinutesTotal = Math.round(cnDurNum * 60);
+            } else if (cnDurUnit === '分钟') {
+                durMinutesTotal = Math.round(cnDurNum);
+            } else if (cnDurUnit === '刻' || cnDurUnit === '刻钟') {
+                durMinutesTotal = Math.round(cnDurNum * 15);
+            }
+            durMinutesTotal += cnDurMin2;
+            if (durMinutesTotal > 0) {
+                endTime = addMinutesToTime(time, durMinutesTotal);
+                confidenceScore += 1;
+            }
+            working = working.replace(cnDurMatch[0], ' ');
+        }
+    }
+
+    // "一个半小时" / "1个半小时" — special case: 1.5 hours
+    if (time && !endTime) {
+        var cnHalfHourRe = /(\d+|一|两)?个半(?:小时|钟头)/;
+        var cnHHMatch = working.match(cnHalfHourRe);
+        if (cnHHMatch) {
+            var hhNum = cnHHMatch[1] ? mapCnNumber(cnHHMatch[1]) : 1;
+            var hhMinutes = Math.round(hhNum * 60 + 30); // X.5 hours
+            endTime = addMinutesToTime(time, hhMinutes);
+            working = working.replace(cnHHMatch[0], ' ');
+            confidenceScore += 1;
+        }
+    }
+
     // ── Single time detection ───────────────────────────────
 
-    // Chinese time: 上午/下午/中午/晚上/早上 + N点/N点半
+    // Chinese time: 凌晨/早上/上午/中午/下午/晚上/傍晚/夜里 + N点/N点半/N点一刻/N点三刻
     if (!time) {
-        var cnTimeRe = /(早上|上午|中午|下午|晚上|傍晚)?(\d{1,2})点(半|(\d{1,2})分?)?/;
+        var cnTimeRe = /(凌晨|早上|上午|中午|下午|晚上|傍晚|夜里)?(\d{1,2})点(?:(一刻|三刻|半)|(\d{1,2})分?)?/;
         var cnTimeMatch = working.match(cnTimeRe);
         if (cnTimeMatch) {
             var cnPeriod = cnTimeMatch[1] || '';
             var cnHour = parseInt(cnTimeMatch[2], 10);
-            var cnHalf = cnTimeMatch[3] === '半';
+            var cnQuarter = cnTimeMatch[3]; // '一刻', '三刻', '半'
             var cnMin = cnTimeMatch[4] ? parseInt(cnTimeMatch[4], 10) : 0;
-            if (cnHalf) cnMin = 30;
+            if (cnQuarter === '半') cnMin = 30;
+            else if (cnQuarter === '一刻') cnMin = 15;
+            else if (cnQuarter === '三刻') cnMin = 45;
             time = cnHourTo24(cnHour, cnPeriod);
             if (!cnPeriod) {
-                // Heuristic: if hour <= 7 and no period hint, assume PM
                 var fullPeriod = getChinesePeriodHint(working);
-                if (!fullPeriod && cnHour <= 7) {
+                if (fullPeriod) {
+                    time = cnHourTo24(cnHour, fullPeriod);
+                } else if (cnHour <= 7) {
+                    // Heuristic: bare hour <= 7, assume PM
                     time = cnHourTo24(cnHour, '下午');
                 }
             }
             if (time) {
-                // Adjust minutes
                 if (cnMin > 0) {
                     var tp = time.split(':');
                     time = tp[0] + ':' + ('0' + cnMin).slice(-2);
@@ -1877,12 +2031,14 @@ function parseNaturalLanguage(text, refDate) {
                 confidenceScore += 2;
             }
             working = working.replace(cnTimeMatch[0], ' ');
+            // Strip orphan period hints near the match
+            working = stripOrphanPeriodHints(working);
         }
     }
 
-    // Chinese standalone period words
+    // Chinese standalone period words (vague time without hour)
     if (!time && !date) {
-        var cnPeriodAlone = { '中午': '12:00', '早上': '09:00', '上午': '09:00', '下午': '14:00', '晚上': '19:00' };
+        var cnPeriodAlone = { '中午': '12:00', '早上': '09:00', '上午': '09:00', '下午': '14:00', '晚上': '19:00', '傍晚': '18:00', '凌晨': '03:00', '夜里': '22:00' };
         for (var cp in cnPeriodAlone) {
             if (working.indexOf(cp) !== -1) {
                 time = cnPeriodAlone[cp];
@@ -1955,6 +2111,12 @@ function parseNaturalLanguage(text, refDate) {
 
     // ── Title extraction ────────────────────────────────────
 
+    // Strip any remaining Chinese period hints (leftover from complex expressions)
+    working = stripOrphanPeriodHints(working);
+
+    // Remove Chinese connecting/measure words that aren't part of the title
+    working = working.replace(/\b(一个|一次|一下|某个|的|去|做|要|想|打算|准备|安排|计划)\b/g, ' ');
+
     // Remove connecting words
     var connectors = /\b(at|on|for|about|from|to|until|till|in|the|a|an|with|every|each|our|my)\b/gi;
     working = working.replace(connectors, ' ');
@@ -1999,6 +2161,36 @@ function parseNaturalLanguage(text, refDate) {
 }
 
 /**
+ * Map Chinese number word or digit string to integer.
+ * Handles: "一"→1, "两"→2, "十"→10, "二十"→20, "半"→0.5, plain digits
+ */
+function mapCnNumber(str) {
+    if (!str) return 0;
+    if (/^\d+$/.test(str)) return parseInt(str, 10);
+    var cnDigits = { '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10, '两': 2, '半': 0.5 };
+    if (str === '十') return 10;
+    if (str.length === 1) return cnDigits[str] || 0;
+    // "二十" → 20, "十二" → 12, "三十五" → 35
+    var total = 0;
+    var i = 0;
+    while (i < str.length) {
+        var ch = str[i];
+        if (ch === '十') {
+            total = (total === 0 ? 1 : total) * 10;
+        } else if (cnDigits[ch]) {
+            if (i + 1 < str.length && str[i + 1] === '十') {
+                total += cnDigits[ch] * 10;
+                i++; // skip '十' on next iteration
+            } else {
+                total += cnDigits[ch];
+            }
+        }
+        i++;
+    }
+    return total;
+}
+
+/**
  * Parse a time expression like "3pm", "3:00pm", "15:00", "3:00" → "HH:MM"
  */
 function parseTimeExpression(str) {
@@ -2026,30 +2218,51 @@ function parseTimeExpression(str) {
 function cnHourTo24(hour, period) {
     if (hour < 1 || hour > 12) return null;
     var h = hour;
-    if (period === '上午' || period === '早上') {
-        // 上午12点 = midnight (0:00), not noon
-        // but usually 上午12点 means 0:00; 上午 can be 0-11
-        // 12 AM (凌晨) = 0
+    if (period === '凌晨' || period === '夜里' || period === '深夜') {
+        // 凌晨/夜里: 0-6 AM range. 凌晨12点 = midnight (0:00)
         if (h === 12) h = 0;
+        // h is already in 0-6 range, keep as-is
+    } else if (period === '早上' || period === '上午') {
+        if (h === 12) h = 0; // 上午12点 = midnight
     } else if (period === '下午' || period === '晚上' || period === '傍晚') {
         if (h < 12) h += 12;
     } else if (period === '中午') {
         if (h >= 11 && h <= 13) h = 12;
-        else if (h < 11) h += 12; // ambiguous
+        else if (h < 11) h += 12;
     }
-    // No period hint: keep as-is (could be AM or PM, caller should adjust)
     return ('0' + h).slice(-2) + ':00';
 }
 
 /**
- * Scan working text for a Chinese period hint (上午/下午/晚上/早上/中午).
+ * Scan working text for a Chinese period hint.
  */
 function getChinesePeriodHint(text) {
+    if (/凌晨|夜里|深夜/.test(text)) return '凌晨';
     if (/早上|上午/.test(text)) return '上午';
     if (/下午/.test(text)) return '下午';
     if (/晚上|傍晚/.test(text)) return '晚上';
     if (/中午/.test(text)) return '中午';
     return '';
+}
+
+/**
+ * Strip orphan Chinese period hint words left behind after range/time extraction.
+ * e.g., "下午 开会" → "开会"
+ */
+function stripOrphanPeriodHints(text) {
+    // \b doesn't work with Chinese chars, so match the words directly
+    return text.replace(/(凌晨|早上|上午|中午|下午|晚上|傍晚|夜里|深夜)\s*/g, ' ');
+}
+
+/**
+ * Add minutes to a "HH:MM" time string, returning a new "HH:MM" string.
+ */
+function addMinutesToTime(t, mins) {
+    var parts = t.split(':');
+    var total = parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10) + mins;
+    var h = Math.floor(total / 60) % 24;
+    var m = total % 60;
+    return ('0' + h).slice(-2) + ':' + ('0' + m).slice(-2);
 }
 
 /** Escape HTML entities for safe preview rendering. */
