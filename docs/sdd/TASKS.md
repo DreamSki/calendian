@@ -175,14 +175,14 @@ Tasks are ordered by dependency and release target. Every task references requir
 - Requirements: `REQ-NL-001` to `REQ-NL-005`
 - Status: Done
 - Priority: P1
-- Evidence: `parseNaturalLanguage()` function with English + expanded Chinese locale support (CN dates: 今天/明天/后天/大后天/明早/明晚/今早/今晚/周末/下周周末/周一~周日/下周一~下周日/下下周一/X天后/X周后/X个月后/下个月/明年/X月Y日; CN times: 凌晨/早上/上午/中午/下午/晚上/傍晚/夜里/N点/N点半/N点一刻/N点三刻; CN duration: X小时/X分钟/X小时Y分钟/一个半小时; period hint cleanup via stripOrphanPeriodHints). `QuickEventModal` class with live preview + confidence badge. "⚡" button in sidebar header. "Fill Form" → pre-filled EventCreateModal; "Manual Form" keeps manual path. Code at main.js (parser + helpers + modal).
+- Evidence: `parseNaturalLanguage()` English + expanded Chinese (compact dates: YYMMDD, X月Y日/号, Chinese numerals, 明早/明晚/今早/今晚, 周末, 下下周; relative: X天后/周后/月后, 下个月/明年; times: 凌晨/N点一刻/三刻; duration: X小时Y分钟/一个半小时; helpers: mapCnNumber, stripOrphanPeriodHints, addMinutesToTime). `QuickEventModal` (⚡) with live regex preview (300ms debounce) + dual "→ Event"/"→ Reminder" buttons. EventCreateModal and ReminderCreateModal accept optional `prefill` parameter. Code in main.js.
 
 ### TASK-023a — AI-powered NL parsing (optional)
 
 - Requirements: `REQ-NL-001` (enhanced accuracy path)
 - Status: Done
 - Priority: P2
-- Evidence: `callAIForParsing()` async function sends text to OpenAI-compatible chat completions API. Settings: `aiParsingEnabled`, `aiEndpoint`, `aiApiKey`, `aiModel` in settings tab. QuickEventModal tries AI-first (800ms debounce), falls back to regex. Preview shows "🤖 AI" or "📋 Regex" badge. API key stored in gitignored `data.json`. Privacy note in settings UI.
+- Evidence: `callAIForParsing()` with AbortController (10s timeout + cancel-on-type). Compact system prompt. `response_format: json_object`. Dual-strategy JSON extraction. Settings: `aiParsingEnabled`, `aiEndpoint`, `aiApiKey`, `aiModel`. Enter-key trigger only (never auto). Two-tier result: `_aiResult` (locked after Enter, cleared on new input) + `_parsedResult` (live regex). Collapsible raw AI JSON in preview. Console timing log. Privacy note in settings UI. API key in gitignored data.json.
 
 ## v0.4 — Safe edit/delete
 

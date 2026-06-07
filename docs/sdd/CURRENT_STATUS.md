@@ -26,7 +26,7 @@ This document records the actual repository state. It intentionally separates im
 | Month cell event dots | Implemented | Calendar-colored dots on month cells showing event presence per calendar. Hollow reminder dot. Multi-day event span support. Uses in-memory cache only (no helper calls). Respects source filters. Dynamic CSS injection for per-calendar colors. |
 | Refresh / sync | Partial | Timer-driven refresh (configurable interval, default 5min). Manual refresh button. `_refreshRunning` concurrency guard. Window focus and EKEventStoreChangedNotification watch deferred beyond v0.2. Post-write refresh planned for v0.3. See SPEC.md §7.6.1. |
 | Right-click actions | Planned | Current day/week context menu is inherited from calendar note behavior; Calendian event/reminder actions are not complete. |
-| Write operations | **Partial (v0.3)** | Event and reminder creation implemented via Swift helper `create-event`/`create-reminder` commands + `EventCreateModal`/`ReminderCreateModal`. Natural language quick-create (TASK-023) done. Default calendar/list settings implemented. Edit/delete planned for v0.4. |
+| Write operations | **Partial (v0.3)** | Event/reminder creation via `EventCreateModal`/`ReminderCreateModal`. NL quick-create (TASK-023) with English + expanded Chinese regex parser + optional AI backend. QuickEventModal dual-path (Event/Reminder). Default calendar/list settings. Positional arg bug fixed. Edit/delete planned for v0.4. |
 | Note association | Planned | Existing daily/weekly note integration comes from the base calendar plugin behavior; Calendian event/reminder frontmatter association is not complete. |
 | Tasks integration | Planned | Current task dots for daily notes exist from base plugin behavior; macOS Reminders sync with Obsidian Tasks is not implemented. |
 | Timeline / week / statistics views | Planned | Not current behavior. |
@@ -61,7 +61,10 @@ README may list the following as current behavior:
 - no-date reminders in collapsible section;
 - reminder display range selector (today / 7 days / all incomplete);
 - month cell event dots (calendar-colored, hollow reminder dot, multi-day span);
-- diagnostic export with consent modal and field redaction.
+- diagnostic export with consent modal and field redaction;
+- event/reminder creation with validation and post-write refresh;
+- natural language quick-create (English + Chinese regex parser);
+- optional AI-powered NL parsing via configurable API (Enter-triggered, privacy-controlled).
 
 Everything else must be marked as planned, experimental, or future.
 
@@ -80,23 +83,17 @@ Everything else must be marked as planned, experimental, or future.
 
 > Updated by AI after every meaningful step. Next session reads this to continue without re-explaining context.
 
-- **Doing:** Documentation alignment for v0.3 progress.
-- **Done this session (v0.3):**
-  - **Swift helper**: `create-event` and `create-reminder` commands. Tested with real EventKit data.
-  - **EventCreateModal**: Full event creation form with validation + error display + post-create refresh.
-  - **ReminderCreateModal**: Full reminder creation form with validation + error display + post-create refresh.
-  - **Sidebar buttons**: "+Event" and "+Remind" in header row.
-  - **Default calendar/list settings**: `defaultCalendarId`/`defaultReminderListId` in settings tab, auto-detect fallback (Outlook).
-  - **Bug fixes**: ISO date millisecond stripping, date parsing when no time entered, async dropdown loading, error message display.
-  - **Code split attempt**: require() blocked; reverted. Module files preserved.
+- **Doing:** Final doc alignment after v0.3 NL + AI implementation burst.
+- **Done in v0.3:**
+  - **Write backend**: `create-event`/`create-reminder` Swift commands + `EventCreateModal`/`ReminderCreateModal`.
+  - **NL regex parser**: `parseNaturalLanguage()` English + expanded Chinese (compact dates, numerals, duration).
+  - **QuickEventModal**: Regex live preview, dual "→ Event"/"→ Reminder" buttons, AI on Enter.
+  - **AI parsing**: `callAIForParsing()` OpenAI-compatible, Enter-only, 10s timeout, cancel-on-type, JSON mode, raw output.
+  - **Bug fixes**: Positional arg placeholders, ISO ms stripping, AI JSON extraction, AI result lock.
 - **Decisions:**
   - require() to local files does NOT work in Obsidian plugin context.
-  - Settings stored in `data.json` (gitignored) — no personal data in git.
-  - Auto-detect mode uses "outlook" substring matching (generic, not personal).
-- **Next:** Natural language event parsing (TASK-023). Deferred v0.2 items.
-- **Natural language parsing (TASK-023, 023a)**: `parseNaturalLanguage()` with English + expanded Chinese locale support (明早/明晚/今早/今晚, 下下周, 周末, X天后/周后/月后, 下个月/明年, X月Y日/号, 凌晨X点, X点一刻/三刻, X小时Y分钟, 一个半小时, YYMMDD, Chinese numeral hours, period hint cleanup). Optional AI-powered parsing via `callAIForParsing()` with configurable OpenAI-compatible backend (DeepSeek, etc).
-- **Bug fixes**: Reminder priority always defaulted to "none" due to positional arg mismatch (JS conditional push vs Swift positional parse). Fixed by always pushing placeholders for all optional args in both create-event and create-reminder.
-- **Next:** Deferred v0.2 items (REQ-UX-010, REQ-PERF-003, REQ-PERM-005, REQ-SYNC-004/005/007, REQ-DATA-003, REQ-TIME-005). v0.4 edit/delete.
-- **AI trigger safety**: AI parsing only fires on Enter key press (not on every keystroke). Regex parser continues to run on 300ms debounce for free live preview.
-- **QuickEventModal now dual-path**: "→ Event" and "→ Reminder" buttons both pre-fill from parsed NL. ReminderCreateModal accepts prefill. "白天" added as period hint (→ 09:00).
-- **Last action:** 2026-06-08 — AI trigger fixed (Enter-only), QuickEventModal dual event/reminder paths, 白天 period hint.
+  - AI parsing is Enter-only — never auto-fires on keystrokes.
+  - NL quick-create is dual-path: user decides event vs reminder after seeing parsed result.
+  - All personal info (calendar IDs, API keys) stays in gitignored `data.json`.
+- **Next:** Deferred v0.2 items (9 items). v0.4 edit/delete.
+- **Last action:** 2026-06-08 — full doc audit after NL + AI implementation burst.

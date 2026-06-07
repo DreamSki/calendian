@@ -1,7 +1,7 @@
 # Calendian Specification
 
 > Status: authoritative product specification  
-> Version target: v0.2 / read-only polish — complete  
+> Version target: v0.3 / safe create — nearly complete  
 > Last updated: 2026-06-08  
 > Plugin ID: `calendian`  
 > Process: Specification-Driven Development (SDD)
@@ -131,6 +131,22 @@ The following features are currently implemented in the codebase. All macOS data
 - ✅ Non-recurring events only (`.thisEvent` span, REQ-WRITE-005)
 - ✅ Default calendar/list preference stored in settings (`defaultCalendarId`, `defaultReminderListId`)
 - ✅ Sidebar "+Event" and "+Remind" buttons (shown only when source enabled + permission granted)
+- ✅ EventCreateModal and ReminderCreateModal accept optional `prefill` parameter from NL parsing
+- ✅ Positional arg placeholders in create command builders prevent field misalignment
+
+#### Natural language event creation (v0.3)
+- ✅ `parseNaturalLanguage()` regex parser with English + expanded Chinese locale
+- ✅ Chinese: 明早/明晚/今早/今晚, 周末/下周周末, 下下周, X天后/周后/月后, 下个月/明年
+- ✅ Chinese: X月Y日/号, 凌晨X点, X点一刻/三刻, YYMMDD compact, Chinese numeral hours/thousands
+- ✅ Chinese duration: X小时Y分钟, 一个半小时; period hint cleanup
+- ✅ `QuickEventModal` (⚡ button) with live regex preview (300ms debounce)
+- ✅ Dual-path: "→ Event" pre-fills EventCreateModal, "→ Reminder" pre-fills ReminderCreateModal
+- ✅ Optional AI-powered parsing via `callAIForParsing()` with configurable OpenAI-compatible backend
+- ✅ AI: Enter-key trigger only (no auto-fire), 10s timeout, cancelled on new keystroke, 256 max_tokens
+- ✅ AI: `response_format: json_object`, dual-strategy JSON extraction (fences + bare braces)
+- ✅ AI settings: `aiParsingEnabled`, `aiEndpoint`, `aiApiKey`, `aiModel` in Settings tab with privacy note
+- ✅ Preview shows `📋 Regex` / `🤖 AI` source badge + confidence level + collapsible raw AI JSON
+- ✅ Two-tier result model: `_aiResult` (locked after Enter, cleared on new input) + `_parsedResult` (live regex)
 
 ### 2.2 Partial and known gaps for v0.2
 
@@ -149,7 +165,6 @@ The following features are currently implemented in the codebase. All macOS data
 
 **Explicitly not yet done (v0.3+)**:
 - Code split into multiple JS modules (REQ-ARCH-001, target v0.3) — modules extracted to `src/` but require() wiring blocked by Obsidian plugin loading constraints
-- Natural language event creation (REQ-NL-*, TASK-023, target v0.3)
 - Recurring event safety model (REQ-REC-002/003/007, target v0.3): blocking recurring edits not yet implemented
 - Remaining v0.2 deferred items (REQ-UX-010, REQ-PERF-003, REQ-PERM-005, REQ-SYNC-004/005/007, REQ-DATA-003, REQ-TIME-005, REQ-REM-009)
 

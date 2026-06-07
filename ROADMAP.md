@@ -7,7 +7,7 @@
 
 This roadmap is not an independent wish list. Every release is derived from requirement groups in [`SPEC.md`](./SPEC.md), acceptance gates in [`docs/sdd/ACCEPTANCE.md`](./docs/sdd/ACCEPTANCE.md), tasks in [`docs/sdd/TASKS.md`](./docs/sdd/TASKS.md), and risks in [`docs/sdd/RISKS.md`](./docs/sdd/RISKS.md).
 
-Current repository status: **v0.3 safe create — nearly complete**. Event/reminder creation + NL parsing done. Only code split (blocked) and deferred v0.2 items remain.
+Current repository status: **v0.3 safe create — nearly complete**. Event/reminder creation (10/10 REQ-WRITE), NL parsing with AI (5/5 REQ-NL), default settings (1/1). Only code split (blocked) and deferred v0.2 items (9) remain.
 
 ---
 
@@ -161,8 +161,11 @@ Allow users to create simple non-recurring events and simple reminders from Obsi
 - ✅ Safe failure state (error classification + red error banner).
 - ✅ Recurring event creation blocked (only `.thisEvent` span).
 - ✅ Default calendar/list settings (`defaultCalendarId`, `defaultReminderListId`).
-- ✅ Natural language event creation (`QuickEventModal` + `parseNaturalLanguage()`, English + Chinese).
-- ✅ NL confirmation dialog (live preview with confidence badge, Fill Form opens EventCreateModal pre-filled).
+- ✅ Natural language creation (`QuickEventModal` + `parseNaturalLanguage()`, English + expanded Chinese).
+- ✅ Chinese NL: compact dates (YYMMDD, Chinese numerals, X月Y日), times (凌晨/一刻/三刻), duration (X小时Y分钟).
+- ✅ NL dual-path: "→ Event" and "→ Reminder" buttons, both pre-fill their respective modals.
+- ✅ Optional AI-powered NL parsing via configurable OpenAI-compatible API (Enter-triggered, not auto).
+- ✅ AI: 10s timeout, cancel on type, `response_format: json_object`, collapsible raw JSON preview.
 - ❌ Module refactor completed — `src/` files on disk but require() blocked.
 - ❌ Subtask display (helper `parentId` needed, REQ-REM-009).
 
