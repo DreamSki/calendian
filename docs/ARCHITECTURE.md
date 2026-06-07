@@ -175,15 +175,46 @@ User submits create/edit/delete form
 
 ### Refresh flow
 
+All refresh paths converge on `MacOSIntegration.init()`, which is gated by `_refreshRunning` to prevent concurrent helper invocations.
+
+#### Current triggers
+
 ```
-Timer fires (configurable interval)
-  → macOS adapter reads all sources
-  → Old cache retained
-  → New data parsed
-  → Cache atomically replaced
-  → UI re-renders if selected date data changed
-  → If read fails: retain old cache, show stale-data indicator
+Timer fires (refreshIntervalMinutes, default 5)
+ Manual refresh button (↻ in date header)
+  Permission retry button
+   Cache freshness check on startup (2× interval, min 15min)
+    Source filter toggle in settings
+         │
+         ▼
+    MacOSIntegration.init()
+         │
+    _refreshRunning? ── true ──→ skip (log "refresh already running")
+         │ false
+         ▼
+    execHelper(['events'/'reminders', fromISO, toISO, ...])
+         │
+    caldian-helper → EventKit → JSON stdout
+         │
+    JSON.parse() → domain model (CalendianEvent[] / CalendianReminder[])
+         │
+    this.allEvents / this.allReminders updated
+         │
+    saveEventsToCache() / saveRemindersToCache() → data.json
+         │
+    render() → DOM update
+         │
+    _refreshRunning = false
 ```
+
+#### Planned triggers (v0.2–v0.3)
+
+| Trigger | Version | Mechanism |
+|---|---|---|
+| Window focus | v0.2 | `window.onfocus` → `init()` if cache stale |
+| macOS system notification | v0.2 | `calendian-helper watch` subscribes `EKEventStoreChangedNotification` → writes signal → JS calls `init()` |
+| Post-write refresh | v0.3 | After create/edit/delete via helper → `init()` immediately |
+| Watch process failure | v0.2 | Fall back to timer-based refresh |
 
 ---
 

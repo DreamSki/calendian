@@ -20,7 +20,7 @@ Tasks are ordered by dependency and release target. Every task references requir
 ### TASK-001 — Align packaging and compatibility metadata
 
 - Requirements: `REQ-PLAT-001`, `REQ-PLAT-002`, `REQ-PLAT-003`
-- Status: Review
+- Status: Done
 - Priority: P0
 - Deliverables:
   - Align plugin name, id, description, version, and minimum Obsidian version.
@@ -28,7 +28,7 @@ Tasks are ordered by dependency and release target. Every task references requir
   - Document desktop-only/macOS-only behavior.
 - Definition of Done:
   - README, SPEC, ROADMAP, and `manifest.json` do not contradict each other.
-- Evidence: `manifest.json` id=calendian, name=Calendian. Folder name `calendar-macos-sync` still needs rename (see CURRENT_STATUS.md).
+- Evidence: `manifest.json` id=calendian, name=Calendian. Folder renamed from `calendar-macos-sync` to `calendian`. VIEW_TYPE_CALENDAR updated.
 
 ### TASK-002 — Permission state model and recovery UI
 
@@ -75,10 +75,10 @@ Tasks are ordered by dependency and release target. Every task references requir
 ### TASK-008 — Privacy and diagnostics baseline
 
 - Requirements: `REQ-PRIV-001` to `REQ-PRIV-002`, `REQ-DIAG-001`
-- Status: Review
+- Status: Done
 - Priority: P1
-- Evidence: Privacy section in settings tab documents local-only behavior. Diagnostic info in footer (refresh time, duration). Full diagnostic panel deferred to v0.2. Code at main.js:816-838.
-- Remaining: Full diagnostic panel (REQ-DIAG-001). Diagnostics redaction by default (REQ-DIAG-002, v0.2).
+- Evidence: Privacy section in settings tab documents local-only behavior. Diagnostic panel in settings shows plugin version, platform, helper status, permissions, source counts, cache stats, refresh timing, and error classification (REQ-DIAG-001). Export and redaction deferred to v0.2 (REQ-DIAG-002). Code at main.js:833-879.
+- Remaining: Diagnostic export with consent and redaction (REQ-DIAG-002, v0.2).
 
 ### TASK-009 — Error classification and recovery
 

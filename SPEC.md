@@ -520,6 +520,58 @@ Goal, habit, intention, nudge, and review data SHALL reside exclusively in Obsid
 | REQ-PERF-003 | Large calendars SHOULD degrade gracefully. | P1 | v0.2 | Planned |
 | REQ-PERF-004 | Plugin unload SHALL not leave active intervals or detached DOM. | P0 | v0.1 | Implemented |
 
+### 7.6.1 Sync and refresh strategy
+
+> The plugin uses a **native Swift EventKit helper** (`calendian-helper`) for all macOS data access. Refresh is designed as a multi-path, single-gate system.
+
+#### Refresh architecture
+
+```
+External changes            Obsidian writes (v0.3+)     Timer (configurable)
+(Calendar.app / iCloud)          │                        │
+        │                         │                        │
+   Planned: watch      ───────────┼────────────────────────┘
+   (EKEventStoreChanged           │
+    Notification)                 ▼
+                           _refreshRunning gate
+                                  │
+                            ┌─ is running? ─→ skip
+                            │
+                            └─→ execHelper() → 72ms
+                                       │
+                                  save to cache
+                                       │
+                                  render() → UI
+```
+
+#### Refresh triggers (current and planned)
+
+| Trigger | Status | Mechanism |
+|---|---|---|
+| Configurable timer | Implemented | `setInterval` on `refreshIntervalMinutes` (default 5) |
+| Manual refresh | Implemented | `↻` button in date header |
+| Cache stale check | Implemented | `isCacheFresh()` — 2× interval, min 15min |
+| Permission retry | Implemented | Retry button calls `init()` |
+| Source filter toggle | Implemented | `render()` with in-memory filter |
+| Window focus | **Planned v0.2** | `window.onfocus` → `init()` if cache stale |
+| macOS system notification | **Planned v0.2** | `calendian-helper watch` subscribes `EKEventStoreChangedNotification` → writes signal → JS calls `init()` |
+| Post-write refresh | **Planned v0.3** | After create/edit/delete via helper, immediately call `init()` |
+
+#### Concurrency safety
+
+All refresh paths go through `init()`, which has a `_refreshRunning` boolean gate. If a refresh is already in progress, subsequent calls return immediately without starting a second helper process.
+
+| ID | Requirement | Priority | Target | Status |
+|---|---|---|---|---|
+| REQ-SYNC-001 | THE SYSTEM SHALL refresh from macOS sources on a configurable timer interval. | P0 | v0.1 | Implemented |
+| REQ-SYNC-002 | THE SYSTEM SHALL provide a manual refresh control. | P1 | v0.1 | Implemented |
+| REQ-SYNC-003 | THE SYSTEM SHALL prevent concurrent refresh operations. | P0 | v0.1 | Implemented |
+| REQ-SYNC-004 | THE SYSTEM SHOULD refresh when the Obsidian window gains focus after being in the background. | P1 | v0.2 | Planned |
+| REQ-SYNC-005 | THE SYSTEM SHOULD detect macOS calendar/reminder changes via system notification and refresh automatically. | P1 | v0.2 | Planned |
+| REQ-SYNC-006 | AFTER a write operation (create/edit/delete), THE SYSTEM SHALL refresh from source immediately. | P0 | v0.3 | Planned |
+| REQ-SYNC-007 | WHEN a system notification watch process terminates unexpectedly, THE SYSTEM SHOULD log the failure and fall back to timer-based refresh. | P1 | v0.2 | Planned |
+| REQ-SYNC-008 | THE SYSTEM SHALL NOT lose data due to concurrent refresh and write operations. | P0 | v0.3 | Planned |
+
 ### 7.7 UX requirements
 
 | ID | Requirement | Priority | Target | Status |

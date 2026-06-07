@@ -27,6 +27,20 @@ All code in `main.js` (5866 lines). The first ~4400 lines are upstream Calendar 
 
 Data flow: `calendian-helper` (EventKit) → JSON stdout → `execHelper()` → in-memory cache → `render()` → DOM. Disk cache written to `data.json` on each successful load.
 
+### Refresh & sync
+
+**All refresh paths converge on `init()`**, gated by `_refreshRunning` to prevent concurrent helper spawns:
+
+- **Configurable timer** (`refreshIntervalMinutes`, default 5) — calls `init()`
+- **Manual refresh** (`↻` button) — calls `init()`
+- **Permission retry** — calls `init()`
+- **Source filter toggle** — calls `render()` only (in-memory filter, no helper call)
+- **Planned v0.2**: Window focus refresh (`window.onfocus` → `init()`)
+- **Planned v0.2**: `calendian-helper watch` — subscribes `EKEventStoreChangedNotification`, writes signal file on change, JS polls signal → calls `init()`
+- **Planned v0.3**: Post-write refresh — after create/edit/delete → `init()` immediately
+
+See SPEC.md §7.6.1 and ARCHITECTURE.md §3 for full refresh architecture.
+
 ## What NOT to do
 
 - **Do not introduce npm, TypeScript, esbuild, or any build toolchain.** The project is plain JS loaded directly by Obsidian. Target multi-file split (v0.3) uses `require()` only.
@@ -86,7 +100,6 @@ this.lastError = { calendar: null, reminders: null };
 
 ## Known issues
 
-- **Folder name** is `calendar-macos-sync`, plugin ID is `calendian`. Should be renamed to `calendian` before public release.
 - **Helper binary** must be compiled from `helper/Sources/main.swift`. Plugin silently produces no data without it — no warning in UI beyond empty panels.
 - **No automated tests.** All verification is manual: reload Obsidian, check console, check panel.
 - **`execJXA` and `parseEvents`/`parseReminders`** are legacy JXA-format parsers. Current data comes from `execHelper` (JSON). These remain as reference but should not be used for new features.

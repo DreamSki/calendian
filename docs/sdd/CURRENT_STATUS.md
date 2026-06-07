@@ -23,6 +23,7 @@ This document records the actual repository state. It intentionally separates im
 | Source filtering | Implemented | Toggle individual calendars/lists via settings. Filter by stable UUID (EventKit `calendarIdentifier`). In-memory instant apply via `render()`. Persisted in `data.json`. |
 | Permission handling | Implemented | Independent calendar/reminder permission states with recovery guidance and retry buttons. Partial permission support (show available data + banner for denied source). |
 | Error states | Implemented | Error classification (permission_denied, timeout, error). Per-source error banners with retry. Parse-failure isolation. Empty vs error distinction. |
+| Refresh / sync | Partial | Timer-driven refresh (configurable interval, default 5min). Manual refresh button. `_refreshRunning` concurrency guard. Window focus and EKEventStoreChangedNotification watch planned for v0.2. Post-write refresh planned for v0.3. See SPEC.md §7.6.1. |
 | Right-click actions | Planned | Current day/week context menu is inherited from calendar note behavior; Calendian event/reminder actions are not complete. |
 | Write operations | Planned | Native EventKit helper supports writes (`EKEventStore.save`). `toggle-reminder` command already implemented in helper. Full CRUD planned for v0.3-v0.4. |
 | Note association | Planned | Existing daily/weekly note integration comes from the base calendar plugin behavior; Calendian event/reminder frontmatter association is not complete. |
@@ -61,7 +62,7 @@ Everything else must be marked as planned, experimental, or future.
 3. ~~Mark multi-file structure in documentation as target architecture until code is actually split.~~ ✅ Architecture includes native helper module.
 4. ~~Move unimplemented README feature claims into Planned Features.~~ ✅ Done.
 5. ~~Add stable event/reminder IDs before any write, delete, or note-association feature is considered release-ready.~~ ✅ EventKit provides stable UUIDs.
-6. Rename plugin folder from `calendar-macos-sync` to `calendian` or update all path references to match actual folder name.
+6. ~~Rename plugin folder from `calendar-macos-sync` to `calendian` or update all path references to match actual folder name.~~ ✅ Done (2026-06-08). VIEW_TYPE_CALENDAR and helper path updated in main.js.
 7. ~~Update ARCHITECTURE.md to document the native Swift EventKit helper module.~~ ✅ Done (2026-06-08).
 8. Split `main.js` into multiple `.js` modules per target architecture (REQ-ARCH-001, target v0.3).
 
@@ -69,8 +70,8 @@ Everything else must be marked as planned, experimental, or future.
 
 > Updated by AI after every meaningful step. Next session reads this to continue without re-explaining context.
 
-- **Doing:** CLAUDE.md / SDD doc sync finished. Next: no active task.
-- **Done this session:** Synced all 10 SDD docs with code reality. Spec requirement states updated (30+ Planned→Implemented). v0.2 leaked items (REQ-CACHE-006/007, REQ-REM-008, REQ-SRC-005, REQ-CAL-007) reclassified to v0.1. ARCHITECTURE.md .ts→.js. CLAUDE.md rewritten (165→91 lines). Added session tracking mechanism. Updated .gitignore to exclude calendian-helper binary.
-- **Decisions:** File extension is .js not .ts (no TypeScript). Multi-file split deferred to v0.3 (REQ-ARCH-001). Native Swift EventKit helper is current production data channel; JXA is legacy. CLAUDE.md focuses on preventing AI mistakes, not comprehensive docs.
-- **Files changed:** SPEC.md, ROADMAP.md, docs/sdd/TASKS.md, docs/sdd/CURRENT_STATUS.md, docs/sdd/TRACEABILITY.md, docs/sdd/RISKS.md, docs/ARCHITECTURE.md, docs/SETTINGS_SCHEMA.md, README.md, CLAUDE.md, .gitignore
-- **Last action:** 2026-06-08 — updated CLAUDE.md with session tracking rule and "Before anything else" handoff block.
+- **Doing:** v0.1 cleanup — folder rename, TASK-001/TASK-008 review. Next: rename physical folder with user confirmation.
+- **Done this session:** Updated VIEW_TYPE_CALENDAR and helper path from "calendar-macos-sync" to "calendian" in main.js. Replaced placeholder diagnostic info with real REQ-DIAG-001 diagnostic panel (permissions, source counts, cache stats, errors, refresh timing). Updated docs.
+- **Decisions:** Used `require("os")` inline in settings tab to avoid scoping issue with `nodeOS` const declared later in file. Diagnostic panel is read-only display (no export — REQ-DIAG-002 deferred to v0.2).
+- **Files changed:** main.js, docs/sdd/CURRENT_STATUS.md, docs/sdd/TASKS.md, CLAUDE.md
+- **Last action:** 2026-06-08 — v0.1 cleanup code and doc changes, pending physical folder rename.
