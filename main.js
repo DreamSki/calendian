@@ -756,6 +756,11 @@ const defaultSettings = Object.freeze({
     // Default calendar/reminder list for create modals (v0.3 schema)
     defaultCalendarId: '',
     defaultReminderListId: '',
+    // AI-powered NL parsing (v0.3 — optional, off by default)
+    aiParsingEnabled: false,
+    aiEndpoint: 'https://api.deepseek.com/v1/chat/completions',
+    aiApiKey: '',
+    aiModel: 'deepseek-chat',
 });
 function appHasPeriodicNotesPluginLoaded() {
     var _a, _b;
@@ -823,6 +828,12 @@ class CalendarSettingsTab extends obsidian.PluginSettingTab {
         this.addMacOSPastEventDisplaySetting();
         this.addDefaultCalendarSetting();
         this.addDefaultReminderListSetting();
+
+        // === AI-Powered NL Parsing (v0.3) ===
+        this.containerEl.createEl("h3", {
+            text: "AI Natural Language Parsing (optional)",
+        });
+        this.addAISettings();
 
         // === Privacy & Diagnostics Section ===
         this.containerEl.createEl("h3", {
@@ -1334,6 +1345,70 @@ class CalendarSettingsTab extends obsidian.PluginSettingTab {
         dropdown.onChange(async function(value) {
             await self.plugin.writeOptions(function() { return { defaultReminderListId: value }; });
         });
+    }
+
+    // v0.3 AI-powered NL parsing settings
+    addAISettings() {
+        var self = this;
+        var opts = this.plugin.options || {};
+
+        var descEl = this.containerEl.createDiv("setting-item-description");
+        descEl.textContent = "Optionally use an AI model (e.g., DeepSeek, OpenAI-compatible) to parse natural language event text. When enabled, the AI will extract title, date, time, and duration with higher accuracy than the built-in regex parser. The built-in parser is always available as a fallback.";
+
+        // Enable toggle
+        new obsidian.Setting(this.containerEl)
+            .setName("Enable AI parsing")
+            .setDesc("Send quick-create text to AI for structured parsing. Text content is sent to the configured endpoint only when you use the quick-create feature.")
+            .addToggle(function(cmp) {
+                cmp.setValue(!!opts.aiParsingEnabled);
+                cmp.onChange(async function(value) {
+                    await self.plugin.writeOptions(function() { return { aiParsingEnabled: value }; });
+                });
+            });
+
+        // Endpoint
+        new obsidian.Setting(this.containerEl)
+            .setName("API endpoint")
+            .setDesc("OpenAI-compatible chat completions endpoint.")
+            .addText(function(cmp) {
+                cmp.setPlaceholder("https://api.deepseek.com/v1/chat/completions");
+                cmp.setValue(opts.aiEndpoint || '');
+                cmp.onChange(async function(value) {
+                    await self.plugin.writeOptions(function() { return { aiEndpoint: value }; });
+                });
+            });
+
+        // API key
+        new obsidian.Setting(this.containerEl)
+            .setName("API key")
+            .setDesc("Your API key. Stored locally in data.json (gitignored). Never logged.")
+            .addText(function(cmp) {
+                cmp.inputEl.type = "password";
+                cmp.setPlaceholder("sk-...");
+                cmp.setValue(opts.aiApiKey || '');
+                cmp.onChange(async function(value) {
+                    await self.plugin.writeOptions(function() { return { aiApiKey: value }; });
+                });
+            });
+
+        // Model
+        new obsidian.Setting(this.containerEl)
+            .setName("Model")
+            .setDesc("Model name for the chat completions API.")
+            .addText(function(cmp) {
+                cmp.setPlaceholder("deepseek-chat");
+                cmp.setValue(opts.aiModel || 'deepseek-chat');
+                cmp.onChange(async function(value) {
+                    await self.plugin.writeOptions(function() { return { aiModel: value }; });
+                });
+            });
+
+        // Privacy note
+        var privacyNote = this.containerEl.createDiv("setting-item-description");
+        privacyNote.style.marginTop = "8px";
+        privacyNote.style.color = "var(--text-muted)";
+        privacyNote.style.fontSize = "0.85em";
+        privacyNote.textContent = "⚠️ Privacy: When enabled, the text you type in quick-create is sent to the configured AI API endpoint. No calendar data, reminder data, or personal information is sent — only the natural language text you explicitly type for parsing. The API key is stored in your local vault's data.json (which is gitignored).";
     }
 }
 
@@ -2314,6 +2389,95 @@ function addMinutesToTime(t, mins) {
 }
 
 /** Escape HTML entities for safe preview rendering. */
+// ── AI-Powered NL Parsing (REQ-NL-001, optional) ────────────
+
+/**
+ * Call an OpenAI-compatible chat completions API to parse natural language
+ * event text into structured fields. Returns the same format as
+ * parseNaturalLanguage(), or null on failure.
+ *
+ * The API key and endpoint are read from plugin settings (data.json, gitignored).
+ * Only the user-typed quick-create text is sent — no calendar data.
+ */
+async function callAIForParsing(text, settings, refDate) {
+    if (!settings || !settings.aiEndpoint || !settings.aiApiKey) return null;
+
+    var refDateStr = (refDate || window.moment()).format('YYYY-MM-DD dddd');
+    var todayStr = window.moment().format('YYYY-MM-DD');
+
+    var systemPrompt = [
+        'You are a date/time parser. Extract event details from the user\'s natural language input.',
+        'Today is ' + todayStr + ' (' + refDateStr + ').',
+        'Return ONLY a JSON object with these fields:',
+        '  title: string — the event description/title (required)',
+        '  date: string — ISO date "YYYY-MM-DD", or null if not found',
+        '  time: string — "HH:MM" in 24h format, or null',
+        '  endTime: string — "HH:MM" in 24h format, or null (if duration is specified)',
+        '  allDay: boolean — true if the event is all-day',
+        '  confidence: "high" | "medium" | "low"',
+        'Rules:',
+        '- Support both English and Chinese input.',
+        '- For vague times: "morning" = 09:00, "afternoon" = 14:00, "evening" = 18:00, "noon" = 12:00.',
+        '- Chinese: "早上"=09:00, "上午"=09:00, "中午"=12:00, "下午"=14:00, "晚上"=19:00, "凌晨"=03:00.',
+        '- "tomorrow" / "明天" = ' + todayStr + ' + 1 day.',
+        '- If duration is given ("1 hour", "30min", "一小时"), compute endTime from time+duration.',
+        '- If no time is specified, leave time and endTime as null.',
+        '- Return valid JSON only, no explanation, no markdown.',
+    ].join('\n');
+
+    try {
+        var resp = await fetch(settings.aiEndpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + settings.aiApiKey,
+            },
+            body: JSON.stringify({
+                model: settings.aiModel || 'deepseek-chat',
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: text },
+                ],
+                temperature: 0,
+                max_tokens: 256,
+            }),
+        });
+
+        if (!resp.ok) {
+            console.log('[Calendian] AI parsing: HTTP ' + resp.status);
+            return null;
+        }
+
+        var data = await resp.json();
+        var content = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+        if (!content) return null;
+
+        // Extract JSON from response (may have markdown fences)
+        var jsonStr = content.trim();
+        var jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (jsonMatch) jsonStr = jsonMatch[1].trim();
+
+        var parsed = JSON.parse(jsonStr);
+
+        // Convert to internal format
+        var result = {
+            title: parsed.title || text,
+            date: parsed.date ? window.moment(parsed.date, 'YYYY-MM-DD') : null,
+            time: parsed.time || null,
+            endTime: parsed.endTime || null,
+            allDay: !!parsed.allDay,
+            confidence: parsed.confidence || 'high',
+            _aiParsed: true,  // marker for UI display
+        };
+
+        if (result.date && !result.date.isValid()) result.date = null;
+        return result;
+    } catch (err) {
+        console.log('[Calendian] AI parsing failed:', err.message || err);
+        return null;
+    }
+}
+
 function escapeHtml(str) {
     if (!str) return '';
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -2624,8 +2788,9 @@ class QuickEventModal extends obsidian.Modal {
         var errorEl = this.contentEl.createDiv("calendian-form-error");
         errorEl.style.display = "none";
 
-        // ── Debounced parse on input ────────────────────────
+        // ── Debounced parse on input (AI-first with regex fallback) ─
         var parseTimer = null;
+        var aiParsing = false;
         inputEl.addEventListener('input', function() {
             var text = inputEl.value.trim();
             if (!text) {
@@ -2634,15 +2799,43 @@ class QuickEventModal extends obsidian.Modal {
                 return;
             }
             if (parseTimer) clearTimeout(parseTimer);
-            parseTimer = setTimeout(function() {
-                var result = parseNaturalLanguage(text, refDate);
+            // Longer debounce for AI (to avoid spamming API), shorter for regex
+            var opts = integ.plugin.options || {};
+            var useAI = !!(opts.aiParsingEnabled && opts.aiEndpoint && opts.aiApiKey);
+            var delay = useAI ? 800 : 300;
+
+            parseTimer = setTimeout(async function() {
+                var result = null;
+
+                // Try AI first if enabled
+                if (useAI) {
+                    aiParsing = true;
+                    previewEl.style.display = 'block';
+                    previewEl.innerHTML = '<div style="color:var(--text-muted);font-style:italic">🤖 AI parsing...</div>';
+                    try {
+                        result = await callAIForParsing(text, {
+                            aiEndpoint: opts.aiEndpoint,
+                            aiApiKey: opts.aiApiKey,
+                            aiModel: opts.aiModel || 'deepseek-chat',
+                        }, refDate);
+                    } catch (e) {
+                        console.log('[Calendian] AI parse error:', e);
+                    }
+                    aiParsing = false;
+                }
+
+                // Fall back to regex if AI didn't return a result
+                if (!result) {
+                    result = parseNaturalLanguage(text, refDate);
+                }
+
                 self._parsedResult = result;
                 if (result) {
                     self._renderPreview(previewEl, result, integ);
                 } else {
                     previewEl.style.display = 'none';
                 }
-            }, 300);
+            }, delay);
         });
 
         // Focus the input
@@ -2723,12 +2916,13 @@ class QuickEventModal extends obsidian.Modal {
             rows.push('<span class="calendian-preview-label">Type:</span> All-day');
         }
 
-        // Confidence
+        // Source + Confidence
+        var sourceBadge = result._aiParsed ? '🤖 AI · ' : '📋 Regex · ';
         var confBadge = '';
-        if (result.confidence === 'high') confBadge = '🟢';
-        else if (result.confidence === 'medium') confBadge = '🟡';
-        else confBadge = '🔴';
-        rows.push('<span class="calendian-preview-label">Confidence:</span> ' + confBadge + ' ' + result.confidence);
+        if (result.confidence === 'high') confBadge = '🟢 high';
+        else if (result.confidence === 'medium') confBadge = '🟡 medium';
+        else confBadge = '🔴 low';
+        rows.push('<span class="calendian-preview-label">Parse:</span> ' + sourceBadge + confBadge);
 
         el.innerHTML = rows.map(function(r) {
             return '<div style="margin-bottom:3px;line-height:1.5">' + r + '</div>';
