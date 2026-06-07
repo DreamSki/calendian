@@ -94,4 +94,5 @@ Everything else must be marked as planned, experimental, or future.
   - Settings stored in `data.json` (gitignored) — no personal data in git.
   - Auto-detect mode uses "outlook" substring matching (generic, not personal).
 - **Next:** Natural language event parsing (TASK-023). Deferred v0.2 items.
-- **Last action:** 2026-06-08 — v0.3 write features complete; all docs aligned.
+- **Bug fixes**: Reminder priority always defaulted to "none" due to positional arg mismatch (JS conditional push vs Swift positional parse). Fixed by always pushing placeholders for all optional args in both create-event and create-reminder.
+- **Last action:** 2026-06-08 — fixed reminder priority + event optional-field positional arg bugs.

@@ -1809,9 +1809,9 @@ class EventCreateModal extends obsidian.Modal {
                         var endISO = endMoment.toISOString().replace(/\.\d{3}Z$/, 'Z');
 
                         var args = ["create-event", title, startISO, endISO, calendarId, isAllDay ? "true" : "false"];
-                        if (location) args.push(location);
-                        if (notes) args.push(notes);
-                        if (url) args.push(url);
+                        args.push(location || "");  // always push to preserve position
+                        args.push(notes || "");     // always push to preserve position
+                        args.push(url || "");       // always push to preserve position
 
                         try {
                             var result = await integ.execHelper(args);
@@ -2001,9 +2001,9 @@ class ReminderCreateModal extends obsidian.Modal {
                             args.push("");  // no due date
                         }
 
-                        if (dueTimeStr) args.push(dueTimeStr);
-                        if (priority) args.push(priority);
-                        if (notes) args.push(notes);
+                        args.push(dueTimeStr || "");     // dueTime  (always push to preserve position)
+                        args.push(priority || "none");      // priority (always push to preserve position)
+                        args.push(notes || "");             // notes    (always push to preserve position)
 
                         try {
                             var result = await integ.execHelper(args);
