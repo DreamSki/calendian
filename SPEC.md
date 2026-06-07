@@ -444,11 +444,11 @@ Goal, habit, intention, nudge, and review data SHALL reside exclusively in Obsid
 | REQ-CAL-004 | THE SYSTEM SHALL display all-day events separately or before timed events. | P0 | v0.1 | Implemented |
 | REQ-CAL-005 | THE SYSTEM SHALL sort events by all-day status and start time. | P0 | v0.1 | Implemented |
 | REQ-CAL-006 | THE SYSTEM SHALL visually indicate ongoing and soon-starting events. | P1 | v0.1 | Implemented |
-| REQ-CAL-007 | THE SYSTEM SHALL display event location, link, notes, calendar source, and recurrence summary where available. | P1 | v0.1 | Partial |
-| REQ-CAL-008 | THE SYSTEM SHALL support an expandable event detail state. | P1 | v0.2 | Planned |
-| REQ-CAL-009 | THE SYSTEM SHALL display multi-day events on every overlapping day. | P1 | v0.2 | Planned |
-| REQ-CAL-010 | THE SYSTEM SHALL visibly mark past events or hide them according to user settings. | P1 | v0.2 | Planned |
-| REQ-CAL-011 | THE SYSTEM SHALL treat recurring events as read-only until recurring mutation is specified. | P0 | v0.1 | Planned |
+| REQ-CAL-007 | THE SYSTEM SHALL display event location, link, notes, calendar source, and recurrence summary where available. | P1 | v0.1 | Implemented |
+| REQ-CAL-008 | THE SYSTEM SHALL support an expandable event detail state. | P1 | v0.2 | Implemented |
+| REQ-CAL-009 | THE SYSTEM SHALL display multi-day events on every overlapping day. | P1 | v0.2 | Implemented |
+| REQ-CAL-010 | THE SYSTEM SHALL visibly mark past events or hide them according to user settings. | P1 | v0.2 | Implemented |
+| REQ-CAL-011 | THE SYSTEM SHALL treat recurring events as read-only until recurring mutation is specified. | P0 | v0.1 | Implemented |
 | REQ-CAL-012 | THE SYSTEM SHOULD display source calendar colors where available. | P1 | v0.1 | Implemented |
 
 ### 7.4 Reminder read requirements

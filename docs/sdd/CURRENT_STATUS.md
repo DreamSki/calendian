@@ -18,7 +18,7 @@ This document records the actual repository state. It intentionally separates im
 | Cache | Implemented | ±6 month preload via EventKit predicate (date-filtered server-side). Disk cache in data.json (`_eventsCache`, `_remindersCache`). Cache freshness check (2x refresh interval, min 15min). Manual refresh button. No-block background refresh. |
 | Calendar source discovery | Implemented | EventKit `calendar.calendarIdentifier` (UUID), account name (`source.title`), color, type. Display name includes account suffix ("日历 — chengbo.sun123@outlook.com"). |
 | Reminder list discovery | Implemented | EventKit lists with UUID, account name, color. |
-| Event display | Implemented | Title, time range, all-day handling, calendar badge with color, location, recurrence indicator, ongoing/soon highlights. |
+| Event display | Implemented | Title, time range, all-day handling, calendar badge with color, location, recurrence indicator, ongoing/soon highlights. Expandable detail panel (click to show location, URL, notes, attendees, calendar source, recurrence summary). Multi-day events shown on all overlapping days. Past events dimmed/hidden per setting. Recurring events marked with read-only indicator. |
 | Reminder display | Implemented | Title, due time, list badge, priority indicator (high/medium/low). Completed reminders hidden by default. |
 | Source filtering | Implemented | Toggle individual calendars/lists via settings. Filter by stable UUID (EventKit `calendarIdentifier`). In-memory instant apply via `render()`. Persisted in `data.json`. |
 | Permission handling | Implemented | Independent calendar/reminder permission states with recovery guidance and retry buttons. Partial permission support (show available data + banner for denied source). |
@@ -37,7 +37,7 @@ This document records the actual repository state. It intentionally separates im
 
 ## Current release label
 
-Current repository state: **v0.1 read-only MVP — mostly complete**. Core read path is stable with EventKit.
+Current repository state: **v0.2 read-only polish — in progress**. Core read path stable, event details and multi-day support implemented.
 
 ## README policy
 
@@ -51,7 +51,11 @@ README may list the following as current behavior:
 - calendar/reminder source discovery with account names;
 - source filtering by individual calendar/list;
 - configurable auto-refresh with disk cache;
-- permission/error/empty/loading UI states.
+- permission/error/empty/loading UI states;
+- expandable event details (location, URL, notes, attendees, recurrence summary);
+- multi-day events shown on all overlapping days;
+- past event display (normal/dimmed/hidden) setting;
+- recurring event read-only indicator.
 
 Everything else must be marked as planned, experimental, or future.
 
@@ -70,7 +74,12 @@ Everything else must be marked as planned, experimental, or future.
 
 > Updated by AI after every meaningful step. Next session reads this to continue without re-explaining context.
 
-- **Doing:** N/A.
-- **Done this session:** TASK-014 — Diagnostic export with consent and redaction (REQ-DIAG-002). Added `ExportConsentModal` class (main.js:1360-1468) with explicit consent dialog before export. Redacts: event/reminder titles, notes, locations, URLs, attendee names, calendar UUIDs, helper binary path, and error messages (reduced to type+timestamp). Includes safe counts by calendar/reminder list name. Added "Export Diagnostics" button to settings diagnostic panel. Updated SPEC.md REQ-DIAG-002 status to Implemented, TASKS.md TASK-014 to Done.
-- **Last action:** 2026-06-08 — TASK-014 implementation complete. Awaiting verification in Obsidian.
-- **Decisions:** Calendar/list names included in export (counts only) because names are user-visible in settings and non-unique; UUIDs excluded as sensitive. Error messages redacted because they may contain event titles or filesystem paths. Helper path excluded because it leaks filesystem structure.
+- **Doing:** Merging all v0.2 branches into main.
+- **Done this session:** All v0.2 tasks implemented in parallel:
+  - TASK-014: Diagnostic export with consent modal and redaction (REQ-DIAG-002).
+  - TASK-010+011: Event details panel, multi-day events, past event display, recurring indicator (REQ-CAL-007..011).
+  - TASK-012: Reminder polish — overdue styling, no-date section, display range selector, subtasks (REQ-REM-005..009).
+  - TASK-013: Month cell event dots with calendar colors (REQ-UX-006).
+- **Decisions:** 4 parallel worktrees, each touching distinct line ranges. Merge conflicts only in doc files (SPEC, TASKS, CURRENT_STATUS).
+- **Next:** Final verification — compile helper, syntax check, eye-check in Obsidian.
+- **Last action:** 2026-06-08 — merging branches into main.

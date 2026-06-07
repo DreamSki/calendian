@@ -342,3 +342,89 @@
     line-height: 1.5;
     margin: 4px 0;
 }
+
+/* ======================================== */
+/* v0.2 Event Details & Multi-day (TASK-010, TASK-011) */
+/* ======================================== */
+
+/* REQ-CAL-008: Clickable event items for expand/collapse */
+.calendian-event-item {
+    cursor: pointer;
+}
+
+.calendian-event-expanded {
+    background-color: var(--background-modifier-hover);
+}
+
+/* REQ-CAL-008: Event detail panel */
+.calendian-event-detail {
+    padding: 6px 10px;
+    margin: 2px 6px 6px;
+    background: var(--background-secondary);
+    border-radius: 4px;
+    font-size: 0.78em;
+    border-left: 2px solid var(--background-modifier-border);
+}
+
+.calendian-event-detail-field {
+    margin: 3px 0;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+.calendian-event-detail-field strong {
+    color: var(--text-normal);
+    margin-right: 4px;
+}
+
+.calendian-event-detail-field a {
+    word-break: break-all;
+}
+
+.calendian-event-detail-notes {
+    margin-top: 2px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--text-muted);
+    max-height: 100px;
+    overflow-y: auto;
+}
+
+/* REQ-CAL-010: Past event dimming */
+.calendian-event-past {
+    opacity: 0.5;
+}
+
+.calendian-event-past .macos-item-title {
+    color: var(--text-muted);
+}
+
+/* REQ-CAL-011: Recurring event indicator */
+.calendian-event-title-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+}
+
+.calendian-event-title-row .macos-item-title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.calendian-event-recurring {
+    color: var(--text-accent);
+    font-size: 0.85em;
+    flex-shrink: 0;
+    opacity: 1;
+    line-height: 1;
+}
+
+/* Override past dim for recurring indicator */
+.calendian-event-past .calendian-event-recurring {
+    opacity: 1;
+}
