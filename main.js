@@ -4525,6 +4525,10 @@ class MacOSIntegration {
         this.lastRefreshTime = null;
         this.lastRefreshDurationMs = null;
         this.sourceCounts = { calendars: 0, reminderLists: 0 };
+        // REQ-UX-006: Dot color CSS management for month cell event dots
+        this._dotStyleEl = null;
+        this._dotColorClasses = {};
+        this._calendarSources = null;  // Reference to sources array passed to Calendar
     }
 
     // --- Execute native helper (EventKit, fast) ---
@@ -5119,6 +5123,147 @@ class MacOSIntegration {
         return `rgb(${Math.round(parts[0]*255)}, ${Math.round(parts[1]*255)}, ${Math.round(parts[2]*255)})`;
     }
 
+    // --- REQ-UX-006: Metadata source for month cell event dots ---
+    // Manages dynamic CSS rules for calendar-colored dots
+
+    _ensureDotStyleEl() {
+        if (!this._dotStyleEl) {
+            this._dotStyleEl = document.createElement("style");
+            this._dotStyleEl.id = "calendian-dot-colors";
+            document.head.appendChild(this._dotStyleEl);
+        }
+        return this._dotStyleEl;
+    }
+
+    _registerDotColor(cssColor) {
+        if (!cssColor || this._dotColorClasses[cssColor]) return this._dotColorClasses[cssColor];
+        // Generate a stable class name from the CSS color
+        var className = "caldot-" + cssColor.replace(/[^a-zA-Z0-9]/g, "");
+        this._dotColorClasses[cssColor] = className;
+        // Inject CSS rule: override fill for filled dots, stroke for hollow dots
+        var styleEl = this._ensureDotStyleEl();
+        styleEl.textContent += "\n." + className + ".filled { fill: " + cssColor + " !important; }\n." + className + ".hollow { stroke: " + cssColor + " !important; }";
+        return className;
+    }
+
+    // Refresh dot color CSS after data loads (new calendars may have been discovered)
+    _refreshDotColorCSS() {
+        var colors = this.calendarColors || {};
+        for (var calName in colors) {
+            var cssColor = this.calendarToCSS(colors[calName]);
+            if (cssColor) {
+                this._registerDotColor(cssColor);
+            }
+        }
+    }
+
+    // Check if an event spans a given date (for multi-day dot display)
+    _eventSpansDate(evt, targetDate) {
+        if (!evt.start) return false;
+        var d = targetDate.toDate();
+        var dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0);
+        var dayEnd = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59);
+        var isAllDay = evt.isAllDay !== undefined ? evt.isAllDay : evt.allday;
+        var eStart = evt.start;
+        var eEnd = evt.end || eStart;
+        if (isAllDay) {
+            // All-day: compare date-only
+            var es = new Date(eStart.getFullYear(), eStart.getMonth(), eStart.getDate());
+            var ee = eEnd ? new Date(eEnd.getFullYear(), eEnd.getMonth(), eEnd.getDate(), 23, 59, 59) : es;
+            return es <= dayEnd && ee >= dayStart;
+        }
+        // Timed events: check if event overlaps with the day
+        return eStart <= dayEnd && eEnd >= dayStart;
+    }
+
+    getEventMetadataSource() {
+        var self = this;
+        return {
+            getDailyMetadata: function(date) {
+                var dots = [];
+                // Refresh dot color CSS in case new colors appeared
+                self._refreshDotColorCSS();
+
+                // Collect unique calendar colors for events on this date
+                var calendarDots = {};  // cssColor -> className
+                var filterIds = (self.plugin.options && self.plugin.options.selectedCalendarIds) || [];
+                var calColors = self.calendarColors || {};
+                var showCal = (self.plugin.options && self.plugin.options.enableCalendar) !== false;
+
+                if (showCal && self.allEvents.length > 0) {
+                    for (var i = 0; i < self.allEvents.length; i++) {
+                        var evt = self.allEvents[i];
+                        if (!self._eventSpansDate(evt, date)) continue;
+                        // Apply calendar source filter
+                        if (filterIds.length > 0) {
+                            var eName = evt.calendarName || evt.calendar || "";
+                            var eColor = calColors[eName] || "";
+                            var eCompoundId = eName + "|||" + eColor;
+                            var eId = evt.calendarId || evt.id || "";
+                            var matched = filterIds.includes(eCompoundId) || filterIds.includes(eId) || filterIds.includes(eName);
+                            if (!matched) continue;
+                        }
+                        // Get the calendar color for this event
+                        var colorStr = evt.calendarColor || calColors[evt.calendarName] || "";
+                        var cssColor = colorStr ? self.calendarToCSS(colorStr) : null;
+                        if (!cssColor) {
+                            // Fallback: use default dot color for events without calendar color
+                            if (!calendarDots["__default__"]) {
+                                calendarDots["__default__"] = true;
+                                dots.push({ className: "", isFilled: true });
+                            }
+                        } else if (!calendarDots[cssColor]) {
+                            var className = self._registerDotColor(cssColor);
+                            calendarDots[cssColor] = className;
+                            dots.push({ className: className, isFilled: true });
+                        }
+                    }
+                }
+
+                // Reminder dot (hollow, muted color)
+                var showRem = (self.plugin.options && self.plugin.options.enableReminders) !== false;
+                if (showRem && self.allReminders.length > 0) {
+                    var remFilterIds = (self.plugin.options && self.plugin.options.selectedReminderListIds) || [];
+                    var hasReminders = false;
+                    var d = date.toDate();
+                    var dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0);
+                    var dayEnd = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59);
+                    for (var j = 0; j < self.allReminders.length; j++) {
+                        var rem = self.allReminders[j];
+                        // Apply reminder list filter
+                        if (remFilterIds.length > 0) {
+                            var rId = rem.listId || rem.id || "";
+                            var rName = rem.listName || rem.list || "";
+                            var rMatched = remFilterIds.includes(rId) || remFilterIds.includes(rName);
+                            if (!rMatched) continue;
+                        }
+                        if (!rem.due) {
+                            var today = new Date();
+                            if (d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate()) {
+                                hasReminders = true;
+                                break;
+                            }
+                            continue;
+                        }
+                        if (rem.due >= dayStart && rem.due <= dayEnd) {
+                            hasReminders = true;
+                            break;
+                        }
+                    }
+                    if (hasReminders) {
+                        dots.push({ className: "calendian-reminder-dot", isFilled: false });
+                    }
+                }
+
+                return { dots: dots };
+            },
+            getWeeklyMetadata: function(date) {
+                // Weekly view uses same dot logic
+                return { dots: [] };
+            }
+        };
+    }
+
     // --- Check if event is starting soon (within 30 min) ---
     isStartingSoon(evt) {
         var isAllDay = evt.isAllDay !== undefined ? evt.isAllDay : evt.allday;
@@ -5266,6 +5411,12 @@ class MacOSIntegration {
             if (this.lastRefreshDurationMs) {
                 refreshFooter.textContent += " (" + this.lastRefreshDurationMs + "ms)";
             }
+        }
+
+        // REQ-UX-006: Refresh calendar grid dots after data change
+        if (this.calendarComponent && this._calendarSources) {
+            // Trigger Svelte re-render by replacing sources with a new array reference
+            this.calendarComponent.$set({ sources: [...this._calendarSources] });
         }
     }
 
@@ -5606,6 +5757,13 @@ class CalendarView extends obsidian.ItemView {
         ];
         this.app.workspace.trigger(TRIGGER_ON_OPEN, sources);
 
+        // === macOS Calendar & Reminders integration ===
+        // Create MacOSIntegration first so its metadata source is available for Calendar
+        this.macosIntegration = new MacOSIntegration(this);
+
+        // REQ-UX-006: Add macOS event/reminder dot source to the calendar
+        sources.push(this.macosIntegration.getEventMetadataSource());
+
         // Click day: single click = select date (show events), Cmd/Ctrl+click = open/create note
         const self = this;
         this.macosWrappedOnClickDay = (date, inNewSplit) => {
@@ -5633,9 +5791,8 @@ class CalendarView extends obsidian.ItemView {
             },
         });
 
-        // === macOS Calendar & Reminders integration ===
-        this.macosIntegration = new MacOSIntegration(this);
         this.macosIntegration.calendarComponent = this.calendar;
+        this.macosIntegration._calendarSources = sources;
         this.eventsPanelEl = this.contentEl.createDiv("macos-events-panel");
         this.macosIntegration.eventsPanelEl = this.eventsPanelEl;
         this.macosIntegration.startAutoRefresh();

@@ -342,3 +342,12 @@
     line-height: 1.5;
     margin: 4px 0;
 }
+
+/* ======================================== */
+/* Month Cell Event Dots (REQ-UX-006)       */
+/* ======================================== */
+
+/* Reminder dot: hollow with muted color */
+.calendian-reminder-dot.hollow {
+    stroke: var(--text-muted) !important;
+}
