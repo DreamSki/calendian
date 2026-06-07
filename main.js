@@ -2459,6 +2459,8 @@ async function callAIForParsing(text, settings, refDate) {
 
         var parsed = JSON.parse(jsonStr);
 
+        console.log('[Calendian] AI raw output:', jsonStr);
+
         // Convert to internal format
         var result = {
             title: parsed.title || text,
@@ -2467,7 +2469,8 @@ async function callAIForParsing(text, settings, refDate) {
             endTime: parsed.endTime || null,
             allDay: !!parsed.allDay,
             confidence: parsed.confidence || 'high',
-            _aiParsed: true,  // marker for UI display
+            _aiParsed: true,      // marker for UI display
+            _aiRawJson: jsonStr,  // raw AI response for debug display
         };
 
         if (result.date && !result.date.isValid()) result.date = null;
@@ -2979,6 +2982,32 @@ class QuickEventModal extends obsidian.Modal {
         el.innerHTML = rows.map(function(r) {
             return '<div style="margin-bottom:3px;line-height:1.5">' + r + '</div>';
         }).join('');
+
+        // ── Raw AI output (collapsible, for debugging) ─────
+        if (result._aiRawJson) {
+            var rawContainer = el.createDiv();
+            rawContainer.style.marginTop = '8px';
+
+            var toggle = rawContainer.createEl('button', {
+                text: '🔍 Show AI raw output',
+                cls: 'calendian-raw-toggle'
+            });
+            toggle.style.cssText = 'font-size:0.75em;padding:2px 8px;border:1px solid var(--background-modifier-border);border-radius:3px;background:var(--background-primary);color:var(--text-muted);cursor:pointer;';
+
+            var rawContent = rawContainer.createDiv();
+            rawContent.style.cssText = 'display:none;margin-top:4px;padding:6px 8px;background:var(--background-primary-alt);border-radius:3px;font-family:monospace;font-size:0.75em;white-space:pre-wrap;word-break:break-all;max-height:120px;overflow-y:auto;';
+            rawContent.textContent = result._aiRawJson;
+
+            toggle.addEventListener('click', function() {
+                if (rawContent.style.display === 'none') {
+                    rawContent.style.display = 'block';
+                    toggle.textContent = '🔍 Hide AI raw output';
+                } else {
+                    rawContent.style.display = 'none';
+                    toggle.textContent = '🔍 Show AI raw output';
+                }
+            });
+        }
     }
 }
 
