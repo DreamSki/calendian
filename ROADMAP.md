@@ -27,8 +27,8 @@ Current repository status: **v0.2 read-only polish — complete**.
 | Version | Theme | Requirement groups | Release posture |
 |---|---|---|---|
 | v0.1 | Read-only MVP | `REQ-PLAT-*`, `REQ-PERM-*`, `REQ-CAL-001..007`, `REQ-REM-001..004,008`, `REQ-SRC-001..005`, `REQ-CACHE-001..008`, `REQ-UX-001..004`, `REQ-PRIV-*`, `REQ-ERR-001..004`, `REQ-DIAG-001`, `REQ-DATA-*` | Mostly complete |
-| v0.2 | Read-only polish | expandable details, overdue/no-date reminders, multi-day events, month-cell dots, full diagnostic panel | Planned |
-| v0.3 | Safe create | simple event/reminder creation, natural language parsing, validation, write verification | Planned |
+| v0.2 | Read-only polish | expandable details, overdue/no-date reminders, multi-day events, month-cell dots, full diagnostic panel | Complete |
+| v0.3 | Safe create | simple event/reminder creation, natural language parsing, validation, write verification + deferred v0.2 sync/polish items | Planned |
 | v0.4 | Safe edit/delete | simple event/reminder edit/delete, reminder completion, recurring safety | Planned |
 | v0.5 | Note association & notifications | frontmatter association, meeting notes, templates, in-app notifications, limited Tasks integration | Planned |
 | v0.5.5 | Self-direction | goals, habits, nudges, reflections, encouragement statistics | Planned |
@@ -100,8 +100,7 @@ Make the read-only experience reliable enough for daily use across common event/
 - Event details: `REQ-CAL-008` to `REQ-CAL-012` (expandable panel, multi-day events, past events, recurring read-only)
 - Reminder polish: `REQ-REM-005` to `REQ-REM-007`, `REQ-REM-009` (overdue styling, no-date section, display range, subtasks)
 - Cache/diagnostics: `REQ-DIAG-001` (full panel), `REQ-DIAG-002`
-- UX polish: `REQ-UX-006`, `REQ-UX-010`
-- Error hardening: `REQ-ERR-003`
+- UX polish: `REQ-UX-006` (month-cell dots)
 
 ### Deliverables
 
@@ -114,13 +113,22 @@ Make the read-only experience reliable enough for daily use across common event/
 - Multi-day event overlap display.
 - Month-cell event dots.
 - Full diagnostic panel with permission status, source counts, timing.
-- Large-calendar behavior reviewed.
+- Diagnostic export with consent modal and redaction.
+- Recurring event read-only indicator.
 
 ### Explicit exclusions
 
 - Still read-only.
 - No automatic Tasks sync.
 - No recurring mutation.
+- No today summary panel (`REQ-UX-010`, deferred to v0.3).
+- No window-focus refresh (`REQ-SYNC-004`, deferred to v0.3).
+- No macOS system notification watch (`REQ-SYNC-005`/`007`, deferred to v0.3).
+- No large-calendar degradation review (`REQ-PERF-003`, deferred to v0.3).
+- No DST transition handling (`REQ-TIME-005`, deferred to v0.3).
+- No permission-change retry path (`REQ-PERM-005`, deferred to v0.3).
+- No display-only marking for unstable IDs (`REQ-DATA-003`, deferred to v0.3).
+- Subtask display is data-dependent (`REQ-REM-009`, helper parentId not yet populated).
 
 ---
 
@@ -138,6 +146,9 @@ Allow users to create simple non-recurring events and simple reminders from Obsi
 - Error safety: `REQ-ERR-005`, `REQ-ERR-006`
 - Recurring safety: `REQ-REC-001` to `REQ-REC-003`
 - Architecture: `REQ-ARCH-001`
+- Sync polish (deferred from v0.2): `REQ-SYNC-004`, `REQ-SYNC-005`, `REQ-SYNC-007`
+- Data safety (deferred from v0.2): `REQ-DATA-003`, `REQ-TIME-005`
+- Misc polish (deferred from v0.2): `REQ-UX-010`, `REQ-PERM-005`, `REQ-PERF-003`
 
 ### Deliverables
 

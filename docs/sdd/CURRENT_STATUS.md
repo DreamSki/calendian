@@ -80,14 +80,11 @@ Everything else must be marked as planned, experimental, or future.
 
 > Updated by AI after every meaningful step. Next session reads this to continue without re-explaining context.
 
-- **Doing:** v0.2 bug fixes.
-- **Done this session:** Fixed three v0.2 bugs identified via eye-check:
-  - **Component range selector broken** — `renderRemindersSection()` called `self.plugin.writeOptions()` but `self.plugin` is `CalendarView`, not `CalendarPlugin`. Fixed to `self.plugin.calendarPlugin.writeOptions()`.
-  - **No-date reminders never fetched** — Swift helper `printReminders()` used `predicateForIncompleteReminders(withDueDateStarting:ending:)` which excludes reminders without due dates. Added new `reminders-nodate` helper command using `nil` start/end + dueDateComponents filter. JS `preloadReminders()` now calls it and merges results.
-  - **Due date display incomplete** — `formatTime()` only showed time, not date. Added `formatDueDate()` showing `M/D HH:MM` for non-today dates, time only for today.
-  - **Overdue reminders excluded** — `getRemindersForDate()` set `start` to selected date, excluding all overdue reminders. Changed `start` to `2000-01-01` so overdue always show; range controls future window only.
-  - Helper: compiled and tested `reminders-nodate` returns valid JSON.
-  - Eye-check confirmed: range selector works, due dates display correctly, no-date reminders appear, overdue reminders show.
-- **Decisions:** v0.2 was previously marked "complete" but had 4 live bugs. These were implementation bugs (requiremtents correctly marked Implemented, but code had defects). Now truly complete.
-- **Next:** Align SPEC/ROADMAP v0.2 scope, update ACCEPTANCE.md gates, then proceed to v0.3 planning.
-- **Last action:** 2026-06-08 — v0.2 bug fixes verified in Obsidian.
+- **Doing:** N/A (v0.2 scope closed — complete).
+- **Done this session:**
+  - **Bug fixes** (verified in Obsidian): component range selector, no-date reminder fetch, due date display, overdue reminder exclusion.
+  - **Scope alignment**: Deferred 8 v0.2-targeted requirements to v0.3 (UX-010, PERF-003, PERM-005, SYNC-004/005/007, DATA-003, TIME-005). Updated SPEC.md §7 targets, ROADMAP v0.2/v0.3 scope & explicit exclusions, CLAUDE.md, ACCEPTANCE.md.
+  - **Deep audit**: 12 requirements Implemented, 1 Partial (REM-009, data-dependent), 0 Planned in v0.2 scope. SPEC and ROADMAP now agree.
+- **Decisions:** v0.2 was prematurely declared complete in a previous session without eye-check or scope alignment. The 4 bugs and 8 SPEC/ROADMAP mismatches are now resolved. v0.2 is genuinely complete.
+- **Next:** v0.3 planning (TASK-020 event create form).
+- **Last action:** 2026-06-08 — v0.2 scope closed, all docs aligned, ready for v0.3.

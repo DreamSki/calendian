@@ -120,7 +120,13 @@ The following features are currently implemented in the codebase. All macOS data
 **What "Partial" means for v0.2**:
 - REQ-REM-009 subtasks — rendering logic exists but helper does not yet populate parentId (data-dependent)
 - Cache range miss triggers a "Go to Today" prompt rather than automatic background reload (REQ-CACHE-002)
-- DOC-001/002/003 — documentation has been updated for v0.2 but may need post-review polish
+
+**Deferred to v0.3 (was originally target v0.2)**:
+- REQ-UX-010 (today summary panel), REQ-PERF-003 (large-calendar deg), REQ-PERM-005 (permission retry)
+- REQ-SYNC-004/005/007 (window focus, EK notification watch, fallback)
+- REQ-DATA-003 (display-only marking), REQ-TIME-005 (DST handling)
+
+**Other known gaps (not version-specific)**:
 - No automated tests; all testing is manual (see `docs/sdd/TESTING.md`)
 - Performance targets (cache switch <100ms, init <3s) have not been benchmarked
 
@@ -425,7 +431,7 @@ Goal, habit, intention, nudge, and review data SHALL reside exclusively in Obsid
 | REQ-PERM-002 | WHEN Reminders permission is unavailable or denied, THE SYSTEM SHALL show actionable recovery guidance. | P0 | v0.1 | Implemented |
 | REQ-PERM-003 | WHILE only one source is permitted, THE SYSTEM SHALL continue showing available data from the permitted source. | P0 | v0.1 | Implemented |
 | REQ-PERM-004 | THE SYSTEM SHALL distinguish permission failure from empty calendar/reminder data. | P0 | v0.1 | Implemented |
-| REQ-PERM-005 | THE SYSTEM SHALL provide a retry or refresh path after permission changes. | P1 | v0.2 | Planned |
+| REQ-PERM-005 | THE SYSTEM SHALL provide a retry or refresh path after permission changes. | P1 | v0.3 | Planned |
 
 ### 7.3 Calendar read requirements
 
@@ -508,7 +514,7 @@ Goal, habit, intention, nudge, and review data SHALL reside exclusively in Obsid
 | REQ-CACHE-008 | THE SYSTEM SHOULD measure refresh duration for diagnostics. | P2 | v0.1 | Implemented |
 | REQ-PERF-001 | Date switching from cache SHOULD complete in under 100ms for normal datasets. | P1 | v0.1 | Planned |
 | REQ-PERF-002 | Initial read SHOULD not block the Obsidian UI. | P0 | v0.1 | Implemented |
-| REQ-PERF-003 | Large calendars SHOULD degrade gracefully. | P1 | v0.2 | Planned |
+| REQ-PERF-003 | Large calendars SHOULD degrade gracefully. | P1 | v0.3 | Planned |
 | REQ-PERF-004 | Plugin unload SHALL not leave active intervals or detached DOM. | P0 | v0.1 | Implemented |
 
 ### 7.6.1 Sync and refresh strategy
@@ -544,8 +550,8 @@ External changes            Obsidian writes (v0.3+)     Timer (configurable)
 | Cache stale check | Implemented | `isCacheFresh()` — 2× interval, min 15min |
 | Permission retry | Implemented | Retry button calls `init()` |
 | Source filter toggle | Implemented | `render()` with in-memory filter |
-| Window focus | **Planned v0.2** | `window.onfocus` → `init()` if cache stale |
-| macOS system notification | **Planned v0.2** | `calendian-helper watch` subscribes `EKEventStoreChangedNotification` → writes signal → JS calls `init()` |
+| Window focus | **Planned v0.3** | `window.onfocus` → `init()` if cache stale |
+| macOS system notification | **Planned v0.3** | `calendian-helper watch` subscribes `EKEventStoreChangedNotification` → writes signal → JS calls `init()` |
 | Post-write refresh | **Planned v0.3** | After create/edit/delete via helper, immediately call `init()` |
 
 #### Concurrency safety
@@ -557,10 +563,10 @@ All refresh paths go through `init()`, which has a `_refreshRunning` boolean gat
 | REQ-SYNC-001 | THE SYSTEM SHALL refresh from macOS sources on a configurable timer interval. | P0 | v0.1 | Implemented |
 | REQ-SYNC-002 | THE SYSTEM SHALL provide a manual refresh control. | P1 | v0.1 | Implemented |
 | REQ-SYNC-003 | THE SYSTEM SHALL prevent concurrent refresh operations. | P0 | v0.1 | Implemented |
-| REQ-SYNC-004 | THE SYSTEM SHOULD refresh when the Obsidian window gains focus after being in the background. | P1 | v0.2 | Planned |
-| REQ-SYNC-005 | THE SYSTEM SHOULD detect macOS calendar/reminder changes via system notification and refresh automatically. | P1 | v0.2 | Planned |
+| REQ-SYNC-004 | THE SYSTEM SHOULD refresh when the Obsidian window gains focus after being in the background. | P1 | v0.3 | Planned |
+| REQ-SYNC-005 | THE SYSTEM SHOULD detect macOS calendar/reminder changes via system notification and refresh automatically. | P1 | v0.3 | Planned |
 | REQ-SYNC-006 | AFTER a write operation (create/edit/delete), THE SYSTEM SHALL refresh from source immediately. | P0 | v0.3 | Planned |
-| REQ-SYNC-007 | WHEN a system notification watch process terminates unexpectedly, THE SYSTEM SHOULD log the failure and fall back to timer-based refresh. | P1 | v0.2 | Planned |
+| REQ-SYNC-007 | WHEN a system notification watch process terminates unexpectedly, THE SYSTEM SHOULD log the failure and fall back to timer-based refresh. | P1 | v0.3 | Planned |
 | REQ-SYNC-008 | THE SYSTEM SHALL NOT lose data due to concurrent refresh and write operations. | P0 | v0.3 | Planned |
 
 ### 7.7 UX requirements
@@ -576,7 +582,7 @@ All refresh paths go through `init()`, which has a `_refreshRunning` boolean gat
 | REQ-UX-007 | THE SYSTEM SHOULD support keyboard navigation and commands. | P2 | v0.6 | Planned |
 | REQ-UX-008 | THE SYSTEM SHOULD support a compact and comfortable density option. | P2 | v0.6 | Planned |
 | REQ-UX-009 | THE SYSTEM SHOULD provide copy-as-Markdown actions. | P2 | v0.5 | Planned |
-| REQ-UX-010 | THE SYSTEM SHOULD support a today summary panel. | P2 | v0.2 | Planned |
+| REQ-UX-010 | THE SYSTEM SHOULD support a today summary panel. | P2 | v0.3 | Planned |
 
 ### 7.8 Privacy and diagnostics requirements
 
@@ -811,7 +817,7 @@ All refresh paths go through `init()`, which has a `_refreshRunning` boolean gat
 |---|---|---|---|---|
 | REQ-DATA-001 | THE SYSTEM SHALL assign each Calendar event a stable source identity where available. | P0 | v0.1 | Implemented |
 | REQ-DATA-002 | THE SYSTEM SHALL assign each Reminder a stable source identity where available. | P0 | v0.1 | Implemented |
-| REQ-DATA-003 | IF stable identity is unavailable for a source item, THE SYSTEM SHALL mark that item as display-only and SHALL NOT permit write, delete, or note-association operations on it. | P0 | v0.2 | Planned |
+| REQ-DATA-003 | IF stable identity is unavailable for a source item, THE SYSTEM SHALL mark that item as display-only and SHALL NOT permit write, delete, or note-association operations on it. | P0 | v0.3 | Planned |
 | REQ-DATA-004 | THE SYSTEM SHALL NOT use fallback display identity (derived from title/time/calendar) for write, delete, or note-association operations. | P0 | v0.3 | Planned |
 | REQ-DATA-005 | THE SYSTEM SHALL isolate parse failures to individual records so that one malformed item does not prevent display of valid items. | P0 | v0.1 | Implemented |
 | REQ-DATA-006 | THE SYSTEM SHALL distinguish stable series identity from occurrence identity for recurring events where the source provides both. | P0 | Future | Planned |
@@ -835,7 +841,7 @@ All refresh paths go through `init()`, which has a `_refreshRunning` boolean gat
 | REQ-TIME-002 | THE SYSTEM SHALL display a timed event that spans midnight on both calendar days (e.g., 23:00–01:00 appears on both the start date and the end date). | P0 | v0.2 | Implemented |
 | REQ-TIME-003 | THE SYSTEM SHALL display a multi-day event on every calendar day that intersects [start, end). | P0 | v0.2 | Implemented |
 | REQ-TIME-004 | THE SYSTEM SHALL use the user's local timezone for all time calculations and display. | P0 | v0.1 | Implemented |
-| REQ-TIME-005 | THE SYSTEM SHALL handle DST transition days correctly (23-hour and 25-hour days SHALL NOT cause event misplacement). | P1 | v0.2 | Planned |
+| REQ-TIME-005 | THE SYSTEM SHALL handle DST transition days correctly (23-hour and 25-hour days SHALL NOT cause event misplacement). | P1 | v0.3 | Planned |
 | REQ-TIME-006 | THE SYSTEM SHALL respect the Obsidian-configured week start day for calendar grid rendering. | P1 | v0.1 | Implemented |
 | REQ-TIME-007 | THE SYSTEM SHALL format times according to the user's system locale (12h/24h). | P1 | v0.1 | Implemented |
 | REQ-TIME-008 | THE SYSTEM SHALL store dates internally as ISO 8601 datetime strings. | P0 | v0.1 | Implemented |
