@@ -1,2 +1,6 @@
 # Personal configuration data
 data.json
+
+# Native helper binary (compiled from helper/Sources/main.swift)
+calendian-helper
+.DS_Store
