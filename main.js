@@ -1703,8 +1703,18 @@ class EventCreateModal extends obsidian.Modal {
                         }
 
                         // Build ISO dates
-                        var startMoment = window.moment(startDateStr + (startTimeStr ? " " + startTimeStr : ""), "YYYY-MM-DD HH:mm");
-                        var endMoment = window.moment(endDateStr + (endTimeStr ? " " + endTimeStr : ""), "YYYY-MM-DD HH:mm");
+                        var startMoment;
+                        var endMoment;
+                        if (startTimeStr) {
+                            startMoment = window.moment(startDateStr + " " + startTimeStr, "YYYY-MM-DD HH:mm");
+                        } else {
+                            startMoment = window.moment(startDateStr, "YYYY-MM-DD");
+                        }
+                        if (endTimeStr) {
+                            endMoment = window.moment(endDateStr + " " + endTimeStr, "YYYY-MM-DD HH:mm");
+                        } else {
+                            endMoment = window.moment(endDateStr, "YYYY-MM-DD").endOf("day");
+                        }
 
                         if (!startMoment.isValid()) {
                             errorEl.textContent = "Invalid start date/time.";
