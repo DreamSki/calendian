@@ -830,7 +830,7 @@ class CalendarSettingsTab extends obsidian.PluginSettingTab {
             "Settings are stored locally in your Obsidian vault under .obsidian/plugins/calendian/data.json. No account credentials are stored by this plugin.";
     }
 
-    // REQ-DIAG-001: Diagnostic panel — safe, non-private info only
+    // REQ-DIAG-001, REQ-DIAG-002: Diagnostic panel — safe, non-private info only
     addDiagnosticInfo() {
         const diagDiv = this.containerEl.createDiv("macos-diagnostics-section");
 
@@ -876,6 +876,17 @@ class CalendarSettingsTab extends obsidian.PluginSettingTab {
             attr: { style: "font-size:11px; line-height:1.5; padding:8px; background:var(--background-secondary); border-radius:4px; overflow-x:auto; white-space:pre-wrap;" }
         });
         pre.textContent = lines.join('\n');
+
+        // REQ-DIAG-002: Export button with consent dialog
+        new obsidian.Setting(diagDiv)
+            .setName("Export diagnostics")
+            .setDesc("Copy diagnostic information to clipboard. Sensitive data (event titles, notes, locations, URLs, attendee names) will be redacted.")
+            .addButton((btn) => {
+                btn.setButtonText("Export Diagnostics");
+                btn.onClick(() => {
+                    new ExportConsentModal(this.plugin.app, integ, manifest).open();
+                });
+            });
     }
     addDotThresholdSetting() {
         new obsidian.Setting(this.containerEl)
@@ -1344,6 +1355,116 @@ class ConfirmationModal extends obsidian.Modal {
 }
 function createConfirmationDialog({ cta, onAccept, text, title, }) {
     new ConfirmationModal(window.app, { cta, onAccept, text, title }).open();
+}
+
+// REQ-DIAG-002: Consent modal for diagnostic export with redaction
+class ExportConsentModal extends obsidian.Modal {
+    constructor(app, integ, manifest) {
+        super(app);
+        this.integ = integ;
+        this.manifest = manifest || {};
+    }
+    onOpen() {
+        var self = this;
+        this.titleEl.setText("Export Diagnostics");
+        this.contentEl.createEl("p", {
+            text: "This will copy diagnostic information to your clipboard. Sensitive data (event titles, notes, locations, URLs, attendee names, and calendar UUIDs) will be redacted."
+        });
+        this.contentEl.createEl("p", {
+            text: "The export includes: plugin version, platform info, helper binary status, permission states, source counts, cache statistics, refresh timing, and error classifications.",
+            cls: "setting-item-description"
+        });
+        this.contentEl.createDiv("modal-button-container", function(buttonsEl) {
+            buttonsEl.createEl("button", { text: "Cancel" })
+                .addEventListener("click", function() { self.close(); });
+            buttonsEl.createEl("button", {
+                cls: "mod-cta",
+                text: "Export (Redacted)"
+            }).addEventListener("click", function() {
+                self.doExport();
+                self.close();
+            });
+        });
+    }
+    doExport() {
+        var payload = this.buildRedactedPayload();
+        var json = JSON.stringify(payload, null, 2);
+        navigator.clipboard.writeText(json).then(function() {
+            new obsidian.Notice("Diagnostics copied to clipboard (sensitive data redacted)");
+            console.log("[Calendian] Diagnostic export copied to clipboard (" + json.length + " chars)");
+        }).catch(function(err) {
+            new obsidian.Notice("Failed to copy diagnostics to clipboard");
+            console.error("[Calendian] Clipboard write failed:", err);
+        });
+    }
+    buildRedactedPayload() {
+        var integ = this.integ;
+        var manifest = this.manifest;
+        var opts = integ && integ.plugin ? integ.plugin.options : {};
+        var fmtDate = function(m) { return m ? m.format('YYYY-MM-DD') : null; };
+
+        // Build event counts by calendar name (safe: names only, counts only)
+        var eventCountsBySource = {};
+        if (integ && integ.allEvents) {
+            for (var i = 0; i < integ.allEvents.length; i++) {
+                var e = integ.allEvents[i];
+                var calName = e.calendarName || e.calendar || '[REDACTED]';
+                eventCountsBySource[calName] = (eventCountsBySource[calName] || 0) + 1;
+            }
+        }
+
+        // Build reminder counts by list name (safe: names only, counts only)
+        var reminderCountsBySource = {};
+        if (integ && integ.allReminders) {
+            for (var j = 0; j < integ.allReminders.length; j++) {
+                var r = integ.allReminders[j];
+                var listName = r.listName || r.list || '[REDACTED]';
+                reminderCountsBySource[listName] = (reminderCountsBySource[listName] || 0) + 1;
+            }
+        }
+
+        // Redacted error: include type and timestamp only, redact message (may contain titles/paths)
+        var redactError = function(err) {
+            if (!err) return null;
+            return { type: err.type || 'unknown', timestamp: err.timestamp || null };
+        };
+
+        return {
+            exportDate: new Date().toISOString(),
+            pluginVersion: manifest.version || 'unknown',
+            pluginName: manifest.name || 'Calendian',
+            platform: navigator.platform,
+            helperStatus: {
+                available: !!(integ && integ.helperPath),
+                // Path redacted — could leak filesystem structure
+            },
+            permissions: {
+                calendar: integ ? integ.permissionState.calendar : 'unknown',
+                reminders: integ ? integ.permissionState.reminders : 'unknown',
+            },
+            sources: {
+                calendarsDiscovered: integ ? integ.sourceCounts.calendars : 0,
+                reminderListsDiscovered: integ ? integ.sourceCounts.reminderLists : 0,
+                eventCountsByCalendar: eventCountsBySource,
+                reminderCountsByList: reminderCountsBySource,
+            },
+            cache: {
+                eventsCount: integ ? integ.allEvents.length : 0,
+                remindersCount: integ ? integ.allReminders.length : 0,
+                cacheStart: integ ? fmtDate(integ.cacheStart) : null,
+                cacheEnd: integ ? fmtDate(integ.cacheEnd) : null,
+            },
+            refresh: {
+                lastRefresh: integ ? integ.lastRefreshTime : null,
+                lastRefreshDurationMs: integ ? integ.lastRefreshDurationMs : null,
+                refreshIntervalMinutes: opts.refreshIntervalMinutes || 5,
+            },
+            errors: {
+                calendar: integ ? redactError(integ.lastError.calendar) : null,
+                reminders: integ ? redactError(integ.lastError.reminders) : null,
+            },
+        };
+    }
 }
 
 /**
