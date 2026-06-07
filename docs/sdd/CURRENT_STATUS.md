@@ -26,7 +26,7 @@ This document records the actual repository state. It intentionally separates im
 | Month cell event dots | Implemented | Calendar-colored dots on month cells showing event presence per calendar. Hollow reminder dot. Multi-day event span support. Uses in-memory cache only (no helper calls). Respects source filters. Dynamic CSS injection for per-calendar colors. |
 | Refresh / sync | Partial | Timer-driven refresh (configurable interval, default 5min). Manual refresh button. `_refreshRunning` concurrency guard. Window focus and EKEventStoreChangedNotification watch deferred beyond v0.2. Post-write refresh planned for v0.3. See SPEC.md §7.6.1. |
 | Right-click actions | Planned | Current day/week context menu is inherited from calendar note behavior; Calendian event/reminder actions are not complete. |
-| Write operations | Planned | Native EventKit helper supports writes (`EKEventStore.save`). `toggle-reminder` command already implemented in helper. Full CRUD planned for v0.3-v0.4. |
+| Write operations | **Partial (v0.3)** | Event and reminder creation implemented via Swift helper `create-event`/`create-reminder` commands + `EventCreateModal`/`ReminderCreateModal`. Edit/delete planned for v0.4. Natural language parsing (TASK-023) pending. Default calendar/list settings implemented. |
 | Note association | Planned | Existing daily/weekly note integration comes from the base calendar plugin behavior; Calendian event/reminder frontmatter association is not complete. |
 | Tasks integration | Planned | Current task dots for daily notes exist from base plugin behavior; macOS Reminders sync with Obsidian Tasks is not implemented. |
 | Timeline / week / statistics views | Planned | Not current behavior. |
@@ -38,7 +38,7 @@ This document records the actual repository state. It intentionally separates im
 
 ## Current release label
 
-Current repository state: **v0.2 read-only polish — complete**. All v0.2 tasks merged and verified.
+Current repository state: **v0.3 safe create — partial**. Event and reminder creation complete (10/10 REQ-WRITE requirements). Natural language parsing (TASK-023) and deferred v0.2 items pending.
 
 ## README policy
 
@@ -80,15 +80,18 @@ Everything else must be marked as planned, experimental, or future.
 
 > Updated by AI after every meaningful step. Next session reads this to continue without re-explaining context.
 
-- **Doing:** v0.3 — event/reminder creation done; natural language parsing (TASK-023) next.
-- **Done this session:**
-  - **Swift helper**: Added `create-event` and `create-reminder` commands. Tested with real EventKit data.
-  - **EventCreateModal**: Title, date/time, calendar selector, all-day, location, URL, notes. Validation + error display. Post-create refresh.
-  - **ReminderCreateModal**: Title, list selector, due date/time, priority, notes. Validation + error display. Post-create refresh.
-  - **Sidebar buttons**: "+Event" and "+Remind" in header row (show only when source enabled + permission granted).
-  - **Code split attempt**: `require()` approach failed in Obsidian; reverted. Module files preserved on disk for reference.
+- **Doing:** Documentation alignment for v0.3 progress.
+- **Done this session (v0.3):**
+  - **Swift helper**: `create-event` and `create-reminder` commands. Tested with real EventKit data.
+  - **EventCreateModal**: Full event creation form with validation + error display + post-create refresh.
+  - **ReminderCreateModal**: Full reminder creation form with validation + error display + post-create refresh.
+  - **Sidebar buttons**: "+Event" and "+Remind" in header row.
+  - **Default calendar/list settings**: `defaultCalendarId`/`defaultReminderListId` in settings tab, auto-detect fallback (Outlook).
+  - **Bug fixes**: ISO date millisecond stripping, date parsing when no time entered, async dropdown loading, error message display.
+  - **Code split attempt**: require() blocked; reverted. Module files preserved.
 - **Decisions:**
-  - `require()` to local files at module top level does NOT work in Obsidian plugin context. Alternative module-loading strategies (bundling, runtime vault adapter) needed for code split.
-  - UI forms use `integ.execHelper()` directly (inline in modal) rather than going through writer.js module — avoids the require() problem while keeping the same data flow.
-- **Next:** Natural language event parsing (TASK-023). Code split strategy revisit. Deferred v0.2 items (REQ-REM-009, etc.).
-- **Last action:** 2026-06-08 — v0.3 write UI complete. Event and reminder creation working end-to-end.
+  - require() to local files does NOT work in Obsidian plugin context.
+  - Settings stored in `data.json` (gitignored) — no personal data in git.
+  - Auto-detect mode uses "outlook" substring matching (generic, not personal).
+- **Next:** Natural language event parsing (TASK-023). Deferred v0.2 items.
+- **Last action:** 2026-06-08 — v0.3 write features complete; all docs aligned.

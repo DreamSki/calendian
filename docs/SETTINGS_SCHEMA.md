@@ -1,7 +1,7 @@
 # Calendian Settings Schema
 
 > Status: normative settings document
-> Last updated: 2026-06-07
+> Last updated: 2026-06-08
 > Plugin ID: `calendian`
 
 This document defines the plugin settings data structure, defaults, source identity model, and migration policy. The canonical settings are stored in `<vault>/.obsidian/plugins/calendian/data.json`.
@@ -46,6 +46,10 @@ interface CalendianSettings {
   legacyClickBehavior: boolean;     // default: false
                                     // true = single-click opens daily note (original Calendar plugin behavior)
                                     // false = single-click selects date, Cmd/Ctrl-click opens daily note
+
+  // ---- Write defaults (v0.3) ----
+  defaultCalendarId: string;        // default: "" (empty = auto-detect, prefers Outlook)
+  defaultReminderListId: string;    // default: "" (empty = auto-detect, prefers Outlook "任务")
 
   // ---- Notifications (v0.5) ----
   notificationsEnabled: boolean;            // default: true
@@ -100,6 +104,8 @@ interface CalendianSourceMetadata {
   "showCompletedReminders": false,
   "noDateReminderSection": "show",
   "legacyClickBehavior": false,
+  "defaultCalendarId": "",
+  "defaultReminderListId": "",
   "notificationsEnabled": true,
   "eventNotificationLeadMinutes": 5,
   "overdueReminderNotifications": true,

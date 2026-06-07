@@ -122,6 +122,16 @@ The following features are currently implemented in the codebase. All macOS data
 - ✅ Month-cell event dots with calendar colors, hollow reminder dots, multi-day spans
 - ✅ Diagnostic panel with permission/source/error overview and export with consent-based redaction
 
+#### Write operations (v0.3)
+- ✅ Event creation via `EventCreateModal` with title, calendar, date/time, all-day, location, URL, notes
+- ✅ Reminder creation via `ReminderCreateModal` with title, list, due date/time, priority, notes
+- ✅ Client-side validation (title required, calendar/list required, date format check)
+- ✅ Post-write refresh (`init(true)`) confirms write success from EventKit source
+- ✅ Write error display with specific failure reason
+- ✅ Non-recurring events only (`.thisEvent` span, REQ-WRITE-005)
+- ✅ Default calendar/list preference stored in settings (`defaultCalendarId`, `defaultReminderListId`)
+- ✅ Sidebar "+Event" and "+Remind" buttons (shown only when source enabled + permission granted)
+
 ### 2.2 Partial and known gaps for v0.2
 
 **What "Partial" means for v0.2**:
@@ -138,9 +148,10 @@ The following features are currently implemented in the codebase. All macOS data
 - Performance targets (cache switch <100ms, init <3s) have not been benchmarked
 
 **Explicitly not yet done (v0.3+)**:
-- Code split into multiple JS modules (REQ-ARCH-001, target v0.3)
-- Write operations (REQ-WRITE-*, target v0.3-v0.4)
-- Recurring event safety model (REQ-REC-*, target v0.3+)
+- Code split into multiple JS modules (REQ-ARCH-001, target v0.3) — modules extracted to `src/` but require() wiring blocked by Obsidian plugin loading constraints
+- Natural language event creation (REQ-NL-*, TASK-023, target v0.3)
+- Recurring event safety model (REQ-REC-002/003/007, target v0.3): blocking recurring edits not yet implemented
+- Remaining v0.2 deferred items (REQ-UX-010, REQ-PERF-003, REQ-PERM-005, REQ-SYNC-004/005/007, REQ-DATA-003, REQ-TIME-005, REQ-REM-009)
 
 ---
 
@@ -591,6 +602,7 @@ All refresh paths go through `init()`, which has a `_refreshRunning` boolean gat
 | REQ-UX-009 | THE SYSTEM SHOULD provide copy-as-Markdown actions. | P2 | v0.5 | Planned |
 | REQ-UX-010 | THE SYSTEM SHOULD support a today summary panel. | P2 | v0.3 | Planned |
 
+| REQ-UX-011 | THE SYSTEM SHOULD persist the user's preferred calendar and reminder list for the create form. | P2 | v0.3 | Implemented — `defaultCalendarId` and `defaultReminderListId` in settings; auto-detect mode prefers Outlook account when unset |
 ### 7.8 Privacy and diagnostics requirements
 
 | ID | Requirement | Priority | Target | Status |

@@ -137,10 +137,10 @@ Tasks are ordered by dependency and release target. Every task references requir
 ### TASK-019 — Code split into src/ modules (REQ-ARCH-001)
 
 - Requirements: `REQ-ARCH-001`
-- Status: In progress (branch: main)
+- Status: Blocked (branch: main)
 - Priority: P1
-- Evidence: `src/macos/helper-executor.js` (execHelper, classifyError, execJXA, refresh lifecycle), `src/cache/schedule-cache.js` (cache load/save, date queries, preload), `src/macos/writer.js` (createEvent, createReminder with validation). Wired into MacOSIntegration.prototype via Object.assign after class definition in main.js.
-- Remaining: settings-tab.js, calendar-panel.js, diagnostics.js, dot-colors.js, domain models not yet extracted.
+- Evidence: `src/macos/helper-executor.js`, `src/cache/schedule-cache.js`, `src/macos/writer.js` modules extracted to disk. require() wiring into MacOSIntegration.prototype was reverted — Obsidian plugin loading does not support top-level require() to local files. Module files preserved for reference; alternative strategy needed (build-time concatenation or runtime vault adapter).
+- Remaining: settings-tab.js, calendar-panel.js, diagnostics.js, dot-colors.js, domain models not yet extracted. Integration strategy TBD.
 
 ### TASK-020 — Event create form
 
@@ -162,6 +162,13 @@ Tasks are ordered by dependency and release target. Every task references requir
 - Status: Done
 - Priority: P0
 - Evidence: Both modals show `new obsidian.Notice("Event/Reminder created: ...")` on success. Error display via `.calendian-form-error` div with red styling. Post-create `init(true)` call refreshes cache from EventKit.
+
+### TASK-022a — Default calendar/list settings for create form
+
+- Requirements: `REQ-UX-011`
+- Status: Done
+- Priority: P2
+- Evidence: `defaultCalendarId` and `defaultReminderListId` in defaultSettings. Settings tab dropdowns populated from `discoverCalendars()`/`discoverReminderLists()`. Create modals read saved preference first, fall back to auto-detect (Outlook). Calendar IDs stored in `data.json` (gitignored).
 
 ### TASK-023 — Natural language event creation
 
