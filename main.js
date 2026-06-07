@@ -2153,7 +2153,7 @@ function parseNaturalLanguage(text, refDate) {
 
     // Chinese standalone period words (vague time without hour)
     if (!time && !date) {
-        var cnPeriodAlone = { '中午': '12:00', '早上': '09:00', '上午': '09:00', '下午': '14:00', '晚上': '19:00', '傍晚': '18:00', '凌晨': '03:00', '夜里': '22:00' };
+        var cnPeriodAlone = { '中午': '12:00', '早上': '09:00', '上午': '09:00', '白天': '09:00', '下午': '14:00', '晚上': '19:00', '傍晚': '18:00', '凌晨': '03:00', '夜里': '22:00' };
         for (var cp in cnPeriodAlone) {
             if (working.indexOf(cp) !== -1) {
                 time = cnPeriodAlone[cp];
@@ -2361,7 +2361,7 @@ function cnHourTo24(hour, period) {
  */
 function getChinesePeriodHint(text) {
     if (/凌晨|夜里|深夜/.test(text)) return '凌晨';
-    if (/早上|上午/.test(text)) return '上午';
+    if (/早上|上午|白天/.test(text)) return '上午';
     if (/下午/.test(text)) return '下午';
     if (/晚上|傍晚/.test(text)) return '晚上';
     if (/中午/.test(text)) return '中午';
@@ -2374,7 +2374,7 @@ function getChinesePeriodHint(text) {
  */
 function stripOrphanPeriodHints(text) {
     // \b doesn't work with Chinese chars, so match the words directly
-    return text.replace(/(凌晨|早上|上午|中午|下午|晚上|傍晚|夜里|深夜)\s*/g, ' ');
+    return text.replace(/(凌晨|早上|上午|白天|中午|下午|晚上|傍晚|夜里|深夜)\s*/g, ' ');
 }
 
 /**
@@ -2753,9 +2753,10 @@ class QuickEventModal extends obsidian.Modal {
         var integ = this.integ;
         var refDate = integ.selectedDate ? integ.selectedDate.clone() : window.moment();
 
-        this.titleEl.setText("Quick Create Event");
+        var aiEnabled = !!(integ.plugin.options && integ.plugin.options.aiParsingEnabled && integ.plugin.options.aiEndpoint && integ.plugin.options.aiApiKey);
+        this.titleEl.setText("Quick Create");
         this.titleEl.createEl("span", {
-            text: " — type naturally, e.g. \"tomorrow 3pm meeting\"",
+            text: aiEnabled ? " — type + Enter for AI ✨" : " — e.g. \"tomorrow 3pm meeting\"",
             cls: "calendian-quick-hint"
         });
 
@@ -2788,9 +2789,18 @@ class QuickEventModal extends obsidian.Modal {
         var errorEl = this.contentEl.createDiv("calendian-form-error");
         errorEl.style.display = "none";
 
-        // ── Debounced parse on input (AI-first with regex fallback) ─
+        // ── Regex parse on input (free, always runs) ──────────
         var parseTimer = null;
-        var aiParsing = false;
+        var doRegexParse = function(text) {
+            var result = parseNaturalLanguage(text, refDate);
+            self._parsedResult = result;
+            if (result) {
+                self._renderPreview(previewEl, result, integ);
+            } else {
+                previewEl.style.display = 'none';
+            }
+        };
+
         inputEl.addEventListener('input', function() {
             var text = inputEl.value.trim();
             if (!text) {
@@ -2799,43 +2809,43 @@ class QuickEventModal extends obsidian.Modal {
                 return;
             }
             if (parseTimer) clearTimeout(parseTimer);
-            // Longer debounce for AI (to avoid spamming API), shorter for regex
+            parseTimer = setTimeout(function() {
+                doRegexParse(text);
+            }, 300);
+        });
+
+        // ── Enter key → AI parse (only when enabled & configured) ─
+        inputEl.addEventListener('keydown', async function(e) {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            var text = inputEl.value.trim();
+            if (!text) return;
+
             var opts = integ.plugin.options || {};
             var useAI = !!(opts.aiParsingEnabled && opts.aiEndpoint && opts.aiApiKey);
-            var delay = useAI ? 800 : 300;
+            if (!useAI) return; // no AI configured, Enter does nothing extra
 
-            parseTimer = setTimeout(async function() {
-                var result = null;
+            // Show AI parsing indicator
+            previewEl.style.display = 'block';
+            previewEl.innerHTML = '<div style="color:var(--text-muted);font-style:italic">🤖 AI parsing...</div>';
 
-                // Try AI first if enabled
-                if (useAI) {
-                    aiParsing = true;
-                    previewEl.style.display = 'block';
-                    previewEl.innerHTML = '<div style="color:var(--text-muted);font-style:italic">🤖 AI parsing...</div>';
-                    try {
-                        result = await callAIForParsing(text, {
-                            aiEndpoint: opts.aiEndpoint,
-                            aiApiKey: opts.aiApiKey,
-                            aiModel: opts.aiModel || 'deepseek-chat',
-                        }, refDate);
-                    } catch (e) {
-                        console.log('[Calendian] AI parse error:', e);
-                    }
-                    aiParsing = false;
+            try {
+                var aiResult = await callAIForParsing(text, {
+                    aiEndpoint: opts.aiEndpoint,
+                    aiApiKey: opts.aiApiKey,
+                    aiModel: opts.aiModel || 'deepseek-chat',
+                }, refDate);
+                if (aiResult) {
+                    self._parsedResult = aiResult;
+                    self._renderPreview(previewEl, aiResult, integ);
+                    return;
                 }
+            } catch (err) {
+                console.log('[Calendian] AI parse error:', err.message || err);
+            }
 
-                // Fall back to regex if AI didn't return a result
-                if (!result) {
-                    result = parseNaturalLanguage(text, refDate);
-                }
-
-                self._parsedResult = result;
-                if (result) {
-                    self._renderPreview(previewEl, result, integ);
-                } else {
-                    previewEl.style.display = 'none';
-                }
-            }, delay);
+            // AI failed — fall back to regex
+            doRegexParse(text);
         });
 
         // Focus the input
@@ -2844,33 +2854,27 @@ class QuickEventModal extends obsidian.Modal {
         // ── Buttons ─────────────────────────────────────────
         new obsidian.Setting(this.contentEl)
             .addButton(function(btn) {
-                btn.setButtonText("Fill Form")
+                btn.setButtonText("→ Event")
                     .setCta()
                     .onClick(function() {
-                        var prefill = self._parsedResult;
-                        if (!prefill || !prefill.title) {
-                            // Parse one more time on current text
-                            var text = inputEl.value.trim();
-                            if (text) {
-                                prefill = parseNaturalLanguage(text, refDate);
-                                self._parsedResult = prefill;
-                            }
-                        }
-                        if (prefill && prefill.title && !prefill.date) {
-                            // No date parsed — default to selected date
-                            prefill.date = refDate.clone();
-                        }
-                        if (!prefill || !prefill.title) {
-                            errorEl.textContent = "Please enter a description (e.g. \"tomorrow 3pm meeting\").";
-                            errorEl.style.display = "block";
-                            return;
-                        }
+                        var prefill = self._getOrParse(inputEl, refDate);
+                        if (!prefill) return;
+                        if (!prefill.date) prefill.date = refDate.clone();
                         self.close();
                         new EventCreateModal(integ.plugin.app, integ, prefill).open();
                     });
             })
             .addButton(function(btn) {
-                btn.setButtonText("Manual Form")
+                btn.setButtonText("→ Reminder")
+                    .onClick(function() {
+                        var prefill = self._getOrParse(inputEl, refDate);
+                        if (!prefill) return;
+                        self.close();
+                        new ReminderCreateModal(integ.plugin.app, integ, prefill).open();
+                    });
+            })
+            .addButton(function(btn) {
+                btn.setButtonText("Manual")
                     .onClick(function() {
                         self.close();
                         new EventCreateModal(integ.plugin.app, integ).open();
@@ -2880,6 +2884,26 @@ class QuickEventModal extends obsidian.Modal {
                 btn.setButtonText("Cancel")
                     .onClick(function() { self.close(); });
             });
+    }
+
+    _getOrParse(inputEl, refDate) {
+        var prefill = this._parsedResult;
+        if (!prefill || !prefill.title) {
+            var text = inputEl.value.trim();
+            if (text) {
+                prefill = parseNaturalLanguage(text, refDate);
+                this._parsedResult = prefill;
+            }
+        }
+        if (!prefill || !prefill.title) {
+            var errorEl = this.contentEl.querySelector('.calendian-form-error');
+            if (errorEl) {
+                errorEl.textContent = 'Please enter a description (e.g. "tomorrow 3pm meeting").';
+                errorEl.style.display = 'block';
+            }
+            return null;
+        }
+        return prefill;
     }
 
     _renderPreview(el, result, integ) {
@@ -2933,17 +2957,23 @@ class QuickEventModal extends obsidian.Modal {
 // ── Reminder Create Modal ──────────────────────────────────
 
 class ReminderCreateModal extends obsidian.Modal {
-    constructor(app, macosIntegration) {
+    constructor(app, macosIntegration, prefill) {
         super(app);
         this.integ = macosIntegration;
+        this.prefill = prefill || null;
     }
 
     onOpen() {
         var self = this;
         var integ = this.integ;
         var selDate = integ.selectedDate ? integ.selectedDate.clone() : window.moment();
+        var pf = this.prefill;
 
-        this.titleEl.setText("Create Reminder");
+        var pfTitle = (pf && pf.title) ? pf.title : '';
+        var pfDate = (pf && pf.date) ? pf.date.clone() : null;
+        var pfTime = (pf && pf.time) ? pf.time : '';
+
+        this.titleEl.setText(pfTitle ? "Create Reminder — " + pfTitle : "Create Reminder");
 
         // ── Title ──────────────────────────────────────────
         var titleInput;
@@ -2952,6 +2982,7 @@ class ReminderCreateModal extends obsidian.Modal {
             .setDesc("Reminder text (required)")
             .addText(function(cmp) {
                 titleInput = cmp.inputEl;
+                if (pfTitle) cmp.setValue(pfTitle);
                 cmp.setPlaceholder("e.g. Buy groceries");
             });
 
@@ -3013,7 +3044,8 @@ class ReminderCreateModal extends obsidian.Modal {
             .setDesc("YYYY-MM-DD (optional — defaults to none)")
             .addText(function(cmp) {
                 dueDateInput = cmp.inputEl;
-                cmp.setPlaceholder("e.g. " + selDate.format("YYYY-MM-DD"));
+                if (pfDate) cmp.setValue(pfDate.format("YYYY-MM-DD"));
+                else cmp.setPlaceholder("e.g. " + selDate.format("YYYY-MM-DD"));
             });
 
         // ── Due time ──────────────────────────────────────
@@ -3023,7 +3055,8 @@ class ReminderCreateModal extends obsidian.Modal {
             .setDesc("HH:MM (optional)")
             .addText(function(cmp) {
                 dueTimeInput = cmp.inputEl;
-                cmp.setPlaceholder("e.g. 14:00");
+                if (pfTime) cmp.setValue(pfTime);
+                else cmp.setPlaceholder("e.g. 14:00");
             });
 
         // ── Priority ──────────────────────────────────────
