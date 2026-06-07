@@ -1,185 +1,281 @@
-# Calendian — 分阶段迭代开发计划
+# Calendian Requirement-Driven Roadmap
 
-> **最后更新**: 2026-06-07  
-> **原则**: 每个 Phase 产出可用的增量功能，用户可在任何阶段停止
+> Status: roadmap derived from `SPEC.md` requirements  
+> Last updated: 2026-06-07  
+> Process: Specification-Driven Development
 
----
+This roadmap is not an independent wish list. Every release is derived from requirement groups in [`SPEC.md`](./SPEC.md), acceptance gates in [`docs/sdd/ACCEPTANCE.md`](./docs/sdd/ACCEPTANCE.md), tasks in [`docs/sdd/TASKS.md`](./docs/sdd/TASKS.md), and risks in [`docs/sdd/RISKS.md`](./docs/sdd/RISKS.md).
 
-## Phase 1：只读展示 + 基础体验
-
-**目标**: 让用户在 Obsidian 中快速、舒适地查看所有日程和提醒
-
-**预计工作量**: 2-3 天
-
-### 功能清单
-
-| # | 功能 | 优先级 | 状态 |
-|---|------|--------|------|
-| 1.1 | 插件骨架：manifest、入口文件、文件拆分 | P0 | ✅ 已完成 |
-| 1.2 | JXA 数据获取：Calendar + Reminders | P0 | ✅ 已完成 |
-| 1.3 | 预加载 ±6 个月缓存机制 | P0 | ✅ 已完成 |
-| 1.4 | 事件列表面板：时间 + 标题 + 日历 badge | P0 | ✅ 已完成 |
-| 1.5 | 日历颜色（从 macOS 获取） | P1 | ✅ 已完成 |
-| 1.6 | 事件时长显示（14:00 - 16:00 (2h)） | P1 | ✅ 已完成 |
-| 1.7 | 全天事件置顶 + 特殊样式 | P1 | ✅ 已完成 |
-| 1.8 | 单击选中日期（不创建日记） | P0 | ✅ 已完成 |
-| 1.9 | ← Today 切换按钮 | P1 | ✅ 已完成 |
-| 1.10 | 即将开始/进行中事件高亮 | P1 | ✅ 已完成 |
-| 1.11 | 设置页：日历来源列表勾选（Discover） | P0 | ✅ 已完成 |
-| 1.12 | 设置页：提醒来源列表勾选 | P0 | ✅ 已完成 |
-| 1.13 | 过期提醒红色标注 | P1 | 🔲 |
-| 1.14 | 无日期提醒单独区域 | P1 | 🔲 |
-| 1.15 | 提醒显示范围切换（今天/7天/全部） | P2 | 🔲 |
-| 1.16 | 已结束事件灰色展示 | P1 | 🔲 |
-| 1.17 | 多天事件每天显示 | P2 | 🔲 |
-| 1.18 | 月视图日期格子上的彩色圆点标记 | P1 | 🔲 |
-| 1.19 | Claude.ai 视觉风格优化 | P1 | 🔲 |
-| 1.20 | 事件通知（开始前 5 分钟） | P2 | 🔲 |
-| 1.21 | 启动时今日概览 Notice | P2 | 🔲 |
-
-### 交付物
-- 可独立运行的 `calendian` 插件
-- 只读展示所有 macOS 日历和提醒
-- 切换日期瞬时响应
-- 基础视觉风格
+Current repository status: **pre-v0.1 / read-only MVP partial**.
 
 ---
 
-## Phase 2：双向同步 + 编辑功能
+## Roadmap principles
 
-**目标**: 在 Obsidian 中创建、编辑、删除事件和提醒
-
-**前置依赖**: Phase 1 完成
-
-**预计工作量**: 3-5 天
-
-### 功能清单
-
-| # | 功能 | 优先级 |
-|---|------|--------|
-| 2.1 | 侧边编辑面板（Slide-over）UI 框架 | P0 |
-| 2.2 | 创建新事件（标题、日历、时间、地点、备注） | P0 |
-| 2.3 | 编辑已有事件 | P0 |
-| 2.4 | 删除事件（确认对话框） | P0 |
-| 2.5 | 创建新提醒（标题、列表、截止日期） | P0 |
-| 2.6 | 标记提醒完成 | P0 |
-| 2.7 | 编辑提醒 | P1 |
-| 2.8 | 删除提醒（确认对话框） | P1 |
-| 2.9 | 斜杠命令 `/event`（智能提示） | P1 |
-| 2.10 | 斜杠命令 `/reminder`（智能提示） | P1 |
-| 2.11 | 右键菜单：事件操作（编辑/删除/在App中打开） | P0 |
-| 2.12 | 右键菜单：提醒操作（完成/编辑/删除） | P0 |
-| 2.13 | 右键菜单：日期操作（新建事件/提醒） | P0 |
-| 2.14 | 右键菜单：日历来源快速筛选 | P1 |
-| 2.15 | 事件详情展开：地点/链接可点击 | P1 |
-| 2.16 | 事件详情展开：备注全文显示 | P1 |
-| 2.17 | 提醒优先级显示（高/中/低） | P2 |
-| 2.18 | 提醒子任务支持 | P2 |
-
-### 交付物
-- 完整的 CRUD 操作
-- 右键菜单交互
-- 斜杠命令创建流程
+1. **Ship safe vertical slices.** Each version must be usable without requiring later phases.
+2. **Do not overpromise.** README may only list current behavior that is reflected in `docs/sdd/CURRENT_STATUS.md`.
+3. **Read before write.** Read-only display must be stable before any Calendar/Reminder mutation ships.
+4. **Stable identity before mutation.** Editing, deleting, and note association require reliable event/reminder IDs.
+5. **Recurring events are safety-critical.** Recurring mutation is blocked until explicitly specified and tested.
+6. **Cross-platform is a separate architecture track.** Android/Microsoft Graph is deferred to v1.x.
 
 ---
 
-## Phase 3：笔记关联 + Tasks 集成
+## Version overview
 
-**目标**: 将 Obsidian 笔记与日程深度绑定
-
-**前置依赖**: Phase 2 完成
-
-**预计工作量**: 3-5 天
-
-### 功能清单
-
-| # | 功能 | 优先级 |
-|---|------|--------|
-| 3.1 | 事件-笔记双向关联（frontmatter 存储） | P0 |
-| 3.2 | 事件详情中显示关联笔记链接 | P0 |
-| 3.3 | 右键「关联笔记」→ 选择已有笔记或新建 | P0 |
-| 3.4 | 关联笔记模板系统（自动生成笔记内容） | P1 |
-| 3.5 | 模板变量：{title}, {date}, {time}, {location}, {calendar} | P1 |
-| 3.6 | Obsidian Tasks 插件格式解析 | P1 |
-| 3.7 | 笔记中的任务同步到 macOS 提醒 | P2 |
-| 3.8 | 反向链接图谱集成（事件出现在笔记的反链中） | P2 |
-| 3.9 | 事件评论/备注（Obsidian 端额外备注） | P2 |
-| 3.10 | 自动关联日记（当天事件自动关联到日记） | P2 |
-
-### 交付物
-- 笔记与日程的双向关联
-- 模板系统
-- Tasks 插件集成基础
+| Version | Theme | Requirement groups | Release posture |
+|---|---|---|---|
+| v0.1 | Read-only MVP | `REQ-PLAT-*`, `REQ-PERM-*`, `REQ-CAL-001..006`, `REQ-REM-001..004`, `REQ-SRC-001..004`, `REQ-CACHE-001..005`, `REQ-UX-001..004`, `REQ-PRIV-*`, `REQ-ERR-001..004` | Next target |
+| v0.2 | Read-only polish | event details, overdue/no-date reminders, multi-day events, diagnostics, manual refresh | Planned |
+| v0.3 | Safe create | simple event/reminder creation, validation, write verification | Planned |
+| v0.4 | Safe edit/delete | simple event/reminder edit/delete, reminder completion, recurring safety | Planned |
+| v0.5 | Note association | frontmatter association, meeting notes, templates, limited Tasks integration | Planned |
+| v0.6 | Advanced views/search | timeline, week view, search, basic statistics | Planned |
+| v1.x | Platform expansion | cross-platform architecture, Microsoft Graph/Android investigation | Deferred |
 
 ---
 
-## Phase 4：高级视图 + 统计
+## v0.1 — Read-only MVP
 
-**目标**: 提供丰富的日程可视化和分析能力
+### Goal
 
-**前置依赖**: Phase 3 完成
+A macOS Obsidian user can open Calendian, grant permissions, select a date, and see that day's Calendar events and Reminders without modifying source data.
 
-**预计工作量**: 5-7 天
+### Required requirements
 
-### 功能清单
+- Platform: `REQ-PLAT-001` to `REQ-PLAT-004`
+- Permissions: `REQ-PERM-001` to `REQ-PERM-004`
+- Calendar read: `REQ-CAL-001` to `REQ-CAL-006`
+- Reminder read: `REQ-REM-001` to `REQ-REM-004`
+- Source selection: `REQ-SRC-001` to `REQ-SRC-004`
+- Cache/performance: `REQ-CACHE-001` to `REQ-CACHE-005`, `REQ-PERF-001`, `REQ-PERF-002`, `REQ-PERF-004`
+- UX: `REQ-UX-001` to `REQ-UX-004`
+- Privacy/error handling: `REQ-PRIV-001` to `REQ-PRIV-003`, `REQ-ERR-001` to `REQ-ERR-004`
+- Documentation: `REQ-DOC-001` to `REQ-DOC-003`
 
-| # | 功能 | 优先级 |
-|---|------|--------|
-| 4.1 | 垂直时间轴视图（时间刻度 + 彩色色块） | P0 |
-| 4.2 | 当前时间红色指示线 | P1 |
-| 4.3 | 周视图（7 天事件列表） | P1 |
-| 4.4 | 视图切换（月列表/时间轴/周视图） | P1 |
-| 4.5 | 日程统计/报表（日/周/月事件数） | P2 |
-| 4.6 | 按日历分组统计 | P2 |
-| 4.7 | 项目管理/分组 | P3 |
-| 4.8 | 时间线笔记浏览（类似 Agenda） | P3 |
-| 4.9 | 年度概览热力图 | P3 |
+### Deliverables
 
-### 交付物
-- 多种视图模式
-- 时间轴可视化
-- 基础统计功能
+- Plugin metadata aligned across manifest and docs.
+- macOS-only support clearly documented.
+- Calendar read integration hardened for basic event fields.
+- Reminders read integration hardened for basic reminder fields.
+- Selected-date sidebar panel.
+- Single-click date selection.
+- Cmd/Ctrl-click daily-note behavior preserved.
+- Source discovery and basic filtering.
+- Bounded cache and configurable refresh.
+- Permission/empty/error states.
+- README corrected to avoid planned-feature overclaiming.
 
----
+### Release gates
 
-## Phase 5：高级功能 + 跨平台
+See `GATE-V001-*` in `docs/sdd/ACCEPTANCE.md`.
 
-**目标**: 智能化、自动化、跨平台
+### Explicit exclusions
 
-**前置依赖**: Phase 4 完成
-
-**预计工作量**: 持续迭代
-
-### 功能清单
-
-| # | 功能 | 优先级 |
-|---|------|--------|
-| 5.1 | 无限缩放时间线 | P1 |
-| 5.2 | 智能事件分类（关键词匹配 + 图标） | P2 |
-| 5.3 | 标签集成（日历名→Obsidian 标签） | P2 |
-| 5.4 | 自定义视图保存/切换 | P2 |
-| 5.5 | 自定义快捷键配置 | P2 |
-| 5.6 | 全局搜索事件/提醒（跨日期） | P1 |
-| 5.7 | 键盘快捷键导航 | P1 |
-| 5.8 | Microsoft Graph API（Android 支持） | P3 |
-| 5.9 | 多语言界面（中/英） | P2 |
-| 5.10 | 导入/导出插件配置 | P3 |
-
-### 交付物
-- 智能分类和标签
-- 跨平台支持
-- 完整的快捷键系统
+- No Calendar/Reminder writes.
+- No event/reminder context-menu mutation.
+- No note association beyond existing daily-note behavior inherited from the base calendar plugin.
+- No recurring event mutation.
+- No Android/cross-platform support.
 
 ---
 
-## 开发节奏建议
+## v0.2 — Read-only polish
 
-| 阶段 | 时间 | 里程碑 |
-|------|------|--------|
-| Phase 1 | 第 1-2 周 | 基础可用，日常查看日程 |
-| Phase 2 | 第 3-4 周 | 可在 Obsidian 中管理日程 |
-| Phase 3 | 第 5-6 周 | 笔记与日程深度绑定 |
-| Phase 4 | 第 7-9 周 | 多视图、时间轴、统计 |
-| Phase 5 | 第 10 周+ | 智能化、跨平台 |
+### Goal
 
-每个 Phase 完成后发布一个可用版本，用户可随时停止在任意阶段。
+Make the read-only experience reliable enough for daily use across common event/reminder shapes.
+
+### Required requirements
+
+- Event details and edge cases: `REQ-CAL-007` to `REQ-CAL-012`
+- Reminder polish: `REQ-REM-005` to `REQ-REM-009`
+- Cache/diagnostics: `REQ-CACHE-006` to `REQ-CACHE-008`, `REQ-DIAG-001` to `REQ-DIAG-004`
+- UX polish: `REQ-UX-006`, `REQ-UX-010`
+- Error hardening: `REQ-ERR-003`
+
+### Deliverables
+
+- Expandable event details.
+- Location, URL, notes, and recurrence summary display where available.
+- Overdue reminder styling.
+- No-date reminder section.
+- Reminder display range selector.
+- Past event treatment.
+- Multi-day event overlap display.
+- Month-cell event dots.
+- Manual refresh.
+- Diagnostic panel with redaction.
+- Large-calendar behavior reviewed.
+
+### Explicit exclusions
+
+- Still read-only.
+- No automatic Tasks sync.
+- No recurring mutation.
+
+---
+
+## v0.3 — Safe create
+
+### Goal
+
+Allow users to create simple non-recurring events and simple reminders from Obsidian with validation, confirmation, and source-of-truth refresh.
+
+### Required requirements
+
+- Event create: `REQ-WRITE-001` to `REQ-WRITE-005`
+- Reminder create: `REQ-WRITE-006` to `REQ-WRITE-010`
+- Error safety: `REQ-ERR-005`, `REQ-ERR-006`
+- Recurring safety: `REQ-REC-001` to `REQ-REC-003`
+- Architecture: `REQ-ARCH-001`
+
+### Deliverables
+
+- Event creation form or side panel.
+- Reminder creation form or side panel.
+- Required-field validation.
+- Save feedback.
+- Refresh-after-create verification.
+- Safe failure state.
+- Recurring event creation blocked until separately specified.
+- Module refactor started before write complexity grows.
+
+### Explicit exclusions
+
+- No editing or deleting yet.
+- No recurring event creation.
+- No automatic natural-language parsing requirement unless separately specified.
+
+---
+
+## v0.4 — Safe edit/delete
+
+### Goal
+
+Support simple event/reminder mutation while protecting users from accidental destructive changes.
+
+### Required requirements
+
+- Event edit/delete: `REQ-WRITE-011` to `REQ-WRITE-015`
+- Reminder edit/delete/complete: `REQ-WRITE-016` to `REQ-WRITE-020`
+- Recurring safety: `REQ-REC-004` to `REQ-REC-008` if recurring mutation is enabled; otherwise block with explanation.
+- Error safety: `REQ-ERR-007`, `REQ-ERR-008`
+
+### Deliverables
+
+- Edit simple non-recurring events.
+- Delete simple non-recurring events with confirmation.
+- Mark reminders complete.
+- Edit reminders.
+- Delete reminders with confirmation.
+- Unsupported recurring operations open Calendar.app or show safe block.
+- Operation result feedback.
+
+### Explicit exclusions
+
+- No silent destructive operation.
+- No mutation without stable source identity.
+
+---
+
+## v0.5 — Note association and Tasks integration
+
+### Goal
+
+Connect calendar/reminder items to Obsidian notes using stable metadata and useful meeting/task workflows.
+
+### Required requirements
+
+- Note association: `REQ-NOTE-001` to `REQ-NOTE-010`
+- Tasks integration: `REQ-TASK-001` to `REQ-TASK-004`
+- Privacy: `REQ-PRIV-003`
+
+### Deliverables
+
+- Associate event/reminder with existing note.
+- Create note from event/reminder using template.
+- Show associated note links in details.
+- Store associations in frontmatter.
+- Handle missing/renamed notes safely.
+- Meeting-note template variables.
+- Copy-as-Markdown.
+- Manual, non-automatic Tasks integration experiment.
+
+### Explicit exclusions
+
+- No automatic two-way Tasks ↔ Reminders sync until identity and conflict strategy are specified.
+
+---
+
+## v0.6 — Advanced views, search, and statistics
+
+### Goal
+
+Add richer planning views while reusing the same domain model and cache strategy.
+
+### Required requirements
+
+- Views: `REQ-VIEW-001` to `REQ-VIEW-006`
+- Search: `REQ-SEARCH-001` to `REQ-SEARCH-005`
+- Statistics: `REQ-STATS-001` to `REQ-STATS-004`
+
+### Deliverables
+
+- Vertical timeline view.
+- Week view.
+- Global local search across cache range.
+- Date range filtering.
+- Basic event/reminder statistics.
+- Markdown summary export.
+
+### Explicit exclusions
+
+- No cloud search.
+- No external analytics.
+
+---
+
+## v1.x — Cross-platform track, deferred
+
+### Goal
+
+Investigate whether Calendian should support Android or non-macOS platforms through a separate architecture.
+
+### Required pre-work
+
+- Architecture proposal.
+- Authentication model.
+- Token storage and revocation model.
+- Privacy model.
+- Conflict handling model.
+- Platform-specific test matrix.
+
+### Related requirements
+
+- `REQ-XPLAT-001` to `REQ-XPLAT-005`
+
+### Notes
+
+This track must not block the macOS local-first roadmap.
+
+---
+
+## Release cadence
+
+Versions should be released only after their gates pass. Estimated effort should be updated after implementation evidence exists; this roadmap intentionally avoids hard day estimates until the SDD artifacts and tests stabilize.
+
+## Backlog ideas not yet committed
+
+These ideas require new requirements before implementation:
+
+- natural-language `/event` parsing;
+- AI schedule summary;
+- saved custom views;
+- annual heatmap;
+- project management dashboards;
+- automatic daily-note agenda insertion;
+- full two-way Tasks sync;
+- direct Google Calendar support;
+- direct Microsoft Graph support.
