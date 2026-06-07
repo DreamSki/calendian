@@ -82,6 +82,7 @@ this.lastError = { calendar: null, reminders: null };
 
 - **Commit format:** `<area>: <description> (REQ-XXX)` — area is `docs`, `macos`, `ui`, `cache`, `settings`, or `spec`.
 - **Separate doc commits from code commits.** If a change touches both `main.js` and spec docs, make two commits.
+- **Never run destructive commands without confirmation.** `git reset --hard`, `git checkout -- .`, `git clean -fd` wipe data irreversibly. When user asks to "undo" or "roll back", first identify the specific scope: a single file edit, all uncommitted changes, or a specific commit. Always show what will be lost (`git diff`, `git log`) before acting. Prefer `git stash` for uncommitted work (recoverable) and `git revert` for committed work (creates a new commit rather than rewriting history).
 
 ## Known issues
 
