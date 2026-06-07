@@ -2789,13 +2789,34 @@ class QuickEventModal extends obsidian.Modal {
         var errorEl = this.contentEl.createDiv("calendian-form-error");
         errorEl.style.display = "none";
 
-        // ── Regex parse on input (free, always runs) ──────────
+        // ── Parsing state ─────────────────────────────────────
+        // Two-tier: regex runs live (free), AI runs on-demand (Enter key).
+        // _parsedResult = latest regex result (always reflects current text).
+        // _aiResult = AI result (set by Enter, cleared when text changes).
+        // Preview shows _aiResult if available, else _parsedResult.
+        // Buttons use _aiResult if available, else _parsedResult.
+
         var parseTimer = null;
+        self._parsedResult = null;
+        self._aiResult = null;
+
         var doRegexParse = function(text) {
             var result = parseNaturalLanguage(text, refDate);
             self._parsedResult = result;
-            if (result) {
-                self._renderPreview(previewEl, result, integ);
+            // Only show regex result if no AI result is active
+            if (!self._aiResult) {
+                if (result) {
+                    self._renderPreview(previewEl, result, integ);
+                } else {
+                    previewEl.style.display = 'none';
+                }
+            }
+        };
+
+        var showCurrentResult = function() {
+            var r = self._aiResult || self._parsedResult;
+            if (r) {
+                self._renderPreview(previewEl, r, integ);
             } else {
                 previewEl.style.display = 'none';
             }
@@ -2806,7 +2827,12 @@ class QuickEventModal extends obsidian.Modal {
             if (!text) {
                 previewEl.style.display = 'none';
                 self._parsedResult = null;
+                self._aiResult = null;
                 return;
+            }
+            // Any new typing invalidates the AI result (it was for old text)
+            if (self._aiResult) {
+                self._aiResult = null;
             }
             if (parseTimer) clearTimeout(parseTimer);
             parseTimer = setTimeout(function() {
@@ -2836,7 +2862,8 @@ class QuickEventModal extends obsidian.Modal {
                     aiModel: opts.aiModel || 'deepseek-chat',
                 }, refDate);
                 if (aiResult) {
-                    self._parsedResult = aiResult;
+                    self._aiResult = aiResult;
+                    self._parsedResult = aiResult; // sync for _getOrParse
                     self._renderPreview(previewEl, aiResult, integ);
                     return;
                 }
@@ -2844,7 +2871,8 @@ class QuickEventModal extends obsidian.Modal {
                 console.log('[Calendian] AI parse error:', err.message || err);
             }
 
-            // AI failed — fall back to regex
+            // AI failed — fall back to regex, clear any stale AI result
+            self._aiResult = null;
             doRegexParse(text);
         });
 
