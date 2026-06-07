@@ -593,7 +593,7 @@ All refresh paths go through `init()`, which has a `_refreshRunning` boolean gat
 | REQ-PRIV-002 | THE SYSTEM SHALL document what data is stored in Obsidian settings/frontmatter. | P0 | v0.1 | Implemented |
 | REQ-PRIV-003 | THE SYSTEM SHALL keep note-association, goal, habit, nudge, and review data local and SHALL NOT send self-direction content to external services. | P0 | v0.5 | Planned |
 | REQ-DIAG-001 | THE SYSTEM SHALL provide diagnostic panel showing permission status, source counts, last refresh time, and error states WITHOUT exposing private event/reminder content by default. | P1 | v0.1 | Partial |
-| REQ-DIAG-002 | WHEN exporting diagnostics, THE SYSTEM SHALL obtain explicit user consent and redact sensitive fields. | P0 | v0.2 | Planned |
+| REQ-DIAG-002 | WHEN exporting diagnostics, THE SYSTEM SHALL obtain explicit user consent and redact sensitive fields. | P0 | v0.2 | Implemented |
 
 ### 7.9 Error handling requirements
 

@@ -70,6 +70,7 @@ Everything else must be marked as planned, experimental, or future.
 
 > Updated by AI after every meaningful step. Next session reads this to continue without re-explaining context.
 
-- **Doing:** N/A (v0.1 doc audit complete).
-- **Done this session:** Full v0.1 audit: code vs SPEC vs docs vs README. Fixed 6 classes of discrepancies — fake build steps in README, stale v0.2 claims in WORKFLOWS.md, `_jxaRunning`→`_refreshRunning` in SPEC.md, outdated JXA platform description, inflated fields in PRIVACY.md, and 5 stale requirement statuses (PLAT-003, CAL-012, DATA-001, DATA-002, CACHE-008 → Implemented).
-- **Last action:** 2026-06-08 — doc audit complete. All v0.1 tasks Done, all docs honest.
+- **Doing:** N/A.
+- **Done this session:** TASK-014 — Diagnostic export with consent and redaction (REQ-DIAG-002). Added `ExportConsentModal` class (main.js:1360-1468) with explicit consent dialog before export. Redacts: event/reminder titles, notes, locations, URLs, attendee names, calendar UUIDs, helper binary path, and error messages (reduced to type+timestamp). Includes safe counts by calendar/reminder list name. Added "Export Diagnostics" button to settings diagnostic panel. Updated SPEC.md REQ-DIAG-002 status to Implemented, TASKS.md TASK-014 to Done.
+- **Last action:** 2026-06-08 — TASK-014 implementation complete. Awaiting verification in Obsidian.
+- **Decisions:** Calendar/list names included in export (counts only) because names are user-visible in settings and non-unique; UUIDs excluded as sensitive. Error messages redacted because they may contain event titles or filesystem paths. Helper path excluded because it leaks filesystem structure.

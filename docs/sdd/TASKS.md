@@ -124,8 +124,9 @@ Tasks are ordered by dependency and release target. Every task references requir
 ### TASK-014 — Manual refresh and diagnostics panel
 
 - Requirements: `REQ-DIAG-001` to `REQ-DIAG-002`, `REQ-CACHE-006`
-- Status: Todo
+- Status: Done
 - Priority: P1
+- Evidence: REQ-DIAG-001 diagnostic panel in settings (main.js:833-888). REQ-DIAG-002 export with consent modal (`ExportConsentModal` at main.js:1360-1468) redacts titles, notes, locations, URLs, attendee names, calendar UUIDs, helper paths, and error messages. Copies redacted JSON to clipboard via `navigator.clipboard.writeText()`. Error messages reduced to type+timestamp only. Event/reminder counts by calendar/list name included (counts only, no content). Code at main.js:880-889, 1360-1468.
 
 ## v0.3 — Safe create
 
