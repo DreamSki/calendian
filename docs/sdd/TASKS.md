@@ -43,7 +43,7 @@ Tasks are ordered by dependency and release target. Every task references requir
 
 ### TASK-003 — Harden Calendar read model
 
-- Requirements: `REQ-CAL-001` to `REQ-CAL-006`, `REQ-DATA-001`
+- Requirements: `REQ-CAL-001` to `REQ-CAL-006`
 - Status: Todo
 - Priority: P0
 - Deliverables:
@@ -55,7 +55,7 @@ Tasks are ordered by dependency and release target. Every task references requir
 
 ### TASK-004 — Harden Reminders read model
 
-- Requirements: `REQ-REM-001` to `REQ-REM-004`, `REQ-DATA-002`
+- Requirements: `REQ-REM-001` to `REQ-REM-004`
 - Status: Todo
 - Priority: P0
 - Deliverables:
@@ -104,7 +104,7 @@ Tasks are ordered by dependency and release target. Every task references requir
 
 ### TASK-008 — Privacy and diagnostics baseline
 
-- Requirements: `REQ-PRIV-001` to `REQ-PRIV-003`, `REQ-DIAG-001`
+- Requirements: `REQ-PRIV-001` to `REQ-PRIV-002`, `REQ-DIAG-001`
 - Status: Todo
 - Priority: P1
 - Deliverables:
@@ -149,7 +149,7 @@ Tasks are ordered by dependency and release target. Every task references requir
 
 ### TASK-014 — Manual refresh and diagnostics panel
 
-- Requirements: `REQ-DIAG-001` to `REQ-DIAG-004`, `REQ-CACHE-006`
+- Requirements: `REQ-DIAG-001` to `REQ-DIAG-002`, `REQ-CACHE-006`
 - Status: Todo
 - Priority: P1
 
@@ -170,9 +170,21 @@ Tasks are ordered by dependency and release target. Every task references requir
 
 ### TASK-022 — Write confirmation and refresh verification
 
-- Requirements: `REQ-WRITE-003`, `REQ-WRITE-008`, `REQ-ERR-005` to `REQ-ERR-008`
+- Requirements: `REQ-WRITE-003`, `REQ-WRITE-008`, `REQ-ERR-005` to `REQ-ERR-006`
 - Status: Todo
 - Priority: P0
+
+### TASK-023 — Natural language event creation
+
+- Requirements: `REQ-NL-001` to `REQ-NL-005`
+- Status: Todo
+- Priority: P1
+- Deliverables:
+  - Natural language input field for quick event creation.
+  - Extract title, date, time, and duration from NL input.
+  - Confirmation dialog for ambiguous parsing.
+  - Keep manual creation form available alongside NL input.
+  - Locale-aware date/time expression support.
 
 ## v0.4 — Safe edit/delete
 
@@ -214,13 +226,116 @@ Tasks are ordered by dependency and release target. Every task references requir
 - Status: Todo
 - Priority: P1
 
+### TASK-043 — In-app notifications
+
+- Requirements: `REQ-NOTIF-001` to `REQ-NOTIF-005`
+- Status: Todo
+- Priority: P1
+- Deliverables:
+  - Event-start notifications with configurable lead time.
+  - Overdue reminder notifications.
+  - Notification enable/disable settings.
+  - Graceful degradation when Obsidian notification APIs are unavailable.
+
 ### TASK-050 — Tasks plugin import/export experiment
 
 - Requirements: `REQ-TASK-001` to `REQ-TASK-004`
 - Status: Todo
 - Priority: P2
 
-## v0.6 — Advanced views/search/statistics
+## v0.5.5 — Self-direction
+
+### TASK-090 — Goal definition and step tracking
+
+- Requirements: `REQ-GOAL-001` to `REQ-GOAL-005`, `REQ-GOAL-008`
+- Status: Todo
+- Priority: P0
+- Deliverables:
+  - Goal creation UI stored in Obsidian (note/frontmatter), not Calendar.app or Reminders.app.
+  - Break goals into ordered actionable steps.
+  - Single-action step completion with progress reflection.
+  - Current focus declaration for a week or phase.
+  - Current focus surfaced prominently in panel.
+  - Local-only data; no external services.
+
+### TASK-091 — Goal lifecycle management
+
+- Requirements: `REQ-GOAL-006`, `REQ-GOAL-007`
+- Status: Todo
+- Priority: P1
+- Deliverables:
+  - Link goals to events/reminders/notes via stable association metadata.
+  - Pause or archive goals without deleting history.
+  - Goal status transitions (active → paused → archived → active).
+
+### TASK-095 — Habit definition and completion
+
+- Requirements: `REQ-HABIT-001` to `REQ-HABIT-004`, `REQ-HABIT-010`
+- Status: Todo
+- Priority: P0
+- Deliverables:
+  - Habit creation UI stored in Obsidian only.
+  - Single-action daily habit completion recording.
+  - Progress displayed as consistency rate (appearance days / total days), not unbroken streak.
+  - No progress reset to zero on a single missed period.
+  - No Reminders.app dependency.
+
+### TASK-096 — Habit restart and minimum viable version
+
+- Requirements: `REQ-HABIT-005` to `REQ-HABIT-009`
+- Status: Todo
+- Priority: P1
+- Deliverables:
+  - Configurable miss threshold before low-friction restart prompt.
+  - Minimum-viable habit version support for low-energy days.
+  - Scheduled rest period marking (not counted as misses).
+  - Habit history visualization emphasizing presence over perfection.
+  - Edit or retire habits without losing history.
+
+### TASK-100 — Nudge system
+
+- Requirements: `REQ-NUDGE-001` to `REQ-NUDGE-009`
+- Status: Todo
+- Priority: P1
+- Deliverables:
+  - Daily intention prompt (once per day).
+  - Optional gentle end-of-day check-in.
+  - Re-engagement prompt framed as restart after goal/habit lapse.
+  - "Start now for N minutes" quick action.
+  - Configurable tone (gentle / neutral / firm).
+  - Configurable frequency with full disable option.
+  - Default language must not use shaming/punitive/guilt-inducing phrasing.
+  - In-panel degradation when Obsidian notification APIs are unavailable.
+  - Local-only; no behavioral data sent externally.
+
+### TASK-105 — Daily and weekly reviews
+
+- Requirements: `REQ-REVIEW-001` to `REQ-REVIEW-007`
+- Status: Todo
+- Priority: P1
+- Deliverables:
+  - Daily reflection generated from template with day's events, completed items, and intention.
+  - Weekly review summarizing completed steps, habit consistency, and current focus.
+  - Template variables: intention, completed items, missed items, next focus.
+  - Completed items surfaced before missed items in output.
+  - Unfinished focus carried forward without penalty.
+  - Review notes linked to goals/habits/events via stable metadata.
+  - Local computation only; no reflection content sent externally.
+
+### TASK-110 — Encouragement statistics
+
+- Requirements: `REQ-STATS-001` to `REQ-STATS-006`
+- Status: Todo
+- Priority: P1
+- Deliverables:
+  - Step/habit completion count over configurable window.
+  - Consistency rate display (appearance days / total days), not streak-based.
+  - Current focus surfaced alongside progress metrics.
+  - Small-wins count displayed before gap/miss analysis.
+  - Progress summaries emphasizing presence and consistency.
+  - Local computation only.
+
+## v0.6 — Advanced views, search, and export
 
 ### TASK-060 — Timeline view
 
@@ -240,11 +355,26 @@ Tasks are ordered by dependency and release target. Every task references requir
 - Status: Todo
 - Priority: P1
 
-### TASK-080 — Basic statistics
+### TASK-075 — Data export
 
-- Requirements: `REQ-STATS-001` to `REQ-STATS-004`
+- Requirements: `REQ-EXPORT-001` to `REQ-EXPORT-004`
+- Status: Todo
+- Priority: P1
+- Deliverables:
+  - Export selected date range as Markdown.
+  - Export data as JSON for backup.
+  - Include all event fields in export.
+  - Local-only; no external services.
+
+### TASK-076 — UI customization
+
+- Requirements: `REQ-UI-001` to `REQ-UI-004`
 - Status: Todo
 - Priority: P2
+- Deliverables:
+  - Compact and comfortable density options.
+  - Configurable event field display.
+  - Theme-aware styling.
 
 ## Future platform track
 

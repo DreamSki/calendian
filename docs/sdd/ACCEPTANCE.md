@@ -80,6 +80,9 @@ Required P0 acceptance:
 - Required fields are validated before write.
 - Write success is confirmed only after macOS source reports success or refresh confirms the new item.
 - Write failure shows a recoverable error and does not update UI as if successful.
+- Natural language input ("tomorrow 3pm meeting") extracts title, date, time, and duration.
+- Ambiguous natural language input shows a confirmation dialog with extracted fields.
+- Manual event creation form remains available alongside NL parsing.
 
 ## v0.4 — Safe edit/delete
 
@@ -91,7 +94,7 @@ Required P0 acceptance:
 - User can edit and delete reminders with confirmation where destructive.
 - Recurring event edit/delete is blocked or explicitly scoped.
 
-## v0.5 — Note association
+## v0.5 — Note association and notifications
 
 Required P0 acceptance:
 
@@ -99,14 +102,38 @@ Required P0 acceptance:
 - Associated notes are discoverable from event/reminder details.
 - Missing or renamed notes fail gracefully.
 - Template variables are documented and validated.
+- Event-start notifications fire within Obsidian at configurable lead time.
+- Overdue reminder notifications fire within Obsidian.
+- Users can configure notification lead time and enable/disable notifications.
+- Notification unavailability degrades gracefully with documented limitation.
 
-## v0.6 — Advanced views and search
+## v0.5.5 — Self-direction
+
+Required P0 acceptance:
+
+- Goals can be defined, broken into steps, paused, and archived without data loss.
+- Goal content is stored in Obsidian only; never written to Calendar.app or Reminders.app.
+- Habits can be defined, completed with one click, and retired without losing history.
+- Habit progress is displayed as consistency rate (appearance days / total days), not as an unbroken streak.
+- A single missed period does not reset accumulated habit progress to zero.
+- Nudge tone and frequency are user-configurable; nudges can be disabled entirely.
+- Default nudge language does not use shaming, punitive, or guilt-inducing phrasing.
+- Daily intention prompt fires once per day.
+- Re-engagement prompts after a lapse are framed as restarts, not failures.
+- Daily and weekly review notes are generated from templates with pre-filled variables.
+- Completed items (small wins) are surfaced before missed items in reviews.
+- All self-direction data (goals, habits, nudges, reviews, stats) is computed locally.
+
+## v0.6 — Advanced views, search, and export
 
 Required P0/P1 acceptance:
 
 - Timeline view shows events with correct vertical position and duration.
 - Week view shows seven-day schedule consistently with day list data.
 - Search returns events/reminders across cache range.
+- Date range can be exported as Markdown.
+- Data can be exported as JSON for backup.
+- Export does not send data to external services.
 - Custom view configuration does not corrupt source filters.
 
 ## Requirement acceptance template

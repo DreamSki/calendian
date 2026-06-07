@@ -128,15 +128,72 @@ Requirements: `REQ-WRITE-011` through `REQ-WRITE-020`
 5. Mark reminder complete.
 6. Confirm Reminders.app state matches.
 
-### TS-009 — Note association, future v0.5
+### TS-009 — Note association and notifications, future v0.5
 
-Requirements: `REQ-NOTE-001` through `REQ-NOTE-010`
+Requirements: `REQ-NOTE-001` through `REQ-NOTE-010`, `REQ-NOTIF-001` through `REQ-NOTIF-005`
 
 1. Associate event with existing note.
 2. Create note from event template.
 3. Rename associated note.
 4. Delete associated note.
 5. Confirm plugin handles broken references safely.
+6. Enable event-start notifications and verify they fire at configured lead time.
+7. Enable overdue reminder notifications and verify they fire.
+8. Disable notifications and confirm no notifications fire.
+9. Confirm graceful degradation when Obsidian notification APIs are unavailable.
+
+### TS-010 — Natural language creation, future v0.3
+
+Requirements: `REQ-NL-001` through `REQ-NL-005`
+
+1. Type "tomorrow 3pm team sync" into NL input.
+2. Confirm title "team sync", date tomorrow, time 3pm are extracted.
+3. Type ambiguous input "next week review".
+4. Confirm confirmation dialog appears with best-guess fields.
+5. Confirm manual creation form remains available.
+6. Test locale-specific date expressions.
+
+### TS-011 — Goals and focus, future v0.5.5
+
+Requirements: `REQ-GOAL-001` through `REQ-GOAL-008`
+
+1. Create a goal with title and description.
+2. Add 3 ordered steps; mark one complete.
+3. Confirm progress reflects 1/3 completion.
+4. Declare a current focus for the week.
+5. Confirm focus is surfaced in the panel.
+6. Pause a goal; confirm steps and history are preserved.
+7. Archive a goal; confirm it does not appear in active views.
+8. Re-activate a paused goal; confirm state is restored.
+9. Confirm goal data is stored only in Obsidian (not in Calendar.app or Reminders.app).
+
+### TS-012 — Habits and consistency, future v0.5.5
+
+Requirements: `REQ-HABIT-001` through `REQ-HABIT-010`
+
+1. Create a daily habit "Morning review".
+2. Mark habit complete for today; confirm recorded.
+3. Skip tomorrow; confirm progress shows 1/2 appearance days (50%), not "streak broken".
+4. Skip 5 consecutive days; confirm re-engagement prompt fires (configurable threshold).
+5. Define minimum-viable version "Open daily note and write one sentence".
+6. Mark a day as minimum-viable completion; confirm it counts toward consistency.
+7. Mark a rest period (vacation); confirm those days are excluded from consistency calculation.
+8. Retire a habit; confirm history is preserved and habit no longer appears in active list.
+9. Confirm habit data is stored in Obsidian only; no Reminders.app dependency.
+
+### TS-013 — Nudges and reviews, future v0.5.5
+
+Requirements: `REQ-NUDGE-001` through `REQ-NUDGE-009`, `REQ-REVIEW-001` through `REQ-REVIEW-007`
+
+1. Enable daily intention prompt; confirm it fires once per day.
+2. Change nudge tone to "firm"; confirm language changes accordingly.
+3. Disable all nudges; confirm none fire.
+4. Confirm default nudge language does not use shaming/punitive phrasing.
+5. Generate daily reflection from template; confirm it includes day's events and intention.
+6. Generate weekly review; confirm it summarizes completed steps and habit consistency.
+7. Confirm completed items appear before missed items in review output.
+8. Carry unfinished focus forward; confirm no penalty or negative language.
+9. Confirm all review content is computed locally only.
 
 ## Future automated test targets
 
@@ -147,6 +204,9 @@ Requirements: `REQ-NOTE-001` through `REQ-NOTE-010`
 | Formatting | Unit tests for time ranges and duration labels. |
 | Settings migration | Unit tests for data.json shape changes. |
 | Frontmatter association | Unit tests for write/read/repair logic. |
+| Habit consistency calculation | Unit tests for appearance rate, rest period exclusion, and minimum-viable counting. |
+| Review template variables | Unit tests for intention, completed items, missed items, next focus substitution. |
+| Nudge scheduling | Unit tests for frequency, tone configuration, and disable behavior. |
 | Error classification | Unit tests for permission, timeout, parse, and unsupported-platform errors. |
 
 ## Test data policy

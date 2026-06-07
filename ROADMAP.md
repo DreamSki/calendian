@@ -2,6 +2,7 @@
 
 > Status: roadmap derived from `SPEC.md` requirements  
 > Last updated: 2026-06-07  
+> Plugin ID: `calendian`  
 > Process: Specification-Driven Development
 
 This roadmap is not an independent wish list. Every release is derived from requirement groups in [`SPEC.md`](./SPEC.md), acceptance gates in [`docs/sdd/ACCEPTANCE.md`](./docs/sdd/ACCEPTANCE.md), tasks in [`docs/sdd/TASKS.md`](./docs/sdd/TASKS.md), and risks in [`docs/sdd/RISKS.md`](./docs/sdd/RISKS.md).
@@ -27,10 +28,11 @@ Current repository status: **pre-v0.1 / read-only MVP partial**.
 |---|---|---|---|
 | v0.1 | Read-only MVP | `REQ-PLAT-*`, `REQ-PERM-*`, `REQ-CAL-001..006`, `REQ-REM-001..004`, `REQ-SRC-001..004`, `REQ-CACHE-001..005`, `REQ-UX-001..004`, `REQ-PRIV-*`, `REQ-ERR-001..004` | Next target |
 | v0.2 | Read-only polish | event details, overdue/no-date reminders, multi-day events, diagnostics, manual refresh | Planned |
-| v0.3 | Safe create | simple event/reminder creation, validation, write verification | Planned |
+| v0.3 | Safe create | simple event/reminder creation, natural language parsing, validation, write verification | Planned |
 | v0.4 | Safe edit/delete | simple event/reminder edit/delete, reminder completion, recurring safety | Planned |
-| v0.5 | Note association | frontmatter association, meeting notes, templates, limited Tasks integration | Planned |
-| v0.6 | Advanced views/search | timeline, week view, search, basic statistics | Planned |
+| v0.5 | Note association & notifications | frontmatter association, meeting notes, templates, in-app notifications, limited Tasks integration | Planned |
+| v0.5.5 | Self-direction | goals, habits, nudges, reflections, encouragement statistics | Planned |
+| v0.6 | Advanced views/search | timeline, week view, search, data export, UI customization | Planned |
 | v1.x | Platform expansion | cross-platform architecture, Microsoft Graph/Android investigation | Deferred |
 
 ---
@@ -50,7 +52,7 @@ A macOS Obsidian user can open Calendian, grant permissions, select a date, and 
 - Source selection: `REQ-SRC-001` to `REQ-SRC-004`
 - Cache/performance: `REQ-CACHE-001` to `REQ-CACHE-005`, `REQ-PERF-001`, `REQ-PERF-002`, `REQ-PERF-004`
 - UX: `REQ-UX-001` to `REQ-UX-004`
-- Privacy/error handling: `REQ-PRIV-001` to `REQ-PRIV-003`, `REQ-ERR-001` to `REQ-ERR-004`
+- Privacy/error handling: `REQ-PRIV-001` to `REQ-PRIV-002`, `REQ-ERR-001` to `REQ-ERR-004`
 - Documentation: `REQ-DOC-001` to `REQ-DOC-003`
 
 ### Deliverables
@@ -91,7 +93,7 @@ Make the read-only experience reliable enough for daily use across common event/
 
 - Event details and edge cases: `REQ-CAL-007` to `REQ-CAL-012`
 - Reminder polish: `REQ-REM-005` to `REQ-REM-009`
-- Cache/diagnostics: `REQ-CACHE-006` to `REQ-CACHE-008`, `REQ-DIAG-001` to `REQ-DIAG-004`
+- Cache/diagnostics: `REQ-CACHE-006` to `REQ-CACHE-008`, `REQ-DIAG-001` to `REQ-DIAG-002`
 - UX polish: `REQ-UX-006`, `REQ-UX-010`
 - Error hardening: `REQ-ERR-003`
 
@@ -127,6 +129,7 @@ Allow users to create simple non-recurring events and simple reminders from Obsi
 
 - Event create: `REQ-WRITE-001` to `REQ-WRITE-005`
 - Reminder create: `REQ-WRITE-006` to `REQ-WRITE-010`
+- Natural language creation: `REQ-NL-001` to `REQ-NL-005`
 - Error safety: `REQ-ERR-005`, `REQ-ERR-006`
 - Recurring safety: `REQ-REC-001` to `REQ-REC-003`
 - Architecture: `REQ-ARCH-001`
@@ -139,6 +142,8 @@ Allow users to create simple non-recurring events and simple reminders from Obsi
 - Save feedback.
 - Refresh-after-create verification.
 - Safe failure state.
+- Natural language event creation ("tomorrow 3pm meeting").
+- Confirmation dialog for ambiguous NL parsing.
 - Recurring event creation blocked until separately specified.
 - Module refactor started before write complexity grows.
 
@@ -146,7 +151,6 @@ Allow users to create simple non-recurring events and simple reminders from Obsi
 
 - No editing or deleting yet.
 - No recurring event creation.
-- No automatic natural-language parsing requirement unless separately specified.
 
 ---
 
@@ -161,7 +165,7 @@ Support simple event/reminder mutation while protecting users from accidental de
 - Event edit/delete: `REQ-WRITE-011` to `REQ-WRITE-015`
 - Reminder edit/delete/complete: `REQ-WRITE-016` to `REQ-WRITE-020`
 - Recurring safety: `REQ-REC-004` to `REQ-REC-008` if recurring mutation is enabled; otherwise block with explanation.
-- Error safety: `REQ-ERR-007`, `REQ-ERR-008`
+- Error safety: `REQ-ERR-005`, `REQ-ERR-006` (write-path errors)
 
 ### Deliverables
 
@@ -190,6 +194,7 @@ Connect calendar/reminder items to Obsidian notes using stable metadata and usef
 
 - Note association: `REQ-NOTE-001` to `REQ-NOTE-010`
 - Tasks integration: `REQ-TASK-001` to `REQ-TASK-004`
+- In-app notifications: `REQ-NOTIF-001` to `REQ-NOTIF-005`
 - Privacy: `REQ-PRIV-003`
 
 ### Deliverables
@@ -202,6 +207,9 @@ Connect calendar/reminder items to Obsidian notes using stable metadata and usef
 - Meeting-note template variables.
 - Copy-as-Markdown.
 - Manual, non-automatic Tasks integration experiment.
+- Event start notifications (configurable lead time).
+- Overdue reminder notifications.
+- Notification enable/disable settings.
 
 ### Explicit exclusions
 
@@ -209,31 +217,129 @@ Connect calendar/reminder items to Obsidian notes using stable metadata and usef
 
 ---
 
-## v0.6 — Advanced views, search, and statistics
+## v0.5.5 — Self-direction
 
 ### Goal
 
-Add richer planning views while reusing the same domain model and cache strategy.
+Help users build consistency through lightweight goals, habits, encouragement nudges, and structured reflection — without shame, without streaks, and without sending personal data anywhere.
+
+### Design principles (encoded as requirements)
+
+These are not optional polish. Key psychological principles are hard-coded as P0/P1 requirements in the spec:
+
+1. **Presence over perfection.** Progress is measured as appearance rate over a window, not an unbroken streak (`REQ-HABIT-003`, `REQ-HABIT-004`). A single missed period does not reset progress to zero.
+2. **No shaming by default.** The system SHALL NOT use punitive or guilt-inducing language (`REQ-NUDGE-007`). Users control tone and can disable nudges entirely (`REQ-NUDGE-005`, `REQ-NUDGE-006`).
+3. **Intention over schedule.** The system prompts for a daily intention rather than imposing a schedule (`REQ-NUDGE-001`).
+4. **Abandoning is not all-or-nothing.** Goals can be paused or archived without deleting history (`REQ-GOAL-007`). Habits can be edited or retired without losing history (`REQ-HABIT-009`).
+
+### Required requirements
+
+- Goals and focus: `REQ-GOAL-001` to `REQ-GOAL-008`
+- Habits and consistency: `REQ-HABIT-001` to `REQ-HABIT-010`
+- Encouragement nudges: `REQ-NUDGE-001` to `REQ-NUDGE-009`
+- Reflection and review: `REQ-REVIEW-001` to `REQ-REVIEW-007`
+- Encouragement statistics: `REQ-STATS-001` to `REQ-STATS-006`
+
+### Deliverables
+
+- **Goals**:
+  - Define lightweight goals in Obsidian (note/frontmatter), not in Calendar.app or Reminders.app
+  - Break goals into small actionable steps
+  - Declare a single current focus for a week or phase
+  - Complete a step with a single action
+  - Pause or archive goals without deleting history
+  - Local-only, no external services
+
+- **Habits**:
+  - Define lightweight recurring habits tracked within Obsidian
+  - Record habit completion for a given day with a single action
+  - Display consistency/appearance rate (NOT unbroken streak)
+  - Configurable restart threshold before re-engagement prompt
+  - Minimum-viable version support for low-energy days
+  - Mark scheduled rest periods (not counted as misses)
+  - Edit or retire habits without losing history
+  - Local-only, no Reminders.app dependency
+
+- **Nudges**:
+  - Daily intention prompt (once per day)
+  - Optional gentle end-of-day check-in
+  - Re-engagement prompt framed as restart, not failure
+  - "Start now for N minutes" quick action
+  - Configurable tone (gentle / neutral / firm)
+  - Configurable frequency and full disable option
+  - In-panel degradation when Obsidian notification APIs are unavailable
+  - Local-only, no behavioral data sent externally
+
+- **Reflection and review**:
+  - Daily reflection from template (pre-filled with events, completed items, intention)
+  - Weekly review (completed steps, habit consistency, current focus)
+  - Template variables: intention, completed items, missed items, next focus
+  - Completed items surfaced before missed items
+  - Carry unfinished focus forward without penalty
+  - Review notes linked to goals/habits/events via stable metadata
+  - Local-only, no reflection content sent externally
+
+- **Encouragement statistics**:
+  - Step/habit completion count over configurable window
+  - Consistency rate (appearance days / total days), not streak
+  - Current focus surfaced alongside progress metrics
+  - Small-wins count before gap analysis
+  - Progress summaries emphasizing presence over perfection
+  - Local computation only
+
+### Dependencies
+
+This phase depends on note association, frontmatter templates, and notification infrastructure from v0.5. Goal, habit, nudge, and review data live entirely in Obsidian (plugin settings, note frontmatter, or note content) and SHALL NOT touch the Apple data pipeline.
+
+### Explicit exclusions
+
+- No external goal/habit tracking services.
+- No social or sharing features.
+- No AI-generated reflection content.
+- No automatic goal/habit creation from calendar data.
+
+---
+
+## v0.6 — Advanced views, data export, and UI customization
+
+### Goal
+
+Add richer planning views and export capabilities while reusing the same domain model and cache strategy.
 
 ### Required requirements
 
 - Views: `REQ-VIEW-001` to `REQ-VIEW-006`
 - Search: `REQ-SEARCH-001` to `REQ-SEARCH-005`
-- Statistics: `REQ-STATS-001` to `REQ-STATS-004`
+- Data export: `REQ-EXPORT-001` to `REQ-EXPORT-004`
+- UI customization: `REQ-UI-001` to `REQ-UI-004`
 
 ### Deliverables
 
-- Vertical timeline view.
-- Week view.
-- Global local search across cache range.
-- Date range filtering.
-- Basic event/reminder statistics.
-- Markdown summary export.
+- **Views**:
+  - Vertical timeline view with current-time indicator
+  - Week view with consistent filtering
+
+- **Search**:
+  - Search events/reminders across cache range
+  - Match title, calendar/list, location, notes, and associated note title
+  - Date range filtering
+  - Local-only, no external services
+
+- **Data export**:
+  - Export selected date range as Markdown
+  - Export data as JSON for backup
+  - Local-only, no external services
+
+- **UI customization**:
+  - Compact/comfortable density options
+  - Configurable event field display
+  - Theme-aware styling
 
 ### Explicit exclusions
 
-- No cloud search.
-- No external analytics.
+- No cloud search or external analytics.
+- No AI-powered features.
+- No mobile or cross-platform support (deferred to v1.x).
 
 ---
 
@@ -270,7 +376,6 @@ Versions should be released only after their gates pass. Estimated effort should
 
 These ideas require new requirements before implementation:
 
-- natural-language `/event` parsing;
 - AI schedule summary;
 - saved custom views;
 - annual heatmap;

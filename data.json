@@ -10,9 +10,8 @@
   "showMacOSCalendar": true,
   "showMacOSReminders": true,
   "macOSCalendarNames": [
-    "日历",
     "节假日"
   ],
   "macOSReminderListNames": [],
-  "macOSRefreshInterval": 5
+  "macOSRefreshInterval": 2
 }

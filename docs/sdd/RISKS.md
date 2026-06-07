@@ -40,7 +40,7 @@ Risks are reviewed before roadmap changes and before releases. Severity combines
 
 - Severity: Medium
 - Area: Data model
-- Related requirements: `REQ-DATA-001`, `REQ-CAL-*`, `REQ-REM-*`
+- Related requirements: `REQ-CAL-*`, `REQ-REM-*`
 - Description: Calendar/Reminders JXA properties may be missing, inconsistent, slow, or differently shaped across iCloud, Google, Exchange, local calendars, and macOS versions.
 - Mitigation:
   - Treat optional fields as optional.
@@ -51,7 +51,7 @@ Risks are reviewed before roadmap changes and before releases. Severity combines
 
 - Severity: High
 - Area: Data integrity
-- Related requirements: `REQ-DATA-001`, `REQ-DATA-002`, `REQ-WRITE-*`, `REQ-NOTE-*`
+- Related requirements: `REQ-WRITE-*`, `REQ-NOTE-*`
 - Description: Without stable event/reminder identifiers, edits, deletes, and note associations can target the wrong item.
 - Mitigation:
   - Do not implement write operations until stable identity strategy exists.
@@ -128,7 +128,41 @@ Risks are reviewed before roadmap changes and before releases. Severity combines
   - Redact by default.
   - Ask user consent before including raw data.
 
-### RISK-012 — Target architecture and actual bundled code diverge
+### RISK-012 — Nudge fatigue and user opt-out
+
+- Severity: Medium
+- Area: UX, user trust
+- Related requirements: `REQ-NUDGE-001` to `REQ-NUDGE-009`
+- Description: Well-intentioned motivational nudges can become annoying if too frequent, poorly timed, or tonally mismatched to the user. This can drive users to disable the feature or abandon the plugin.
+- Mitigation:
+  - P0 requirement for full disable (`REQ-NUDGE-006`).
+  - P1 requirement for configurable tone (`REQ-NUDGE-005`).
+  - P0 requirement for no shaming language by default (`REQ-NUDGE-007`).
+  - Start with conservative defaults; let users increase frequency if desired.
+
+### RISK-013 — Self-direction data model scope creep
+
+- Severity: Medium
+- Area: Roadmap, maintainability
+- Related requirements: `REQ-GOAL-*`, `REQ-HABIT-*`, `REQ-REVIEW-*`
+- Description: Goals, habits, intentions, and reviews add four new domain entities and ~34 new requirements. Without disciplined scoping, these features could delay the core calendar/reminder roadmap.
+- Mitigation:
+  - Self-direction data is fully local to Obsidian (no Apple pipeline integration).
+  - Most requirements target v0.5/v0.5.5, reusing v0.5 note association and notification infrastructure.
+  - Hard boundary in §5.8: self-direction data never touches Calendar.app or Reminders.app.
+
+### RISK-014 — Self-direction data loss on vault migration
+
+- Severity: Medium
+- Area: Data durability
+- Related requirements: `REQ-GOAL-008`, `REQ-HABIT-010`, `REQ-REVIEW-007`
+- Description: Goal, habit, and review data stored only in Obsidian (plugin settings or note frontmatter) has no external backup. If a user migrates vaults or loses settings, self-direction history could be lost.
+- Mitigation:
+  - Document where data is stored.
+  - Consider JSON export for self-direction data in future release.
+  - Frontmatter-based storage survives note sync (Obsidian Sync, git).
+
+### RISK-015 — Target architecture and actual bundled code diverge
 
 - Severity: Medium
 - Area: Maintainability

@@ -5,6 +5,8 @@
 
 This document records the actual repository state. It intentionally separates implemented behavior from planned behavior so that README, roadmap, and release notes do not overpromise.
 
+**For detailed current implementation breakdown, see [Section 2 of SPEC.md](../../SPEC.md#2-current-implementation-status).**
+
 ## Repository-level status
 
 | Area | Current status | Evidence / note |
@@ -23,6 +25,10 @@ This document records the actual repository state. It intentionally separates im
 | Note association | Planned | Existing daily/weekly note integration comes from the base calendar plugin behavior; Calendian event/reminder frontmatter association is not complete. |
 | Tasks integration | Planned | Current task dots for daily notes exist from base plugin behavior; macOS Reminders sync with Obsidian Tasks is not implemented. |
 | Timeline / week / statistics views | Planned | Not current behavior. |
+| Goals and focus tracking | Planned | Requires note association and frontmatter infrastructure (v0.5 dependency). |
+| Habit tracking and consistency | Planned | Requires note association and frontmatter infrastructure (v0.5 dependency). |
+| Nudges and daily intention | Planned | Depends on notification infrastructure (v0.5). |
+| Daily/weekly review generation | Planned | Depends on template and note association infrastructure (v0.5). |
 | Android / cross-platform | Deferred | Requires a separate architecture and authentication model. |
 
 ## Current release label

@@ -3,6 +3,7 @@
 > Status: authoritative product specification  
 > Version target: pre-v0.1 / read-only MVP  
 > Last updated: 2026-06-07  
+> Plugin ID: `calendian`  
 > Process: Specification-Driven Development (SDD)
 
 Calendian is an Obsidian desktop plugin that brings macOS Calendar events and macOS Reminders into the Obsidian sidebar. The product is local-first: early versions read from Calendar.app and Reminders.app through macOS automation rather than sending data to a cloud service.
@@ -47,9 +48,77 @@ The current repository must be treated as **pre-v0.1 / read-only MVP in progress
 
 ---
 
-## 2. Non-goals and explicit boundaries
+## 2. Current implementation status
 
-### 2.1 v0.1 non-goals
+### 2.1 Implemented (v0.1 partial)
+
+The following features are currently implemented in the codebase:
+
+#### Platform and permissions
+- ✅ Obsidian desktop plugin shell
+- ✅ macOS-only detection (isMacOS check)
+- ✅ Desktop-only enforcement in manifest
+- ⚠️ Permission error detection (basic, UI recovery needs improvement)
+
+#### Calendar reading
+- ✅ JXA-based Calendar.app event reading
+- ✅ Event title, start time, end time parsing
+- ✅ All-day event detection and handling
+- ✅ Event sorting (all-day first, then by time)
+- ✅ Calendar source discovery (discoverCalendars)
+- ✅ Calendar color extraction and display
+- ⚠️ Stable event identity (needs verification across account types)
+- ❌ Event location, URL, notes, attendees, recurrence details
+
+#### Reminders reading
+- ✅ JXA-based Reminders.app reading
+- ✅ Reminder title and due date parsing
+- ✅ Reminder list source discovery (discoverReminderLists)
+- ✅ Completed reminder filtering (hide by default)
+- ✅ No-date reminder handling (shows on today)
+- ⚠️ Stable reminder identity (needs verification)
+- ❌ Reminder priority, subtasks display
+
+#### Cache and performance
+- ✅ ±6 month preload cache
+- ✅ Configurable auto-refresh interval (default 5 minutes)
+- ✅ Cache start/end tracking
+- ✅ Timer cleanup on unload
+- ⚠️ Cache miss behavior not explicitly defined
+- ⚠️ Large calendar performance not tested
+
+#### Source filtering
+- ✅ Calendar source toggle (enable/disable individual calendars)
+- ✅ Reminder list source toggle
+- ✅ Empty selection = show all
+- ⚠️ Duplicate name handling (needs improvement)
+
+#### User interface
+- ✅ Date selection (click to select, shows events/reminders)
+- ✅ Cmd/Ctrl-click for daily note creation (preserved from base plugin)
+- ✅ Events panel display (title, time, calendar badge)
+- ✅ Reminders panel display (title, due date, list badge)
+- ⚠️ Loading state (basic, could be improved)
+- ⚠️ Empty state (basic, could be improved)
+- ⚠️ Error state (basic, could be improved)
+- ❌ Permission denied UI recovery
+- ❌ Diagnostic panel
+- ❌ Manual refresh button
+
+### 2.2 Partial Implementation Notes
+
+**What "Partial" means for v0.1**:
+- Core reading functionality works for basic event/reminder fields
+- UI states exist but lack polish and edge-case handling
+- Error detection exists but recovery UX needs work
+- Performance is acceptable for typical users but not benchmarked
+- Stability features needed for write operations are not yet implemented
+
+---
+
+## 3. Non-goals and explicit boundaries
+
+### 3.1 v0.1 non-goals
 
 The following are explicitly out of scope for v0.1:
 
@@ -64,15 +133,15 @@ The following are explicitly out of scope for v0.1:
 - Cloud sync managed by Calendian.
 - AI summarization or remote processing of private calendar data.
 
-### 2.2 Future non-goal unless re-specified
+### 3.2 Future non-goal unless re-specified
 
 Calendian will not send event titles, reminder text, attendees, notes, locations, or URLs to any external service unless a future spec adds an opt-in external integration with a separate privacy model.
 
 ---
 
-## 3. Platforms and dependencies
+## 4. Platforms and dependencies
 
-### 3.1 Platform matrix
+### 4.1 Platform matrix
 
 | Platform | Status | Notes |
 |---|---|---|
@@ -82,27 +151,27 @@ Calendian will not send event titles, reminder text, attendees, notes, locations
 | Windows / Linux | Deferred | Requires non-JXA architecture. |
 | Android | Deferred to v1.x platform track | Requires external API/auth design. |
 
-### 3.2 External apps
+### 4.2 External apps
 
 - Calendar.app is the source of calendar events.
 - Reminders.app is the source of reminders.
 - Account support is inherited from what the user has configured in macOS Calendar/Reminders.
 
-### 3.3 Packaging consistency requirement
+### 4.3 Packaging consistency requirement
 
 `manifest.json`, README, SPEC, and release notes must agree on:
 
-- plugin display name;
-- plugin id;
+- plugin display name: **Calendian**
+- plugin id: **calendian**
 - version;
 - minimum Obsidian version;
 - desktop/macOS-only scope.
 
 ---
 
-## 4. Domain model
+## 5. Domain model
 
-### 4.1 Event model
+### 5.1 Event model
 
 Internal event records should converge toward this shape:
 
@@ -130,7 +199,7 @@ interface CalendianEvent {
 
 v0.1 may use a reduced display model, but write operations and note association must not ship until stable IDs exist.
 
-### 4.2 Reminder model
+### 5.2 Reminder model
 
 ```ts
 interface CalendianReminder {
@@ -149,7 +218,7 @@ interface CalendianReminder {
 }
 ```
 
-### 4.3 Association model
+### 5.3 Association model
 
 Future note associations must use stable source IDs:
 
@@ -168,9 +237,149 @@ calendian:
 
 Fallback IDs derived from title/time/calendar may be used only for display hints, not destructive operations.
 
+### 5.4 Goal and focus model
+
+Goals and focus declarations are stored locally in Obsidian notes/frontmatter, never written to Calendar.app or Reminders.app.
+
+```ts
+interface CalendianGoal {
+  id: string;
+  title: string;
+  description?: string;
+  steps: CalendianStep[];
+  currentFocus?: string;       // single weekly/phase focus
+  status: "active" | "paused" | "archived" | "completed";
+  createdAt: string;
+  updatedAt: string;
+  archivedAt?: string;
+}
+
+interface CalendianStep {
+  id: string;
+  description: string;
+  completed: boolean;
+  completedAt?: string;
+  order: number;
+}
+```
+
+```yaml
+---
+calendian:
+  goals:
+    - id: "goal-001"
+      title: "Learn TypeScript"
+      steps:
+        - id: "step-001"
+          description: "Complete basic types tutorial"
+          completed: true
+          completedAt: "2026-06-05"
+          order: 1
+        - id: "step-002"
+          description: "Build a small project"
+          completed: false
+          order: 2
+      currentFocus: "TypeScript generics deep dive"
+      status: "active"
+---
+```
+
+### 5.5 Habit model
+
+Habit tracking data lives entirely in Obsidian. Consistency is measured as appearance rate over a window, not as an unbroken streak.
+
+```ts
+interface CalendianHabit {
+  id: string;
+  title: string;
+  description?: string;
+  frequency: "daily" | "weekly" | "custom";
+  minimumViable?: string;       // reduced version for low-energy days
+  completions: CalendianHabitCompletion[];
+  restPeriods: CalendianRestPeriod[];
+  status: "active" | "paused" | "retired";
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface CalendianHabitCompletion {
+  date: string;                 // ISO date
+  completed: boolean;
+  variant?: "full" | "minimum"; // whether full or minimum-viable version was done
+}
+
+interface CalendianRestPeriod {
+  start: string;
+  end: string;
+  reason?: string;              // e.g. "vacation", "recovery"
+}
+```
+
+```yaml
+---
+calendian:
+  habits:
+    - id: "habit-001"
+      title: "Morning review"
+      frequency: "daily"
+      minimumViable: "Open daily note and write one sentence"
+      completions:
+        - date: "2026-06-07"
+          completed: true
+          variant: "full"
+      restPeriods: []
+      status: "active"
+---
+```
+
+### 5.6 Intention and nudge model
+
+Daily intentions and nudge configuration are stored locally. Nudge tone and frequency are user-configurable.
+
+```ts
+interface CalendianIntention {
+  date: string;
+  text: string;
+  progressed?: boolean;         // set during end-of-day check-in
+  reflection?: string;
+}
+
+interface CalendianNudgeConfig {
+  enabled: boolean;
+  tone: "gentle" | "neutral" | "firm";
+  morningPrompt: boolean;       // daily intention prompt
+  eveningCheckin: boolean;      // end-of-day check-in
+  reEngagementAfterMissDays: number; // days before re-engagement prompt
+  quickStartMinutes: number;    // default N for "start now for N minutes"
+}
+```
+
+### 5.7 Review model
+
+Reviews are generated from templates and stored as notes with stable metadata links.
+
+```ts
+interface CalendianReview {
+  id: string;
+  type: "daily" | "weekly";
+  date: string;
+  intention?: string;
+  completedItems: string[];     // completed steps, habits
+  missedItems: string[];
+  nextFocus?: string;
+  associatedGoals: string[];    // goal IDs
+  associatedHabits: string[];   // habit IDs
+  notePath: string;             // path to generated note
+}
+```
+
+### 5.8 Self-direction data locality
+
+Goal, habit, intention, nudge, and review data SHALL reside exclusively in Obsidian (plugin settings, note frontmatter, or note content). These entities SHALL NOT be written to Calendar.app, Reminders.app, or any external service. This is a hard boundary: self-direction features are private by construction and do not touch the Apple data pipeline.
+
 ---
 
-## 5. Requirement status vocabulary
+## 6. Requirement status vocabulary
 
 | Status | Meaning |
 |---|---|
@@ -182,9 +391,9 @@ Fallback IDs derived from title/time/calendar may be used only for display hints
 
 ---
 
-## 6. Requirements
+## 7. Requirements
 
-### 6.1 Platform requirements
+### 7.1 Platform requirements
 
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
@@ -193,7 +402,7 @@ Fallback IDs derived from title/time/calendar may be used only for display hints
 | REQ-PLAT-003 | THE SYSTEM SHALL keep manifest metadata consistent with documentation. | P0 | v0.1 | Planned |
 | REQ-PLAT-004 | IF the platform is unsupported, THE SYSTEM SHALL show an unsupported-platform message instead of crashing. | P0 | v0.1 | Planned |
 
-### 6.2 Permission requirements
+### 7.2 Permission requirements
 
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
@@ -203,7 +412,7 @@ Fallback IDs derived from title/time/calendar may be used only for display hints
 | REQ-PERM-004 | THE SYSTEM SHALL distinguish permission failure from empty calendar/reminder data. | P0 | v0.1 | Planned |
 | REQ-PERM-005 | THE SYSTEM SHALL provide a retry or refresh path after permission changes. | P1 | v0.2 | Planned |
 
-### 6.3 Calendar read requirements
+### 7.3 Calendar read requirements
 
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
@@ -220,7 +429,7 @@ Fallback IDs derived from title/time/calendar may be used only for display hints
 | REQ-CAL-011 | THE SYSTEM SHALL treat recurring events as read-only until recurring mutation is specified. | P0 | v0.1 | Planned |
 | REQ-CAL-012 | THE SYSTEM SHOULD display source calendar colors where available. | P1 | v0.2 | Partial |
 
-### 6.4 Reminder read requirements
+### 7.4 Reminder read requirements
 
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
@@ -234,7 +443,7 @@ Fallback IDs derived from title/time/calendar may be used only for display hints
 | REQ-REM-008 | THE SYSTEM SHOULD display reminder priority where available. | P2 | v0.2 | Planned |
 | REQ-REM-009 | THE SYSTEM SHOULD display reminder subtasks where available. | P2 | v0.2 | Planned |
 
-### 6.5 Source selection requirements
+### 7.5 Source selection requirements
 
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
@@ -245,7 +454,32 @@ Fallback IDs derived from title/time/calendar may be used only for display hints
 | REQ-SRC-005 | THE SYSTEM SHALL handle duplicate source names safely. | P1 | v0.2 | Planned |
 | REQ-SRC-006 | THE SYSTEM SHALL show source discovery empty/error states. | P1 | v0.2 | Planned |
 
-### 6.6 Cache and performance requirements
+### 7.6 Cache and performance requirements
+
+#### Cache strategy
+
+**Preload range**: 
+- Default: ±6 months from current date
+- Purpose: Enable fast date switching within typical planning horizon
+- Configurability: Fixed for v0.1, may become configurable in later versions
+
+**Cache lifecycle**:
+1. **Initial load**: Preload all events/reminders for the cache range when plugin initializes
+2. **Date navigation**: Dates within cache range display instantly from memory cache
+3. **Cache miss behavior**: When user selects date outside cache range, either:
+   - Option A: Show empty state with message to navigate within cached range
+   - Option B: Trigger background refresh and show loading state
+4. **Refresh**: Auto-refresh at configured interval (default 5 minutes, minimum 1 minute)
+5. **Unload**: Clear all timers and cache when plugin unloads
+
+**Cache performance targets**:
+- Initial preload: <3 seconds for typical user (≤1000 events in range)
+- Date switch from cache: <100ms
+- Auto-refresh: Non-blocking, preserve old cache until new data ready
+
+**Large calendar behavior**:
+- Degrade gracefully if preload takes >5 seconds
+- Consider reducing cache range or lazy loading in future versions
 
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
@@ -262,7 +496,7 @@ Fallback IDs derived from title/time/calendar may be used only for display hints
 | REQ-PERF-003 | Large calendars SHOULD degrade gracefully. | P1 | v0.2 | Planned |
 | REQ-PERF-004 | Plugin unload SHALL not leave active intervals or detached DOM. | P0 | v0.1 | Partial |
 
-### 6.7 UX requirements
+### 7.7 UX requirements
 
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
@@ -277,32 +511,28 @@ Fallback IDs derived from title/time/calendar may be used only for display hints
 | REQ-UX-009 | THE SYSTEM SHOULD provide copy-as-Markdown actions. | P2 | v0.5 | Planned |
 | REQ-UX-010 | THE SYSTEM SHOULD support a today summary panel. | P2 | v0.2 | Planned |
 
-### 6.8 Privacy and diagnostics requirements
+### 7.8 Privacy and diagnostics requirements
 
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
-| REQ-PRIV-001 | THE SYSTEM SHALL keep Calendar and Reminders data local by default. | P0 | v0.1 | Planned |
-| REQ-PRIV-002 | THE SYSTEM SHALL NOT send event/reminder content to third-party services by default. | P0 | v0.1 | Planned |
-| REQ-PRIV-003 | THE SYSTEM SHALL document what data is stored in Obsidian settings/frontmatter. | P0 | v0.1 | Planned |
-| REQ-DIAG-001 | THE SYSTEM SHOULD expose diagnostic status without private event/reminder content by default. | P1 | v0.2 | Planned |
-| REQ-DIAG-002 | THE SYSTEM SHOULD show Calendar and Reminders permission status. | P1 | v0.2 | Planned |
-| REQ-DIAG-003 | THE SYSTEM SHOULD show source counts and last refresh status. | P1 | v0.2 | Planned |
-| REQ-DIAG-004 | THE SYSTEM SHOULD redact diagnostics unless the user explicitly exports raw data. | P0 | v0.2 | Planned |
+| REQ-PRIV-001 | THE SYSTEM SHALL keep Calendar and Reminders data local and NOT send content to third-party services by default. | P0 | v0.1 | Planned |
+| REQ-PRIV-002 | THE SYSTEM SHALL document what data is stored in Obsidian settings/frontmatter. | P0 | v0.1 | Planned |
+| REQ-PRIV-003 | THE SYSTEM SHALL keep note-association, goal, habit, nudge, and review data local and SHALL NOT send self-direction content to external services. | P0 | v0.5 | Planned |
+| REQ-DIAG-001 | THE SYSTEM SHALL provide diagnostic panel showing permission status, source counts, last refresh time, and error states WITHOUT exposing private event/reminder content by default. | P1 | v0.2 | Planned |
+| REQ-DIAG-002 | WHEN exporting diagnostics, THE SYSTEM SHALL obtain explicit user consent and redact sensitive fields. | P0 | v0.2 | Planned |
 
-### 6.9 Error handling requirements
+### 7.9 Error handling requirements
 
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
-| REQ-ERR-001 | IF JXA execution fails due to permission, THE SYSTEM SHALL classify it as permission failure. | P0 | v0.1 | Partial |
-| REQ-ERR-002 | IF JXA execution times out, THE SYSTEM SHALL show a timeout error and keep previous data if available. | P0 | v0.1 | Planned |
-| REQ-ERR-003 | IF one event/reminder fails to parse, THE SYSTEM SHALL skip that item and continue rendering valid items. | P1 | v0.2 | Planned |
-| REQ-ERR-004 | IF the source returns no data, THE SYSTEM SHALL show an empty state distinct from failure. | P0 | v0.1 | Planned |
-| REQ-ERR-005 | IF a future write fails, THE SYSTEM SHALL not display false success. | P0 | v0.3 | Planned |
-| REQ-ERR-006 | IF a future write partially succeeds, THE SYSTEM SHALL refresh from source of truth. | P0 | v0.3 | Planned |
-| REQ-ERR-007 | IF a future delete is requested, THE SYSTEM SHALL require confirmation. | P0 | v0.4 | Planned |
-| REQ-ERR-008 | IF a future edit targets unsupported recurrence, THE SYSTEM SHALL block or redirect safely. | P0 | v0.4 | Planned |
+| REQ-ERR-001 | WHEN JXA execution fails, THE SYSTEM SHALL classify the error type (permission denied, timeout, parse failure, or empty data). | P0 | v0.1 | Partial |
+| REQ-ERR-002 | THE SYSTEM SHALL show appropriate error states for each error type with recovery guidance. | P0 | v0.1 | Planned |
+| REQ-ERR-003 | IF a data item fails to parse, THE SYSTEM SHALL skip that item and continue rendering valid items. | P1 | v0.2 | Planned |
+| REQ-ERR-004 | THE SYSTEM SHALL distinguish empty data from failure states in the UI. | P0 | v0.1 | Planned |
+| REQ-ERR-005 | WHEN write operations are implemented, failed writes SHALL NOT display false success and SHALL refresh from source of truth. | P0 | v0.3 | Planned |
+| REQ-ERR-006 | DESTRUCTIVE OPERATIONS (delete/edit) SHALL require user confirmation and stable source identity. | P0 | v0.4 | Planned |
 
-### 6.10 Write requirements, future releases
+### 7.10 Write requirements, future releases
 
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
@@ -327,7 +557,7 @@ Fallback IDs derived from title/time/calendar may be used only for display hints
 | REQ-WRITE-019 | THE SYSTEM SHALL not mutate reminders without a stable source identity. | P0 | v0.4 | Planned |
 | REQ-WRITE-020 | THE SYSTEM SHOULD expose write operation result feedback. | P1 | v0.4 | Planned |
 
-### 6.11 Recurring event safety requirements
+### 7.11 Recurring event safety requirements
 
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
@@ -340,7 +570,7 @@ Fallback IDs derived from title/time/calendar may be used only for display hints
 | REQ-REC-007 | THE SYSTEM SHALL document recurrence limitations. | P0 | v0.3 | Planned |
 | REQ-REC-008 | THE SYSTEM SHALL test recurring edit/delete before enabling it by default. | P0 | Future | Planned |
 
-### 6.12 Note association requirements
+### 7.12 Note association requirements
 
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
@@ -355,7 +585,7 @@ Fallback IDs derived from title/time/calendar may be used only for display hints
 | REQ-NOTE-009 | THE SYSTEM SHOULD support copy-as-Markdown for events/reminders. | P2 | v0.5 | Planned |
 | REQ-NOTE-010 | THE SYSTEM SHOULD support meeting-note templates. | P1 | v0.5 | Planned |
 
-### 6.13 Tasks integration requirements
+### 7.13 Tasks integration requirements
 
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
@@ -364,7 +594,7 @@ Fallback IDs derived from title/time/calendar may be used only for display hints
 | REQ-TASK-003 | THE SYSTEM SHALL NOT enable automatic two-way Tasks/Reminders sync until identity and conflict strategy are specified. | P0 | v0.5 | Planned |
 | REQ-TASK-004 | THE SYSTEM SHALL avoid duplicate reminder creation during task export. | P0 | v0.5 | Planned |
 
-### 6.14 Advanced view/search/statistics requirements
+### 7.14 Advanced view/search/statistics requirements
 
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
@@ -379,12 +609,8 @@ Fallback IDs derived from title/time/calendar may be used only for display hints
 | REQ-SEARCH-003 | Search SHOULD support date range filtering. | P2 | v0.6 | Planned |
 | REQ-SEARCH-004 | Search SHALL not query external services by default. | P0 | v0.6 | Planned |
 | REQ-SEARCH-005 | Search results SHOULD clearly distinguish events from reminders. | P1 | v0.6 | Planned |
-| REQ-STATS-001 | THE SYSTEM SHOULD provide basic event count statistics by day/week/month. | P2 | v0.6 | Planned |
-| REQ-STATS-002 | THE SYSTEM SHOULD group statistics by calendar source. | P2 | v0.6 | Planned |
-| REQ-STATS-003 | THE SYSTEM SHOULD generate Markdown summaries. | P3 | v0.6 | Planned |
-| REQ-STATS-004 | THE SYSTEM SHALL compute statistics locally. | P0 | v0.6 | Planned |
 
-### 6.15 Cross-platform requirements, deferred
+### 7.15 Cross-platform requirements, deferred
 
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
@@ -394,7 +620,58 @@ Fallback IDs derived from title/time/calendar may be used only for display hints
 | REQ-XPLAT-004 | External API integrations SHALL be opt-in. | P0 | v1.x | Deferred |
 | REQ-XPLAT-005 | External API integrations SHALL have separate acceptance and test matrices. | P0 | v1.x | Deferred |
 
-### 6.16 Documentation and architecture requirements
+### 7.16 Progress and consistency statistics requirements
+
+> Direction: encouragement-oriented metrics for personal consistency tracking (completion counts, appearance rate, current focus). This replaces the earlier v0.6 "time statistics and reporting" draft that was oriented toward meeting-load analysis for busy professionals. See §7.22–§7.25 for related self-direction features.
+
+| ID | Requirement | Priority | Target | Status |
+|---|---|---|---|---|
+| REQ-STATS-001 | THE SYSTEM SHOULD display step/habit completion count over a configurable window (day/week/month). | P1 | v0.5 | Planned |
+| REQ-STATS-002 | THE SYSTEM SHOULD display consistency rate as appearance days over total days in the window, NOT as an unbroken streak. | P1 | v0.5 | Planned |
+| REQ-STATS-003 | THE SYSTEM SHOULD surface the current declared focus alongside progress metrics in the panel. | P1 | v0.5 | Planned |
+| REQ-STATS-004 | THE SYSTEM SHOULD display completed-items count (small wins) before any gap or miss analysis. | P2 | v0.5 | Planned |
+| REQ-STATS-005 | THE SYSTEM SHOULD generate progress summaries emphasizing presence and consistency over perfection. | P2 | v0.6 | Planned |
+| REQ-STATS-006 | All statistics SHALL be computed locally without external services. | P0 | v0.5 | Planned |
+
+### 7.17 Natural language event creation requirements
+
+| ID | Requirement | Priority | Target | Status |
+|---|---|---|---|---|
+| REQ-NL-001 | THE SYSTEM SHOULD support natural language parsing for quick event creation (e.g., "tomorrow 3pm meeting"). | P1 | v0.3 | Planned |
+| REQ-NL-002 | WHEN parsing natural language, THE SYSTEM SHOULD extract title, date, time, and duration. | P1 | v0.3 | Planned |
+| REQ-NL-003 | IF natural language parsing is ambiguous, THE SYSTEM SHOULD show a confirmation dialog with extracted fields. | P1 | v0.3 | Planned |
+| REQ-NL-004 | Natural language parsing SHALL be optional; manual event creation MUST remain available. | P0 | v0.3 | Planned |
+| REQ-NL-005 | THE SYSTEM SHOULD support common date/time expressions in the user's locale. | P2 | v0.3 | Planned |
+
+### 7.18 In-app notification requirements
+
+| ID | Requirement | Priority | Target | Status |
+|---|---|---|---|---|
+| REQ-NOTIF-001 | THE SYSTEM SHOULD show in-app notifications for events starting soon (configurable lead time). | P1 | v0.5 | Planned |
+| REQ-NOTIF-002 | THE SYSTEM SHOULD show notifications for overdue reminders. | P1 | v0.5 | Planned |
+| REQ-NOTIF-003 | NOTIFICATIONS SHALL work within Obsidian using available notification APIs. | P0 | v0.5 | Planned |
+| REQ-NOTIF-004 | THE SYSTEM SHALL allow users to configure notification lead time and enable/disable notifications. | P1 | v0.5 | Planned |
+| REQ-NOTIF-005 | IF Obsidian notification APIs are unavailable, THE SYSTEM SHALL document this limitation gracefully. | P2 | v0.5 | Planned |
+
+### 7.19 Data export and backup requirements
+
+| ID | Requirement | Priority | Target | Status |
+|---|---|---|---|---|
+| REQ-EXPORT-001 | THE SYSTEM SHOULD allow users to export selected date range as Markdown. | P1 | v0.6 | Planned |
+| REQ-EXPORT-002 | THE SYSTEM SHOULD allow users to export data as JSON for backup purposes. | P2 | v0.6 | Planned |
+| REQ-EXPORT-003 | WHEN exporting, THE SYSTEM SHALL include all event fields (title, time, location, notes, etc.). | P1 | v0.6 | Planned |
+| REQ-EXPORT-004 | Exported data SHALL NOT be sent to external services; local export only. | P0 | v0.6 | Planned |
+
+### 7.20 User interface customization requirements
+
+| ID | Requirement | Priority | Target | Status |
+|---|---|---|---|---|
+| REQ-UI-001 | THE SYSTEM SHOULD support compact and comfortable density options. | P2 | v0.6 | Planned |
+| REQ-UI-002 | THE SYSTEM SHOULD allow users to customize which event fields are displayed. | P2 | v0.6 | Planned |
+| REQ-UI-003 | THE SYSTEM SHOULD respect Obsidian theme colors and CSS variables. | P1 | v0.1 | Partial |
+| REQ-UI-004 | Advanced customization (custom CSS, themes) SHOULD be documented but not required in core. | P3 | Future | Planned |
+
+### 7.21 Documentation and architecture requirements
 
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
@@ -403,9 +680,65 @@ Fallback IDs derived from title/time/calendar may be used only for display hints
 | REQ-DOC-003 | Target architecture SHALL be labeled as target until code is refactored. | P0 | v0.1 | Planned |
 | REQ-ARCH-001 | THE SYSTEM SHOULD split JXA integration, rendering, settings, sync, and note-link logic into maintainable modules before complex write features. | P1 | v0.3 | Planned |
 
+### 7.22 Goal and focus requirements
+
+| ID | Requirement | Priority | Target | Status |
+|---|---|---|---|---|
+| REQ-GOAL-001 | THE SYSTEM SHALL let users define a lightweight goal stored locally in Obsidian (note/frontmatter), not in Calendar.app or Reminders.app. | P1 | v0.5 | Planned |
+| REQ-GOAL-002 | THE SYSTEM SHALL support breaking a goal into small, actionable steps. | P1 | v0.5 | Planned |
+| REQ-GOAL-003 | THE SYSTEM SHOULD let users declare a single current focus for a week or phase. | P1 | v0.5 | Planned |
+| REQ-GOAL-004 | THE SYSTEM SHOULD surface the current focus prominently in the panel. | P2 | v0.5 | Planned |
+| REQ-GOAL-005 | THE SYSTEM SHALL let users complete a step with a single action and reflect it in goal progress. | P1 | v0.5 | Planned |
+| REQ-GOAL-006 | THE SYSTEM SHOULD link goals to events, reminders, or notes using stable association metadata. | P2 | v0.6 | Planned |
+| REQ-GOAL-007 | THE SYSTEM SHALL allow pausing or archiving a goal without deleting its history, so abandoning is not all-or-nothing. | P1 | v0.6 | Planned |
+| REQ-GOAL-008 | THE SYSTEM SHALL keep goal content local and SHALL NOT send it to external services. | P0 | v0.5 | Planned |
+
+### 7.23 Habit and consistency requirements
+
+| ID | Requirement | Priority | Target | Status |
+|---|---|---|---|---|
+| REQ-HABIT-001 | THE SYSTEM SHALL let users define lightweight recurring habits tracked within Obsidian. | P1 | v0.5 | Planned |
+| REQ-HABIT-002 | THE SYSTEM SHALL record habit completion for a given day with a single action. | P1 | v0.5 | Planned |
+| REQ-HABIT-003 | THE SYSTEM SHALL represent progress as a consistency/appearance rate over a window, NOT solely as an unbroken streak. | P1 | v0.5 | Planned |
+| REQ-HABIT-004 | THE SYSTEM SHALL NOT reset accumulated habit progress to zero after a single missed period. | P0 | v0.5 | Planned |
+| REQ-HABIT-005 | WHEN a habit has been missed for a configurable number of periods, THE SYSTEM SHOULD offer a low-friction restart (e.g. a reduced version) rather than marking failure. | P1 | v0.5 | Planned |
+| REQ-HABIT-006 | THE SYSTEM SHOULD support a minimum-viable version of a habit (a very small commitment) to lower activation energy. | P2 | v0.6 | Planned |
+| REQ-HABIT-007 | THE SYSTEM SHOULD let users mark scheduled rest periods so that rest is not counted as a miss. | P2 | v0.6 | Planned |
+| REQ-HABIT-008 | THE SYSTEM SHOULD visualize habit history in a way that emphasizes presence over perfection. | P2 | v0.6 | Planned |
+| REQ-HABIT-009 | THE SYSTEM SHALL let users edit or retire a habit without losing its history. | P2 | v0.6 | Planned |
+| REQ-HABIT-010 | THE SYSTEM SHALL keep habit data local in Obsidian and SHALL NOT require Reminders.app or external services. | P0 | v0.5 | Planned |
+
+### 7.24 Encouragement and nudge requirements
+
+> Distinct from REQ-NOTIF-* (event-start / overdue alarms). Nudges are motivational, not time-based alarms.
+
+| ID | Requirement | Priority | Target | Status |
+|---|---|---|---|---|
+| REQ-NUDGE-001 | THE SYSTEM SHOULD prompt the user once per day to declare a daily intention rather than impose a schedule. | P1 | v0.5 | Planned |
+| REQ-NUDGE-002 | THE SYSTEM SHOULD offer an optional gentle end-of-day check-in on whether the day's intention progressed. | P2 | v0.5 | Planned |
+| REQ-NUDGE-003 | WHEN a goal or habit has lapsed, THE SYSTEM SHOULD offer a re-engagement prompt framed as a restart, not a failure notice. | P1 | v0.5 | Planned |
+| REQ-NUDGE-004 | THE SYSTEM SHOULD offer a "start now for N minutes" quick action to lower the cost of beginning. | P1 | v0.5 | Planned |
+| REQ-NUDGE-005 | THE SYSTEM SHALL allow users to configure nudge tone (e.g. gentle / neutral / firm). | P1 | v0.5 | Planned |
+| REQ-NUDGE-006 | THE SYSTEM SHALL allow users to configure nudge frequency and to disable nudges entirely. | P0 | v0.5 | Planned |
+| REQ-NUDGE-007 | THE SYSTEM SHALL NOT use shaming, punitive, or guilt-inducing language by default. | P0 | v0.5 | Planned |
+| REQ-NUDGE-008 | THE SYSTEM SHALL deliver nudges locally within Obsidian and SHALL NOT send nudge or behavioral data to external services. | P0 | v0.5 | Planned |
+| REQ-NUDGE-009 | IF Obsidian notification APIs are unavailable, THE SYSTEM SHALL degrade to in-panel nudges and document the limitation. | P2 | v0.5 | Planned |
+
+### 7.25 Reflection and review requirements
+
+| ID | Requirement | Priority | Target | Status |
+|---|---|---|---|---|
+| REQ-REVIEW-001 | THE SYSTEM SHALL generate a daily reflection from a template, optionally pre-filled with the day's events, completed items, and declared intention. | P1 | v0.5 | Planned |
+| REQ-REVIEW-002 | THE SYSTEM SHALL generate a weekly review summarizing completed steps, habit consistency, and current focus. | P1 | v0.5 | Planned |
+| REQ-REVIEW-003 | THE SYSTEM SHOULD support template variables for intention, completed items, missed items, and next focus. | P1 | v0.5 | Planned |
+| REQ-REVIEW-004 | THE SYSTEM SHOULD surface completed items (small wins) before missed items in any review output. | P2 | v0.5 | Planned |
+| REQ-REVIEW-005 | THE SYSTEM SHOULD let users carry an unfinished focus forward to the next period without penalty. | P2 | v0.6 | Planned |
+| REQ-REVIEW-006 | THE SYSTEM SHOULD link review notes to associated goals, habits, or events using stable metadata. | P2 | v0.6 | Planned |
+| REQ-REVIEW-007 | THE SYSTEM SHALL compute review content locally and SHALL NOT send reflection content to external services. | P0 | v0.5 | Planned |
+
 ---
 
-## 7. Target architecture
+## 8. Target architecture
 
 Current implementation may be bundled. This is the target architecture, not a claim that all files already exist.
 
@@ -442,7 +775,7 @@ calendian/
 
 ---
 
-## 8. Release policy
+## 9. Release policy
 
 A version may be released only when:
 
@@ -454,7 +787,7 @@ A version may be released only when:
 
 ---
 
-## 9. Open specification questions
+## 10. Open specification questions
 
 These must be resolved before the related release:
 

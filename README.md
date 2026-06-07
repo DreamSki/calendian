@@ -49,12 +49,19 @@ These are planned, but should not be treated as current behavior until their req
 - Expandable event details with location, links, notes, and recurrence summary.
 - Manual refresh and diagnostics panel.
 - Safe event/reminder creation.
+- Natural language event creation ("tomorrow 3pm meeting").
 - Safe event/reminder editing and deletion.
 - Recurring event safety model.
 - Event/reminder note association through frontmatter.
 - Meeting-note templates.
+- In-app notifications for upcoming events and overdue reminders.
 - Copy-as-Markdown.
-- Timeline view, week view, local search, and statistics.
+- Goals and focus tracking (define goals, break into steps, declare weekly focus).
+- Habit tracking with consistency rate (not streaks), minimum-viable versions, and rest periods.
+- Encouragement nudges (daily intention prompt, re-engagement prompts, configurable tone).
+- Daily and weekly reflection notes from templates.
+- Encouragement statistics (completion count, consistency rate, small-wins focus).
+- Timeline view, week view, local search, and data export.
 
 See [`ROADMAP.md`](./ROADMAP.md) for the requirement-driven plan.
 
@@ -131,6 +138,7 @@ Calendian uses SDD so that implementation stays aligned with requirements and re
 |---|---|
 | [`SPEC.md`](./SPEC.md) | Authoritative product specification and requirement IDs. |
 | [`ROADMAP.md`](./ROADMAP.md) | Versioned plan derived from the specification. |
+| [`WORKFLOWS.md`](./WORKFLOWS.md) | User workflow examples and how-to guides. |
 | [`docs/sdd/README.md`](./docs/sdd/README.md) | SDD process and document hierarchy. |
 | [`docs/sdd/CURRENT_STATUS.md`](./docs/sdd/CURRENT_STATUS.md) | Actual implemented / partial / planned status. |
 | [`docs/sdd/ACCEPTANCE.md`](./docs/sdd/ACCEPTANCE.md) | Release gates and acceptance rules. |
@@ -168,10 +176,11 @@ Future external API integrations, if any, must be opt-in and specified separatel
 |---|---|---|
 | v0.1 | Read-only MVP | In progress |
 | v0.2 | Read-only polish | Planned |
-| v0.3 | Safe create | Planned |
+| v0.3 | Safe create + natural language | Planned |
 | v0.4 | Safe edit/delete | Planned |
-| v0.5 | Note association + limited Tasks integration | Planned |
-| v0.6 | Advanced views, search, statistics | Planned |
+| v0.5 | Note association + notifications + Tasks | Planned |
+| v0.5.5 | Self-direction (goals, habits, nudges, reviews) | Planned |
+| v0.6 | Advanced views, search, export | Planned |
 | v1.x | Cross-platform architecture track | Deferred |
 
 ---
