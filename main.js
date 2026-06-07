@@ -743,12 +743,12 @@ const defaultSettings = Object.freeze({
     weeklyNoteTemplate: "",
     weeklyNoteFolder: "",
     localeOverride: "system-default",
-    // macOS Calendar & Reminders integration
-    showMacOSCalendar: true,
-    showMacOSReminders: true,
-    macOSCalendarNames: [],
-    macOSReminderListNames: [],
-    macOSRefreshInterval: 5,
+    // macOS Calendar & Reminders integration (v0.1 schema)
+    enableCalendar: true,
+    enableReminders: true,
+    selectedCalendarIds: [],
+    selectedReminderListIds: [],
+    refreshIntervalMinutes: 5,
 });
 function appHasPeriodicNotesPluginLoaded() {
     var _a, _b;
@@ -812,6 +812,29 @@ class CalendarSettingsTab extends obsidian.PluginSettingTab {
         this.addMacOSCalendarNamesSetting();
         this.addMacOSReminderListNamesSetting();
         this.addMacOSRefreshIntervalSetting();
+
+        // === Privacy & Diagnostics Section ===
+        this.containerEl.createEl("h3", {
+            text: "Privacy & Diagnostics",
+        });
+        this.addPrivacyInfo();
+        this.addDiagnosticInfo();
+    }
+
+    // REQ-PRIV-001, REQ-PRIV-002: Privacy information
+    addPrivacyInfo() {
+        const privacyDiv = this.containerEl.createDiv("macos-privacy-section");
+        privacyDiv.createEl("p", { cls: "setting-item-description" }).textContent =
+            "Calendian reads data from your local macOS Calendar.app and Reminders.app using system automation. All data processing happens on your device. No calendar events, reminders, notes, or personal data are sent to third-party services.";
+        privacyDiv.createEl("p", { cls: "setting-item-description" }).textContent =
+            "Settings are stored locally in your Obsidian vault under .obsidian/plugins/calendian/data.json. No account credentials are stored by this plugin.";
+    }
+
+    // REQ-DIAG-001: Basic diagnostic info without exposing private content
+    addDiagnosticInfo() {
+        const diagDiv = this.containerEl.createDiv("macos-diagnostics-section");
+        diagDiv.createEl("p", { cls: "setting-item-description" }).textContent =
+            "Diagnostic information is available in the calendar panel footer (refresh time, source counts). Detailed diagnostics are added in a future version and will redact private event/reminder content by default.";
     }
     addDotThresholdSetting() {
         new obsidian.Setting(this.containerEl)
@@ -934,9 +957,9 @@ class CalendarSettingsTab extends obsidian.PluginSettingTab {
             .setName("Show macOS Calendar events")
             .setDesc("Display Calendar events below the calendar widget")
             .addToggle((toggle) => {
-            toggle.setValue(this.plugin.options.showMacOSCalendar !== false);
+            toggle.setValue(this.plugin.options.enableCalendar !== false);
             toggle.onChange(async (value) => {
-                this.plugin.writeOptions(() => ({ showMacOSCalendar: value }));
+                this.plugin.writeOptions(() => ({ enableCalendar: value }));
             });
         });
     }
@@ -945,104 +968,193 @@ class CalendarSettingsTab extends obsidian.PluginSettingTab {
             .setName("Show macOS Reminders")
             .setDesc("Display Reminders below the calendar widget")
             .addToggle((toggle) => {
-            toggle.setValue(this.plugin.options.showMacOSReminders !== false);
+            toggle.setValue(this.plugin.options.enableReminders !== false);
             toggle.onChange(async (value) => {
-                this.plugin.writeOptions(() => ({ showMacOSReminders: value }));
+                this.plugin.writeOptions(() => ({ enableReminders: value }));
             });
         });
     }
     addMacOSCalendarNamesSetting() {
+        const self = this;
         const container = this.containerEl.createDiv();
+
+        // Auto-discover button
         new obsidian.Setting(container)
             .setName("Calendar sources")
-            .setDesc("Click 'Discover' to list your macOS calendars, then toggle which ones to show.")
+            .setDesc("Toggle which calendars to show. Changes apply immediately.")
             .addButton((btn) => {
                 btn.setButtonText("Discover");
                 btn.setClass("mod-cta");
                 btn.onClick(async () => {
                     btn.setButtonText("Loading...");
                     btn.setDisabled(true);
-                    const view = this.plugin.view;
+                    const view = self.plugin.view;
                     if (view && view.macosIntegration) {
-                        const names = await view.macosIntegration.discoverCalendars();
-                        this.renderCalendarToggles(container, names);
+                        const sources = await view.macosIntegration.discoverCalendars();
+                        self.renderCalendarToggles(container, sources);
+                        // Persist metadata
+                        var meta = sources.map(function(s) {
+                            return { name: s.rawName, id: s.id, color: s.color, typeHint: s.typeHint, accountHint: s.accountHint };
+                        });
+                        await self.plugin.writeOptions(function() { return { _calendarMeta: meta }; });
                     }
                     btn.setButtonText("Refresh");
                     btn.setDisabled(false);
                 });
             });
-        // Show current selection if exists
-        const currentNames = this.plugin.options.macOSCalendarNames || [];
-        if (currentNames.length > 0) {
+
+        // Show toggles from saved metadata if available, otherwise from current selection
+        const savedMeta = this.plugin.options._calendarMeta || [];
+        const currentNames = this.plugin.options.selectedCalendarIds || [];
+        if (savedMeta.length > 0) {
+            this.renderCalendarToggles(container, savedMeta);
+        } else if (currentNames.length > 0) {
             this.renderCalendarToggles(container, currentNames);
         }
     }
-    renderCalendarToggles(container, names) {
+    renderCalendarToggles(container, sources) {
         // Remove old toggles
         container.querySelectorAll(".macos-cal-toggle").forEach((el) => el.remove());
-        const enabled = this.plugin.options.macOSCalendarNames || [];
+        const self = this;
+        const enabled = this.plugin.options.selectedCalendarIds || [];
         const showAll = enabled.length === 0;
-        names.forEach((name) => {
-            const setting = new obsidian.Setting(container.createDiv("macos-cal-toggle"))
-                .setName(name)
-                .setDesc("Calendar")
+        if (!sources || sources.length === 0) {
+            var emptyEl = container.createDiv("macos-cal-toggle");
+            emptyEl.createEl("p", { cls: "setting-item-description" }).textContent = "No calendars found. Check that Calendar.app has calendars configured.";
+            return;
+        }
+        sources.forEach((source) => {
+            // Use unique ID as the filter key; fall back to rawName if no ID available
+            const sourceId = typeof source === 'string' ? source : (source.id || source.rawName || source.name);
+            const sourceDisplay = typeof source === 'string' ? source : (source.name || source.rawName);
+            var desc = "Calendar";
+            if (source.accountHint) {
+                desc = "Calendar · " + source.accountHint;
+            } else if (source.typeHint) {
+                desc = "Calendar · " + source.typeHint;
+            }
+            // Check if this source is enabled: match by ID, or by name (backward compat)
+            var isEnabled = showAll;
+            if (!isEnabled) {
+                isEnabled = enabled.includes(sourceId) ||
+                    enabled.includes(source.rawName || source.name) ||
+                    enabled.includes(source.name || source.rawName);
+            }
+            new obsidian.Setting(container.createDiv("macos-cal-toggle"))
+                .setName(sourceDisplay)
+                .setDesc(desc)
                 .addToggle((toggle) => {
-                    toggle.setValue(showAll || enabled.includes(name));
+                    toggle.setValue(isEnabled);
                     toggle.onChange(async (value) => {
-                        let current = this.plugin.options.macOSCalendarNames || [];
+                        let current = (self.plugin.options.selectedCalendarIds || []).slice();
                         if (value) {
-                            if (!current.includes(name)) current.push(name);
+                            // Turning this source ON — add its unique ID
+                            if (!current.includes(sourceId)) current.push(sourceId);
                         } else {
-                            current = current.filter(function(n) { return n !== name; });
+                            if (current.length === 0) {
+                                // Was showing all; now exclude just this one source
+                                var allIds = [];
+                                sources.forEach(function(s) {
+                                    allIds.push(typeof s === 'string' ? s : (s.id || s.rawName || s.name));
+                                });
+                                current = allIds.filter(function(id) { return id !== sourceId; });
+                            } else {
+                                // Remove by ID and by name (clean up any old-format entries)
+                                current = current.filter(function(id) {
+                                    return id !== sourceId && id !== (source.rawName || source.name) && id !== (source.name || source.rawName);
+                                });
+                            }
                         }
-                        await this.plugin.writeOptions(() => ({ macOSCalendarNames: current }));
+                        await self.plugin.writeOptions(function() { return { selectedCalendarIds: current }; });
+                        // Apply filter instantly from cache — no JXA reload needed
+                        var view = self.plugin.view;
+                        if (view && view.macosIntegration) {
+                            view.macosIntegration.render();
+                        }
                     });
                 });
         });
     }
     addMacOSReminderListNamesSetting() {
+        const self = this;
         const container = this.containerEl.createDiv();
+
         new obsidian.Setting(container)
             .setName("Reminder sources")
-            .setDesc("Click 'Discover' to list your macOS Reminder lists, then toggle which ones to show.")
+            .setDesc("Toggle which reminder lists to show. Changes apply immediately.")
             .addButton((btn) => {
                 btn.setButtonText("Discover");
                 btn.setClass("mod-cta");
                 btn.onClick(async () => {
                     btn.setButtonText("Loading...");
                     btn.setDisabled(true);
-                    const view = this.plugin.view;
+                    const view = self.plugin.view;
                     if (view && view.macosIntegration) {
-                        const names = await view.macosIntegration.discoverReminderLists();
-                        this.renderReminderToggles(container, names);
+                        const sources = await view.macosIntegration.discoverReminderLists();
+                        self.renderReminderToggles(container, sources);
+                        var meta = sources.map(function(s) { return { name: s.rawName, id: s.id }; });
+                        await self.plugin.writeOptions(function() { return { _reminderMeta: meta }; });
                     }
                     btn.setButtonText("Refresh");
                     btn.setDisabled(false);
                 });
             });
-        const currentNames = this.plugin.options.macOSReminderListNames || [];
-        if (currentNames.length > 0) {
+
+        const savedMeta = this.plugin.options._reminderMeta || [];
+        if (savedMeta.length > 0) {
+            this.renderReminderToggles(container, savedMeta);
+        }
+        const currentNames = this.plugin.options.selectedReminderListIds || [];
+        if (savedMeta.length === 0 && currentNames.length > 0) {
             this.renderReminderToggles(container, currentNames);
         }
     }
-    renderReminderToggles(container, names) {
+    renderReminderToggles(container, sources) {
         container.querySelectorAll(".macos-rem-toggle").forEach((el) => el.remove());
-        const enabled = this.plugin.options.macOSReminderListNames || [];
+        const self = this;
+        const enabled = this.plugin.options.selectedReminderListIds || [];
         const showAll = enabled.length === 0;
-        names.forEach((name) => {
-            const setting = new obsidian.Setting(container.createDiv("macos-rem-toggle"))
-                .setName(name)
+        if (!sources || sources.length === 0) {
+            var emptyEl = container.createDiv("macos-rem-toggle");
+            emptyEl.createEl("p", { cls: "setting-item-description" }).textContent = "No reminder lists found. Check that Reminders.app has lists configured.";
+            return;
+        }
+        sources.forEach((source) => {
+            const sourceId = typeof source === 'string' ? source : (source.id || source.rawName || source.name);
+            const sourceDisplay = typeof source === 'string' ? source : (source.name || source.rawName);
+            var isEnabled = showAll;
+            if (!isEnabled) {
+                isEnabled = enabled.includes(sourceId) ||
+                    enabled.includes(source.rawName || source.name) ||
+                    enabled.includes(source.name || source.rawName);
+            }
+            new obsidian.Setting(container.createDiv("macos-rem-toggle"))
+                .setName(sourceDisplay)
                 .setDesc("Reminder list")
                 .addToggle((toggle) => {
-                    toggle.setValue(showAll || enabled.includes(name));
+                    toggle.setValue(isEnabled);
                     toggle.onChange(async (value) => {
-                        let current = this.plugin.options.macOSReminderListNames || [];
+                        let current = (self.plugin.options.selectedReminderListIds || []).slice();
                         if (value) {
-                            if (!current.includes(name)) current.push(name);
+                            if (!current.includes(sourceId)) current.push(sourceId);
                         } else {
-                            current = current.filter(function(n) { return n !== name; });
+                            if (current.length === 0) {
+                                var allIds = [];
+                                sources.forEach(function(s) {
+                                    allIds.push(typeof s === 'string' ? s : (s.id || s.rawName || s.name));
+                                });
+                                current = allIds.filter(function(id) { return id !== sourceId; });
+                            } else {
+                                current = current.filter(function(id) {
+                                    return id !== sourceId && id !== (source.rawName || source.name) && id !== (source.name || source.rawName);
+                                });
+                            }
                         }
-                        await this.plugin.writeOptions(() => ({ macOSReminderListNames: current }));
+                        await self.plugin.writeOptions(function() { return { selectedReminderListIds: current }; });
+                        var view = self.plugin.view;
+                        if (view && view.macosIntegration) {
+                            view.macosIntegration.render();
+                        }
                     });
                 });
         });
@@ -1054,10 +1166,10 @@ class CalendarSettingsTab extends obsidian.PluginSettingTab {
             .addText((textfield) => {
             textfield.setPlaceholder("5");
             textfield.inputEl.type = "number";
-            textfield.setValue(String(this.plugin.options.macOSRefreshInterval || 5));
+            textfield.setValue(String(this.plugin.options.refreshIntervalMinutes || 5));
             textfield.onChange(async (value) => {
                 const num = Math.max(1, Number(value) || 5);
-                this.plugin.writeOptions(() => ({ macOSRefreshInterval: num }));
+                this.plugin.writeOptions(() => ({ refreshIntervalMinutes: num }));
             });
         });
     }
@@ -4341,25 +4453,101 @@ class MacOSIntegration {
         this.refreshTimer = null;
         this.eventsPanelEl = null;
         this.selectedDate = window.moment();
-        this.permissionDenied = false;
-        this.isLoading = false;
+        // Native helper binary path (EventKit, much faster than JXA)
+        this.helperPath = plugin.helperPath || null;
+        if (this.helperPath) {
+            try { if (!nodeFS.existsSync(this.helperPath)) { this.helperPath = null; } } catch(e) { this.helperPath = null; }
+        }
+        if (!this.helperPath) {
+            console.warn("[Calendian] EventKit helper not found — discovery/preload will fail");
+        }
+        // REQ-PERM-001..004, REQ-ERR-001: Independent permission/error state per source
+        this.permissionState = {
+            calendar: 'unknown',   // 'unknown' | 'granted' | 'denied' | 'timeout' | 'error'
+            reminders: 'unknown'
+        };
+        this.lastError = {
+            calendar: null,        // { type, message, timestamp }
+            reminders: null
+        };
+        this.isLoading = {
+            calendar: false,
+            reminders: false
+        };
         // Pre-loaded cache: all events/reminders for ±6 months
         this.allEvents = [];
         this.allReminders = [];
         this.calendarColors = {};  // { calendarName: "r,g,b" }
         this.cacheStart = null;    // moment
         this.cacheEnd = null;      // moment
+        // Diagnostics
+        this.lastRefreshTime = null;
+        this.lastRefreshDurationMs = null;
+        this.sourceCounts = { calendars: 0, reminderLists: 0 };
     }
 
-    // --- Execute JXA via spawn + stdin ---
+    // --- Execute native helper (EventKit, fast) ---
+    execHelper(args) {
+        if (!this.helperPath) return Promise.reject(new Error('Helper not available'));
+        return new Promise((resolve, reject) => {
+            var proc = nodeChildProcess.spawn(this.helperPath, args);
+            var stdout = '';
+            var stderr = '';
+            proc.stdout.on('data', function(d) { stdout += d.toString(); });
+            proc.stderr.on('data', function(d) { stderr += d.toString(); });
+            proc.on('close', function(code) {
+                if (code !== 0) {
+                    reject({ error: new Error('Helper exited with code ' + code), stderr: stderr, stdout: stdout });
+                    return;
+                }
+                try {
+                    resolve(JSON.parse(stdout.trim()));
+                } catch (e) {
+                    reject({ error: e, stderr: stderr, stdout: stdout });
+                }
+            });
+            proc.on('error', function(err) {
+                reject({ error: err, stderr: stderr, stdout: stdout });
+            });
+        });
+    }
+
+    // REQ-ERR-001: Classify JXA errors by type
+    classifyError(err) {
+        const msg = ((err.stderr || '') + ' ' + (err.error?.message || '')).toLowerCase();
+        if (msg.includes('not allowed') || msg.includes('permission') ||
+            msg.includes('automation') || msg.includes('-1743') || msg.includes('-10004')) {
+            return 'permission_denied';
+        }
+        if (msg.includes('timed out') || msg.includes('timeout') || msg.includes('killed')) {
+            return 'timeout';
+        }
+        return 'error';
+    }
+
+    // --- Execute JXA via spawn + stdin (with 30s timeout) ---
     execJXA(script) {
         return new Promise((resolve, reject) => {
             const proc = nodeChildProcess.spawn('/usr/bin/osascript', ['-l', 'JavaScript']);
             let stdout = '';
             let stderr = '';
+            let settled = false;
+
+            // 5-minute timeout (only for true hangs, not slow syncs)
+            const timer = setTimeout(() => {
+                if (!settled) {
+                    settled = true;
+                    proc.kill('SIGTERM');
+                    reject({ error: new Error('JXA execution timed out after 5min'), stderr, stdout });
+                }
+            }, 300000);
+
             proc.stdout.on('data', (data) => { stdout += data.toString(); });
             proc.stderr.on('data', (data) => { stderr += data.toString(); });
             proc.on('close', (code) => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
                 if (code !== 0) {
                     reject({ error: new Error('osascript exited with code ' + code), stderr, stdout });
                     return;
@@ -4367,6 +4555,9 @@ class MacOSIntegration {
                 resolve(stdout.trim());
             });
             proc.on('error', (err) => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
                 reject({ error: err, stderr, stdout });
             });
             proc.stdin.write(script);
@@ -4374,136 +4565,276 @@ class MacOSIntegration {
         });
     }
 
-    // --- Preload all events for ±6 months ---
-    async preloadAll() {
-        const now = window.moment();
-        this.cacheStart = now.clone().subtract(6, 'months').startOf('month');
-        this.cacheEnd = now.clone().add(6, 'months').endOf('month');
-        const startStr = this.cacheStart.format("YYYY-MM-DD");
-        const endStr = this.cacheEnd.format("YYYY-MM-DD");
-
-        const opts = this.plugin.options || {};
-        const calendarNames = opts.macOSCalendarNames || [];
-        const filterCals = calendarNames.length > 0
-            ? `var targetNames = ${JSON.stringify(calendarNames)}; var cals = app.calendars().filter(function(c) { return targetNames.indexOf(c.name()) !== -1; });`
-            : `var cals = app.calendars();`;
-
-        const script = `
-            var app = Application("Calendar");
-            ${filterCals}
-            var startDate = new Date("${startStr}");
-            var endDate = new Date("${endStr}");
-            var results = [];
-            var colors = {};
-            for (var i = 0; i < cals.length; i++) {
-                var cal = cals[i];
-                var calName = cal.name();
-                try {
-                    var calColor = cal.color();
-                    colors[calName] = calColor;
-                    var evts = cal.events();
-                    for (var j = 0; j < evts.length; j++) {
-                        var e = evts[j];
-                        var sd = new Date(e.startDate());
-                        if (sd >= startDate && sd <= endDate) {
-                            var ed = e.endDate();
-                            var allday = false;
-                            try { allday = e.allday(); } catch(ex) {}
-                            results.push(
-                                e.summary() + "|||" +
-                                sd.toString() + "|||" +
-                                (ed ? new Date(ed).toString() : "") + "|||" +
-                                calName + "|||" +
-                                (allday ? "1" : "0")
-                            );
-                        }
-                    }
-                } catch(err) {}
-            }
-            var colorLines = [];
-            for (var key in colors) { colorLines.push(key + "|||" + colors[key]); }
-            colorLines.join("\\n") + "###SPLIT###" + results.join("\\n");
-        `;
-
+    // --- Load events from persistent disk cache (instant) ---
+    async loadEventsFromCache() {
         try {
-            this.permissionDenied = false;
-            const result = await this.execJXA(script);
-            const parts = result.split("###SPLIT###");
-            // Parse colors
-            if (parts[0]) {
-                parts[0].split("\n").filter(Boolean).forEach((line) => {
-                    const cp = line.split("|||");
-                    if (cp[0] && cp[1]) this.calendarColors[cp[0]] = cp[1];
+            var raw = await this.plugin.readCacheFile('_eventsCache');
+            if (raw && raw.events && raw.events.length > 0) {
+                var events = [];
+                for (var i = 0; i < raw.events.length; i++) {
+                    var e = raw.events[i];
+                    e.start = e._start ? new Date(e._start) : null;
+                    e.end = e._end ? new Date(e._end) : null;
+                    // Backward compat: migrate old field names to SPEC model
+                    if (!e.title && e.summary) e.title = e.summary;
+                    if (!e.calendarName && e.calendar) e.calendarName = e.calendar;
+                    if (e.isAllDay === undefined && e.allday !== undefined) e.isAllDay = e.allday;
+                    events.push(e);
+                }
+                this.allEvents = events;
+                if (raw.colors) this.calendarColors = raw.colors;
+                if (raw.cacheStart) this.cacheStart = window.moment(raw.cacheStart);
+                if (raw.cacheEnd) this.cacheEnd = window.moment(raw.cacheEnd);
+                this._cacheSavedAt = raw.savedAt || null;
+                this.permissionState.calendar = 'granted';
+                console.log("[Calendian] Loaded " + events.length + " events from disk cache (saved at " + (raw.savedAt || "unknown") + ")");
+                return true;
+            }
+        } catch (e) {
+            console.warn("[Calendian] Failed to load events from cache:", e.message);
+        }
+        return false;
+    }
+
+    // --- Check if cache is fresh enough to skip background refresh ---
+    isCacheFresh() {
+        if (!this._cacheSavedAt) return false;
+        // If JXA is already running, consider cache "fresh enough" — don't stack calls
+        if (this._jxaRunning) return true;
+        try {
+            var savedTime = new Date(this._cacheSavedAt).getTime();
+            var ageMs = Date.now() - savedTime;
+            // Use 2x the refresh interval, minimum 15 minutes, to avoid hammering Calendar.app
+            var intervalMin = Math.max(15, (this.plugin.options?.refreshIntervalMinutes || 5) * 2);
+            return ageMs < (intervalMin * 60 * 1000);
+        } catch (e) { return false; }
+    }
+
+    // --- Save events to persistent disk cache ---
+    async saveEventsToCache() {
+        try {
+            var events = [];
+            for (var i = 0; i < this.allEvents.length; i++) {
+                var e = this.allEvents[i];
+                events.push({
+                    id: e.id, source: e.source,
+                    title: e.title || e.summary || "",
+                    _start: e.start ? e.start.toISOString() : null,
+                    _end: e.end ? e.end.toISOString() : null,
+                    calendarName: e.calendarName || e.calendar || "",
+                    calendarId: e.calendarId || "",
+                    isAllDay: e.isAllDay !== undefined ? e.isAllDay : (e.allday || false),
+                    location: e.location || "", url: e.url || "",
+                    notes: e.notes || "", isRecurring: e.isRecurring || false,
+                    recurrenceSummary: e.recurrenceSummary || ""
                 });
             }
-            // Parse events
-            this.allEvents = this.parseEvents(parts[1] || "");
-        } catch (err) {
-            console.error("[Calendar-macOS] Failed to preload events:", err.error?.message || err.stderr);
-            if (this.isPermissionError(err)) this.permissionDenied = true;
-            this.allEvents = [];
+            var cache = {
+                events: events,
+                colors: this.calendarColors,
+                cacheStart: this.cacheStart ? this.cacheStart.format() : null,
+                cacheEnd: this.cacheEnd ? this.cacheEnd.format() : null,
+                savedAt: new Date().toISOString()
+            };
+            await this.plugin.writeCacheFile('_eventsCache', cache);
+        } catch (e) {
+            console.warn("[Calendian] Failed to save events to cache:", e.message);
         }
     }
 
-    // --- Preload all reminders for ±6 months ---
-    async preloadReminders() {
-        const opts = this.plugin.options || {};
-        const listNames = opts.macOSReminderListNames || [];
-        const filterLists = listNames.length > 0
-            ? `var targetNames = ${JSON.stringify(listNames)}; var lists = app.lists().filter(function(l) { return targetNames.indexOf(l.name()) !== -1; });`
-            : `var lists = app.lists();`;
-
-        const script = `
-            var app = Application("Reminders");
-            ${filterLists}
-            var results = [];
-            for (var i = 0; i < lists.length; i++) {
-                var lst = lists[i];
-                var listName = lst.name();
-                try {
-                    var rems = lst.reminders();
-                    for (var j = 0; j < rems.length; j++) {
-                        var r = rems[j];
-                        if (r.completed()) continue;
-                        var due = r.dueDate();
-                        var dueStr = "";
-                        if (due) { dueStr = new Date(due).toString(); }
-                        results.push(r.name() + "|||" + dueStr + "|||" + listName);
-                    }
-                } catch(err) {}
+    // --- Save reminders to persistent disk cache ---
+    async saveRemindersToCache() {
+        try {
+            var reminders = [];
+            for (var i = 0; i < this.allReminders.length; i++) {
+                var r = this.allReminders[i];
+                reminders.push({
+                    id: r.id, source: r.source,
+                    title: r.title || r.name || "",
+                    _due: r.due ? r.due.toISOString() : null,
+                    dueDate: r.dueDate || "",
+                    listName: r.listName || r.list || "",
+                    listId: r.listId || "",
+                    priority: r.priority || "none",
+                    completed: r.completed || false,
+                    notes: r.notes || ""
+                });
             }
-            results.join("\\n");
-        `;
+            var cache = {
+                reminders: reminders,
+                savedAt: new Date().toISOString()
+            };
+            await this.plugin.writeCacheFile('_remindersCache', cache);
+        } catch (e) {
+            console.warn("[Calendian] Failed to save reminders to cache:", e.message);
+        }
+    }
+
+    // --- Load reminders from persistent disk cache (instant) ---
+    async loadRemindersFromCache() {
+        try {
+            var raw = await this.plugin.readCacheFile('_remindersCache');
+            if (raw && raw.reminders && raw.reminders.length > 0) {
+                var reminders = [];
+                for (var i = 0; i < raw.reminders.length; i++) {
+                    var r = raw.reminders[i];
+                    r.due = r._due ? new Date(r._due) : null;
+                    // Backward compat: migrate old field names
+                    if (!r.title && r.name) r.title = r.name;
+                    if (!r.listName && r.list) r.listName = r.list;
+                    reminders.push(r);
+                }
+                this.allReminders = reminders;
+                this.permissionState.reminders = 'granted';
+                console.log("[Calendian] Loaded " + reminders.length + " reminders from disk cache");
+                return true;
+            }
+        } catch (e) {
+            console.warn("[Calendian] Failed to load reminders from cache:", e.message);
+        }
+        return false;
+    }
+
+    // --- Preload all events for ±6 months ---
+    // --- Preload events via EventKit helper (fast) ---
+    async preloadAll() {
+        this.isLoading.calendar = true;
+        var now = window.moment();
+        this.cacheStart = now.clone().subtract(6, 'months').startOf('month');
+        this.cacheEnd = now.clone().add(6, 'months').endOf('month');
+        var fromISO = this.cacheStart.toISOString().replace(/\.\d{3}Z$/, 'Z');
+        var toISO = this.cacheEnd.toISOString().replace(/\.\d{3}Z$/, 'Z');
+
+        var opts = this.plugin.options || {};
+        var filterIds = opts.selectedCalendarIds || [];
 
         try {
-            this.permissionDenied = false;
-            const result = await this.execJXA(script);
-            this.allReminders = this.parseReminders(result);
+            var startMs = Date.now();
+            var args = ['events', fromISO, toISO];
+            if (filterIds.length > 0) { args = args.concat(filterIds); }
+            var rawEvents = await this.execHelper(args);
+            console.log("[Calendian] EventKit events completed in " + (Date.now() - startMs) + "ms, " + rawEvents.length + " events");
+
+            // Map to internal model + collect colors
+            var colors = {};
+            var events = [];
+            for (var i = 0; i < rawEvents.length; i++) {
+                var e = rawEvents[i];
+                if (e.calendarColor) { colors[e.calendarName] = e.calendarColor; }
+                events.push({
+                    id: e.id,
+                    source: "macos-calendar",
+                    title: e.title || "",
+                    start: e.start ? new Date(e.start) : null,
+                    end: e.end ? new Date(e.end) : null,
+                    calendarName: e.calendarName || "",
+                    calendarId: e.calendarId || "",
+                    calendarColor: e.calendarColor || "",
+                    isAllDay: e.isAllDay || false,
+                    isRecurring: e.isRecurring || false,
+                    recurrenceSummary: e.recurrenceSummary || "",
+                    location: e.location || "",
+                    url: e.url || "",
+                    notes: e.notes || "",
+                    attendees: e.attendees || [],
+                    accountName: e.accountName || ""
+                });
+            }
+            this.calendarColors = colors;
+            this.allEvents = events;
+            this.permissionState.calendar = 'granted';
+            this.lastError.calendar = null;
+            this.sourceCounts.calendars = Object.keys(colors).length;
+            this.saveEventsToCache();
         } catch (err) {
-            console.error("[Calendar-macOS] Failed to preload reminders:", err.error?.message || err.stderr);
-            this.allReminders = [];
+            console.error("[Calendian] Failed to preload events:", err.error?.message || err.stderr, "stderr:", err.stderr);
+            var errorType = this.classifyError(err);
+            this.permissionState.calendar = errorType;
+            this.lastError.calendar = { type: errorType, message: (err.stderr || err.error?.message || 'Unknown error'), timestamp: new Date().toISOString() };
+            if (errorType === 'permission_denied') { this.allEvents = []; }
         }
+        this.isLoading.calendar = false;
+    }
+
+    // --- Preload reminders via EventKit helper (fast) ---
+    async preloadReminders() {
+        this.isLoading.reminders = true;
+        var now = window.moment();
+        var fromISO = now.clone().subtract(6, 'months').startOf('month').toISOString().replace(/\.\d{3}Z$/, 'Z');
+        var toISO = now.clone().add(6, 'months').endOf('month').toISOString().replace(/\.\d{3}Z$/, 'Z');
+
+        var opts = this.plugin.options || {};
+        var filterIds = opts.selectedReminderListIds || [];
+
+        try {
+            var args = ['reminders', fromISO, toISO];
+            if (filterIds.length > 0) { args = args.concat(filterIds); }
+            var rawReminders = await this.execHelper(args);
+
+            var reminders = [];
+            for (var i = 0; i < rawReminders.length; i++) {
+                var r = rawReminders[i];
+                reminders.push({
+                    id: r.id || "",
+                    source: "macos-reminders",
+                    title: r.title || "",
+                    dueDate: r.dueDate || "",
+                    due: r.dueDate ? new Date(r.dueDate) : null,
+                    listName: r.listName || "",
+                    listId: r.listId || "",
+                    priority: r.priority || "none",
+                    completed: r.completed || false,
+                    notes: r.notes || "",
+                    parentId: r.parentId || ""
+                });
+            }
+            this.allReminders = reminders;
+            this.permissionState.reminders = 'granted';
+            this.lastError.reminders = null;
+            this.sourceCounts.reminderLists = this.countReminderLists(reminders);
+            this.saveRemindersToCache();
+        } catch (err) {
+            console.error("[Calendian] Failed to preload reminders:", err.error?.message || err.stderr);
+            var errorType = this.classifyError(err);
+            this.permissionState.reminders = errorType;
+            this.lastError.reminders = { type: errorType, message: (err.stderr || err.error?.message || 'Unknown error'), timestamp: new Date().toISOString() };
+            if (errorType === 'permission_denied') { this.allReminders = []; }
+        }
+        this.isLoading.reminders = false;
     }
 
     // --- Get events for a specific date from cache ---
     getEventsForDate(date) {
-        const d = date.toDate();
-        const y = d.getFullYear(), m = d.getMonth(), day = d.getDate();
-        const start = new Date(y, m, day, 0, 0, 0);
-        const end = new Date(y, m, day, 23, 59, 59);
+        var d = date.toDate();
+        var y = d.getFullYear(), m = d.getMonth(), day = d.getDate();
+        var start = new Date(y, m, day, 0, 0, 0);
+        var end = new Date(y, m, day, 23, 59, 59);
+        var filterIds = (this.plugin.options && this.plugin.options.selectedCalendarIds) || [];
+        var calColors = this.calendarColors || {};
         return this.allEvents.filter(function(e) {
             if (!e.start) return false;
-            // All-day events: check if event overlaps this day
-            if (e.allday) {
+            // Apply calendar source filter by compound ID (name|||color) or plain ID
+            if (filterIds.length > 0) {
+                var eName = e.calendarName || e.calendar || "";
+                var eColor = calColors[eName] || "";
+                var eCompoundId = eName + "|||" + eColor;
+                var eId = e.calendarId || e.id || "";
+                // Match by compound ID, then by raw ID, then by name (backward compat)
+                var matched = filterIds.includes(eCompoundId) || filterIds.includes(eId) || filterIds.includes(eName);
+                if (!matched) return false;
+            }
+            var isAllDay = e.isAllDay !== undefined ? e.isAllDay : e.allday;
+            if (isAllDay) {
                 var es = new Date(e.start.getFullYear(), e.start.getMonth(), e.start.getDate());
                 var ee = e.end ? new Date(e.end.getFullYear(), e.end.getMonth(), e.end.getDate(), 23, 59, 59) : es;
                 return es <= end && ee >= start;
             }
             return e.start >= start && e.start <= end;
         }).sort(function(a, b) {
-            // All-day events first, then by time
-            if (a.allday && !b.allday) return -1;
-            if (!a.allday && b.allday) return 1;
+            var aAllDay = a.isAllDay !== undefined ? a.isAllDay : a.allday;
+            var bAllDay = b.isAllDay !== undefined ? b.isAllDay : b.allday;
+            if (aAllDay && !bAllDay) return -1;
+            if (!aAllDay && bAllDay) return 1;
             if (!a.start || !b.start) return 0;
             return a.start.getTime() - b.start.getTime();
         });
@@ -4511,11 +4842,19 @@ class MacOSIntegration {
 
     // --- Get reminders for a specific date from cache ---
     getRemindersForDate(date) {
-        const d = date.toDate();
-        const y = d.getFullYear(), m = d.getMonth(), day = d.getDate();
-        const start = new Date(y, m, day, 0, 0, 0);
-        const end = new Date(y, m, day, 23, 59, 59);
+        var d = date.toDate();
+        var y = d.getFullYear(), m = d.getMonth(), day = d.getDate();
+        var start = new Date(y, m, day, 0, 0, 0);
+        var end = new Date(y, m, day, 23, 59, 59);
+        var filterIds = (this.plugin.options && this.plugin.options.selectedReminderListIds) || [];
         return this.allReminders.filter(function(r) {
+            // Apply reminder list filter by ID (primary) or name (fallback)
+            if (filterIds.length > 0) {
+                var rId = r.listId || r.id || "";
+                var rName = r.listName || r.list || "";
+                var matched = filterIds.includes(rId) || filterIds.includes(rName);
+                if (!matched) return false;
+            }
             // Reminders with no due date: show on today only
             if (!r.due) {
                 var today = new Date();
@@ -4525,50 +4864,190 @@ class MacOSIntegration {
         });
     }
 
-    // --- Check if error is a permission error ---
+    // --- Check if error is a permission error (delegates to classifyError) ---
     isPermissionError(err) {
-        const msg = (err.stderr || "") + (err.error?.message || "");
-        return msg.includes("not allowed") || msg.includes("permission") || msg.includes("Automation");
+        return this.classifyError(err) === 'permission_denied';
     }
 
     // --- Parse event data ---
+    // v0.1 fields per SPEC §5.1: id, source, calendarId, calendarName, calendarColor,
+    //   title, start, end, isAllDay, isRecurring, recurrenceSummary,
+    //   location, url, notes, attendees, alarms
+    // v0.2 fields (REQ-CAL-007): location, url, notes populated from JXA
     parseEvents(raw) {
         if (!raw) return [];
-        return raw.split("\n").filter(Boolean).map(function(line) {
-            const parts = line.split("|||");
-            return {
-                summary: parts[0] || "",
-                start: parts[1] ? new Date(parts[1]) : null,
-                end: parts[2] ? new Date(parts[2]) : null,
-                calendar: parts[3] || "",
-                allday: parts[4] === "1"
-            };
-        }).filter(function(e) { return e.summary; });
+        return raw.split("\n").filter(Boolean).reduce(function(acc, line) {
+            try {
+                const parts = line.split("|||");
+                // JXA output format: summary|startDate|endDate|calendarName|allday|uid
+                var evt = {
+                    id: parts[5] || ("evt-" + encodeURIComponent(parts[0] || "untitled") + "-" + (parts[1] || "0")),
+                    source: "macos-calendar",
+                    title: parts[0] || "",
+                    start: parts[1] ? new Date(parts[1]) : null,
+                    end: parts[2] ? new Date(parts[2]) : null,
+                    calendarName: parts[3] || "",
+                    calendarId: parts[3] || "",
+                    calendarColor: "",
+                    isAllDay: parts[4] === "1",
+                    isRecurring: false,
+                    recurrenceSummary: "",
+                    location: "",
+                    url: "",
+                    notes: "",
+                    attendees: [],
+                    alarms: []
+                };
+                if (evt.title || evt.start) {
+                    acc.push(evt);
+                }
+            } catch (e) {
+                console.warn("[Calendian] Skipped unparseable event record:", line.substring(0, 80));
+            }
+            return acc;
+        }, []);
     }
 
     // --- Parse reminder data ---
+    // REQ-DATA-007: Treat optional JXA fields as optional
     parseReminders(raw) {
         if (!raw) return [];
-        return raw.split("\n").filter(Boolean).map(function(line) {
-            const parts = line.split("|||");
-            return {
-                name: parts[0] || "",
-                due: parts[1] ? new Date(parts[1]) : null,
-                list: parts[2] || ""
-            };
-        }).filter(function(r) { return r.name; });
+        // REQ-DATA-005: Isolate parse failures to individual records
+        var listNames = {};
+        return raw.split("\n").filter(Boolean).reduce(function(acc, line) {
+            try {
+                const parts = line.split("|||");
+                var listName = parts[2] || "";
+                if (listName && !listNames[listName]) listNames[listName] = true;
+                var priority = "none";
+                if (parts[4] && parts[4] !== "none") {
+                    var p = parseInt(parts[4], 10);
+                    if (!isNaN(p)) {
+                        if (p <= 500) priority = "high";
+                        else if (p <= 700) priority = "medium";
+                        else priority = "low";
+                    }
+                }
+                var rem = {
+                    id: parts[3] || ("rem-" + (parts[0] || "unknown") + "-" + (parts[2] || "n/a")),
+                    source: "macos-reminders",
+                    title: parts[0] || "",
+                    dueDate: parts[1] || "",
+                    due: parts[1] ? new Date(parts[1]) : null,
+                    listName: listName,
+                    listId: listName,
+                    priority: priority,
+                    completed: parts[5] === "1",
+                    notes: parts[6] || "",
+                    parentId: ""
+                };
+                if (rem.title) {
+                    acc.push(rem);
+                }
+            } catch (e) {
+                // REQ-DATA-005: Skip malformed record
+                console.warn("[Calendian] Skipped unparseable reminder record:", line.substring(0, 80));
+            }
+            return acc;
+        }, []);
     }
 
-    // --- Initial load: preload + render ---
+    // --- Count unique reminder lists ---
+    countReminderLists(reminders) {
+        var lists = {};
+        for (var i = 0; i < reminders.length; i++) {
+            var ln = reminders[i].listName || reminders[i].list || "";
+            if (ln) lists[ln] = true;
+        }
+        return Object.keys(lists).length;
+    }
+
+    // --- Initial load: fire-and-forget background sync, render immediately ---
     async init() {
-        this.renderLoading();
+        // Hard debounce: only allow one init per 2 seconds
+        var now = Date.now();
+        if (this._lastInitTime && (now - this._lastInitTime) < 2000) {
+            return;
+        }
+        this._lastInitTime = now;
+        var initStart = now;
+        console.log("[Calendian] init() starting...");
+        const opts = this.plugin.options || {};
+
+        // Phase 1: Try disk cache first (near-instant)
+        var calCached = false, remCached = false;
+        if (opts.enableCalendar !== false) calCached = await this.loadEventsFromCache();
+        if (opts.enableReminders !== false) remCached = await this.loadRemindersFromCache();
+
+        if (calCached || remCached) {
+            // Show cached data immediately
+            console.log("[Calendian] Showing cached data (" + (Date.now() - initStart) + "ms)");
+            this.lastRefreshTime = new Date().toISOString();
+            this.lastRefreshDurationMs = Date.now() - initStart;
+            this.render();
+
+            // Phase 2: Only background refresh if cache is stale
+            if (this.isCacheFresh()) {
+                console.log("[Calendian] Cache is fresh, skipping background refresh");
+                this.lastRefreshTime = new Date().toISOString();
+            } else {
+                console.log("[Calendian] Cache is stale, starting background refresh...");
+                this.refreshInBackground();
+            }
+        } else {
+            // First run: show syncing state and start background load
+            console.log("[Calendian] First run, starting background sync...");
+            this.renderSyncing();
+            this.initBackground(initStart);
+        }
+    }
+
+    // Background sync without blocking the UI
+    async initBackground(initStart) {
+        if (this._jxaRunning) { console.log("[Calendian] initBackground skipped (JXA already running)"); return; }
+        this._jxaRunning = true;
         const opts = this.plugin.options || {};
         const promises = [];
-        if (opts.showMacOSCalendar !== false) promises.push(this.preloadAll());
-        if (opts.showMacOSReminders !== false) promises.push(this.preloadReminders());
-        await Promise.allSettled(promises);
-        this.isLoading = false;
+        if (opts.enableCalendar !== false) promises.push(this.preloadAll());
+        if (opts.enableReminders !== false) promises.push(this.preloadReminders());
+        if (promises.length > 0) {
+            await Promise.allSettled(promises);
+        }
+        console.log("[Calendian] Background sync done in " + (Date.now() - initStart) + "ms. cal=" + this.permissionState.calendar + " rem=" + this.permissionState.reminders);
+        this._jxaRunning = false;
+        this.lastRefreshTime = new Date().toISOString();
+        this.lastRefreshDurationMs = Date.now() - initStart;
         this.render();
+    }
+
+    // Refresh from JXA in background (used when cache already shown)
+    async refreshInBackground() {
+        if (this._jxaRunning) { console.log("[Calendian] Background refresh skipped (JXA already running)"); return; }
+        this._jxaRunning = true;
+        var start = Date.now();
+        console.log("[Calendian] Background refresh from macOS...");
+        const opts = this.plugin.options || {};
+        const promises = [];
+        if (opts.enableCalendar !== false) promises.push(this.preloadAll());
+        if (opts.enableReminders !== false) promises.push(this.preloadReminders());
+        if (promises.length > 0) {
+            await Promise.allSettled(promises);
+        }
+        console.log("[Calendian] Background refresh done in " + (Date.now() - start) + "ms. cal=" + this.permissionState.calendar + " rem=" + this.permissionState.reminders);
+        this._jxaRunning = false;
+        this.lastRefreshTime = new Date().toISOString();
+        this.lastRefreshDurationMs = Date.now() - start;
+        this.render();
+    }
+
+    // Render syncing state (shown during first-ever load)
+    renderSyncing() {
+        if (!this.eventsPanelEl) return;
+        this.eventsPanelEl.empty();
+        var syncEl = this.eventsPanelEl.createDiv("macos-loading");
+        syncEl.textContent = "Syncing with macOS Calendar & Reminders...";
+        var subEl = this.eventsPanelEl.createDiv("macos-empty");
+        subEl.textContent = "This may take a moment on first run. Data is cached for future launches.";
     }
 
     // --- Select a date and render from cache (instant) ---
@@ -4585,6 +5064,12 @@ class MacOSIntegration {
         loadingEl.textContent = "Loading events & reminders...";
     }
 
+    // --- Check if event is within cached range ---
+    isDateInCacheRange(date) {
+        if (!this.cacheStart || !this.cacheEnd) return true;
+        return date.isSameOrAfter(this.cacheStart, 'day') && date.isSameOrBefore(this.cacheEnd, 'day');
+    }
+
     // --- Convert RGB string to CSS color ---
     calendarToCSS(rgbStr) {
         if (!rgbStr) return null;
@@ -4595,7 +5080,8 @@ class MacOSIntegration {
 
     // --- Check if event is starting soon (within 30 min) ---
     isStartingSoon(evt) {
-        if (!evt.start || evt.allday) return false;
+        var isAllDay = evt.isAllDay !== undefined ? evt.isAllDay : evt.allday;
+        if (!evt.start || isAllDay) return false;
         const now = new Date();
         const diff = evt.start.getTime() - now.getTime();
         return diff > 0 && diff <= 30 * 60 * 1000;
@@ -4603,7 +5089,8 @@ class MacOSIntegration {
 
     // --- Check if event is currently ongoing ---
     isOngoing(evt) {
-        if (!evt.start || !evt.end || evt.allday) return false;
+        var isAllDay = evt.isAllDay !== undefined ? evt.isAllDay : evt.allday;
+        if (!evt.start || !evt.end || isAllDay) return false;
         const now = new Date();
         return now >= evt.start && now <= evt.end;
     }
@@ -4614,16 +5101,55 @@ class MacOSIntegration {
         this.eventsPanelEl.empty();
 
         const opts = this.plugin.options || {};
-        if (this.permissionDenied) {
+        const showCal = opts.enableCalendar !== false;
+        const showRem = opts.enableReminders !== false;
+
+        // REQ-PLAT-004: Platform check
+        if (!isMacOS()) {
             const errEl = this.eventsPanelEl.createDiv("macos-error");
-            errEl.textContent = "Permission denied. Go to System Settings > Privacy & Security > Automation to grant access.";
+            errEl.textContent = "Calendian requires macOS. This plugin reads from Calendar.app and Reminders.app.";
             return;
         }
 
+        // REQ-PERM-004: Distinguish permission failure from empty data
+        var calPerm = this.permissionState.calendar;
+        var remPerm = this.permissionState.reminders;
+
+        // Both permission denied
+        if (showCal && showRem && calPerm === 'denied' && remPerm === 'denied') {
+            this.renderPermissionBanner(this.eventsPanelEl, 'both');
+            return;
+        }
+        // Only calendar enabled and denied
+        if (showCal && !showRem && calPerm === 'denied') {
+            this.renderPermissionBanner(this.eventsPanelEl, 'calendar');
+            return;
+        }
+        // Only reminders enabled and denied
+        if (!showCal && showRem && remPerm === 'denied') {
+            this.renderPermissionBanner(this.eventsPanelEl, 'reminders');
+            return;
+        }
+
+        // REQ-CACHE-002: Cache miss warning
+        if (!this.isDateInCacheRange(this.selectedDate)) {
+            const missEl = this.eventsPanelEl.createDiv("macos-cache-miss");
+            missEl.createEl("p").textContent = "Selected date is outside the cached range.";
+            const todayBtn = missEl.createEl("button", { cls: "macos-today-btn" });
+            todayBtn.textContent = "← Go to Today";
+            todayBtn.addEventListener("click", () => {
+                this.selectedDate = window.moment();
+                this.render();
+                if (this.calendarComponent) {
+                    this.calendarComponent.$set({ displayedMonth: window.moment() });
+                }
+            });
+            return;
+        }
+
+        // Date header row with refresh button
         const today = window.moment();
         const isToday = this.selectedDate.isSame(today, "day");
-
-        // Date header row with Today button
         const headerRow = this.eventsPanelEl.createDiv("macos-date-header-row");
         const dateLabel = headerRow.createDiv("macos-date-label");
         if (isToday) {
@@ -4637,32 +5163,96 @@ class MacOSIntegration {
             todayBtn.addEventListener("click", () => {
                 this.selectedDate = window.moment();
                 this.render();
-                // Also navigate calendar back to today
                 if (this.calendarComponent) {
                     this.calendarComponent.$set({ displayedMonth: window.moment() });
                 }
             });
         }
+        // REQ-CACHE-006: Manual refresh button
+        const refreshBtn = headerRow.createDiv("macos-refresh-btn");
+        refreshBtn.textContent = "↻";
+        refreshBtn.setAttribute("title", "Refresh calendar data");
+        refreshBtn.addEventListener("click", () => { this.init(); });
+
+        // REQ-PERM-003: Partial permission banner
+        if (showCal && calPerm === 'denied') {
+            this.renderPermissionBanner(this.eventsPanelEl, 'calendar');
+        }
+        if (showRem && remPerm === 'denied') {
+            this.renderPermissionBanner(this.eventsPanelEl, 'reminders');
+        }
+
+        // REQ-ERR-002: Error state with retry
+        if (showCal && (calPerm === 'timeout' || calPerm === 'error')) {
+            this.renderErrorBanner(this.eventsPanelEl, 'calendar');
+        }
+        if (showRem && (remPerm === 'timeout' || remPerm === 'error')) {
+            this.renderErrorBanner(this.eventsPanelEl, 'reminders');
+        }
 
         // Get data from cache
-        const dayEvents = opts.showMacOSCalendar !== false ? this.getEventsForDate(this.selectedDate) : [];
-        const dayReminders = opts.showMacOSReminders !== false ? this.getRemindersForDate(this.selectedDate) : [];
+        var dayEvents = [];
+        var dayReminders = [];
+        if (showCal && calPerm === 'granted') {
+            dayEvents = this.getEventsForDate(this.selectedDate);
+        }
+        if (showRem && remPerm === 'granted') {
+            dayReminders = this.getRemindersForDate(this.selectedDate);
+        }
 
         // Events section
-        if (opts.showMacOSCalendar !== false) {
+        if (showCal && calPerm === 'granted') {
             this.renderEventsSection(this.eventsPanelEl, dayEvents);
         }
         // Reminders section
-        if (opts.showMacOSReminders !== false) {
+        if (showRem && remPerm === 'granted') {
             this.renderRemindersSection(this.eventsPanelEl, dayReminders);
         }
-        // Empty state
+        // REQ-ERR-004: Distinguish empty data from failure states
         if (dayEvents.length === 0 && dayReminders.length === 0) {
-            if (opts.showMacOSCalendar !== false || opts.showMacOSReminders !== false) {
+            var allGranted = (!showCal || calPerm === 'granted') && (!showRem || remPerm === 'granted');
+            if (allGranted) {
                 const emptyEl = this.eventsPanelEl.createDiv("macos-empty");
-                emptyEl.textContent = "No events or reminders";
+                emptyEl.textContent = "No events or reminders for this day";
             }
         }
+
+        // Last refresh time (REQ-CACHE-007)
+        if (this.lastRefreshTime) {
+            var refreshFooter = this.eventsPanelEl.createDiv("macos-refresh-footer");
+            var timeStr = new Date(this.lastRefreshTime).toLocaleTimeString();
+            refreshFooter.textContent = "Last refresh: " + timeStr;
+            if (this.lastRefreshDurationMs) {
+                refreshFooter.textContent += " (" + this.lastRefreshDurationMs + "ms)";
+            }
+        }
+    }
+
+    // REQ-PERM-001, REQ-PERM-002: Actionable permission recovery guidance
+    renderPermissionBanner(parent, source) {
+        const banner = parent.createDiv("macos-permission-banner");
+        banner.createEl("strong").textContent = source === 'calendar' ? "Calendar access denied" :
+            source === 'reminders' ? "Reminders access denied" : "Calendar & Reminders access denied";
+        banner.createEl("p").textContent =
+            "Open System Settings → Privacy & Security → Automation, then enable Obsidian for " +
+            (source === 'both' ? "Calendar and Reminders" :
+             source === 'calendar' ? "Calendar" : "Reminders") + ".";
+        var retryBtn = banner.createEl("button", { cls: "macos-retry-btn" });
+        retryBtn.textContent = "Retry";
+        retryBtn.addEventListener("click", () => { this.init(); });
+    }
+
+    // REQ-ERR-002: Error recovery with retry
+    renderErrorBanner(parent, source) {
+        var lastErr = source === 'calendar' ? this.lastError.calendar : this.lastError.reminders;
+        var banner = parent.createDiv("macos-error-banner");
+        banner.createEl("strong").textContent = (source === 'calendar' ? "Calendar" : "Reminders") + " data unavailable";
+        if (lastErr && lastErr.message) {
+            banner.createEl("p", { cls: "macos-error-detail" }).textContent = lastErr.message;
+        }
+        var retryBtn = banner.createEl("button", { cls: "macos-retry-btn" });
+        retryBtn.textContent = "Retry";
+        retryBtn.addEventListener("click", () => { this.init(); });
     }
 
     // --- Render events section ---
@@ -4690,22 +5280,40 @@ class MacOSIntegration {
 
             // Time column
             const timeEl = itemEl.createDiv("macos-item-time");
-            if (evt.allday) {
+            var isAllDay = evt.isAllDay !== undefined ? evt.isAllDay : evt.allday;
+            if (isAllDay) {
                 timeEl.textContent = "All day";
                 timeEl.addClass("macos-time-allday");
             } else if (evt.start) {
                 timeEl.textContent = this.formatTimeRange(evt.start, evt.end);
             }
 
-            // Title
-            const titleEl = itemEl.createDiv("macos-item-title");
-            titleEl.textContent = evt.summary;
+            // Title + optional details column
+            const detailsCol = itemEl.createDiv("macos-item-details");
+            const titleEl = detailsCol.createDiv("macos-item-title");
+            titleEl.textContent = evt.title || evt.summary || "";
+
+            // Recurrence badge
+            if (evt.isRecurring) {
+                const recEl = detailsCol.createDiv("macos-item-meta");
+                recEl.textContent = "↻ " + (evt.recurrenceSummary || "Recurring");
+                recEl.addClass("macos-meta-recurring");
+            }
+
+            // Location
+            if (evt.location) {
+                const locEl = detailsCol.createDiv("macos-item-meta");
+                locEl.textContent = evt.location;
+                locEl.addClass("macos-meta-location");
+            }
 
             // Calendar badge with color
-            if (evt.calendar) {
-                const badgeEl = itemEl.createDiv("macos-item-badge");
-                badgeEl.textContent = evt.calendar;
-                const color = this.calendarToCSS(this.calendarColors[evt.calendar]);
+            var calName = evt.calendarName || evt.calendar || "";
+            const badgeRow = itemEl.createDiv("macos-item-badges");
+            if (calName) {
+                const badgeEl = badgeRow.createDiv("macos-item-badge");
+                badgeEl.textContent = calName;
+                const color = this.calendarToCSS(this.calendarColors[calName]);
                 if (color) {
                     badgeEl.style.backgroundColor = color;
                     badgeEl.style.color = "#fff";
@@ -4732,7 +5340,22 @@ class MacOSIntegration {
 
             // Checkbox + title
             const titleEl = itemEl.createDiv("macos-item-title");
-            titleEl.textContent = "○ " + rem.name;
+            titleEl.textContent = "○ " + (rem.title || rem.name || "");
+
+            // REQ-REM-008: Priority indicator
+            if (rem.priority && rem.priority !== "none") {
+                const priorityEl = itemEl.createDiv("macos-priority");
+                if (rem.priority === "high") {
+                    priorityEl.textContent = "!!!";
+                    priorityEl.addClass("macos-priority-high");
+                } else if (rem.priority === "medium") {
+                    priorityEl.textContent = "!!";
+                    priorityEl.addClass("macos-priority-medium");
+                } else {
+                    priorityEl.textContent = "!";
+                    priorityEl.addClass("macos-priority-low");
+                }
+            }
 
             // Due time
             if (rem.due) {
@@ -4741,9 +5364,10 @@ class MacOSIntegration {
             }
 
             // List badge
-            if (rem.list) {
+            var listName = rem.listName || rem.list || "";
+            if (listName) {
                 const badgeEl = itemEl.createDiv("macos-item-badge");
-                badgeEl.textContent = rem.list;
+                badgeEl.textContent = listName;
             }
         }
     }
@@ -4773,40 +5397,58 @@ class MacOSIntegration {
     }
 
     // --- Discover available calendars ---
+    // --- Discover available calendars (EventKit helper) ---
     async discoverCalendars() {
-        const script = `
-            var app = Application("Calendar");
-            var cals = app.calendars();
-            var results = [];
-            for (var i = 0; i < cals.length; i++) {
-                var cal = cals[i];
-                results.push(cal.name());
-            }
-            results.join("\\n");
-        `;
         try {
-            const result = await this.execJXA(script);
-            return result.split("\n").filter(Boolean);
+            var raw = await this.execHelper(['calendars']);
+            var calendars = [];
+            for (var i = 0; i < raw.length; i++) {
+                var s = raw[i];
+                var displayName = s.name;
+                if (s.accountName) {
+                    displayName = displayName + " — " + s.accountName;
+                }
+                calendars.push({
+                    name: displayName,
+                    rawName: s.name,
+                    id: s.id,
+                    color: s.color || "",
+                    accountHint: s.accountName,
+                    typeHint: s.type,
+                    source: "macos-calendar"
+                });
+            }
+            this.sourceCounts.calendars = calendars.length;
+            return calendars;
         } catch (err) {
+            console.error("[Calendian] Failed to discover calendars:", err.error?.message || err.stderr);
             return [];
         }
     }
 
-    // --- Discover available reminder lists ---
+    // --- Discover available reminder lists (EventKit helper) ---
     async discoverReminderLists() {
-        const script = `
-            var app = Application("Reminders");
-            var lists = app.lists();
-            var results = [];
-            for (var i = 0; i < lists.length; i++) {
-                results.push(lists[i].name());
-            }
-            results.join("\\n");
-        `;
         try {
-            const result = await this.execJXA(script);
-            return result.split("\n").filter(Boolean);
+            var raw = await this.execHelper(['lists']);
+            var lists = [];
+            for (var i = 0; i < raw.length; i++) {
+                var s = raw[i];
+                var displayName = s.name;
+                if (s.accountName) {
+                    displayName = displayName + " — " + s.accountName;
+                }
+                lists.push({
+                    name: displayName,
+                    rawName: s.name,
+                    id: s.id,
+                    source: "macos-reminders",
+                    color: s.color || ""
+                });
+            }
+            this.sourceCounts.reminderLists = lists.length;
+            return lists;
         } catch (err) {
+            console.error("[Calendian] Failed to discover reminder lists:", err.error?.message || err.stderr);
             return [];
         }
     }
@@ -4814,7 +5456,7 @@ class MacOSIntegration {
     // --- Auto-refresh: reload all data ---
     startAutoRefresh() {
         this.stopAutoRefresh();
-        const intervalMinutes = this.plugin.options?.macOSRefreshInterval || 5;
+        const intervalMinutes = this.plugin.options?.refreshIntervalMinutes || 5;
         const intervalMs = Math.max(1, intervalMinutes) * 60 * 1000;
         this.refreshTimer = setInterval(() => {
             this.init();
@@ -4839,8 +5481,10 @@ class MacOSIntegration {
 }
 
 class CalendarView extends obsidian.ItemView {
-    constructor(leaf) {
+    constructor(leaf, plugin, helperPath) {
         super(leaf);
+        this.calendarPlugin = plugin;
+        this.helperPath = helperPath || null;
         this.openOrCreateDailyNote = this.openOrCreateDailyNote.bind(this);
         this.openOrCreateWeeklyNote = this.openOrCreateWeeklyNote.bind(this);
         this.onNoteSettingsUpdate = this.onNoteSettingsUpdate.bind(this);
@@ -4862,18 +5506,36 @@ class CalendarView extends obsidian.ItemView {
         this.settings = null;
         this.macosIntegration = null;
         this.macosWrappedOnClickDay = null;
+        this.options = get_store_value(settings); // Initial value before subscribe fires
         settings.subscribe((val) => {
+            this.options = val;
             this.settings = val;
-            // Refresh the calendar if settings change
+            // Refresh the calendar dots if settings change
             if (this.calendar) {
                 this.calendar.tick();
             }
-            // Restart macOS integration with new settings
-            if (this.macosIntegration) {
-                this.macosIntegration.startAutoRefresh();
-            }
         });
     }
+    // --- Persistent disk cache helpers (stored inside data.json) ---
+    async writeCacheFile(key, data) {
+        try {
+            var allData = (await this.calendarPlugin.loadData()) || {};
+            allData[key] = data;
+            await this.calendarPlugin.saveData(allData);
+        } catch (e) {
+            console.warn("[Calendian] Failed to write cache:", e.message);
+        }
+    }
+    async readCacheFile(key) {
+        try {
+            var allData = (await this.calendarPlugin.loadData()) || {};
+            return allData[key] || null;
+        } catch (e) {
+            console.warn("[Calendian] Failed to read cache:", e.message);
+        }
+        return null;
+    }
+
     getViewType() {
         return VIEW_TYPE_CALENDAR;
     }
@@ -5094,10 +5756,33 @@ class CalendarPlugin extends obsidian.Plugin {
             });
     }
     async onload() {
+        // REQ-PLAT-004: Graceful unsupported-platform handling
+        if (!isMacOS()) {
+            new obsidian.Notice(
+                "Calendian requires macOS. This plugin reads from macOS Calendar.app and Reminders.app and cannot run on other platforms.",
+                10000
+            );
+            console.warn("[Calendian] Unsupported platform detected. Plugin disabled.");
+            return;
+        }
+
         this.register(settings.subscribe((value) => {
             this.options = value;
         }));
-        this.registerView(VIEW_TYPE_CALENDAR, (leaf) => (this.view = new CalendarView(leaf)));
+        // Pass helper path to view — try multiple approaches
+        var helperPath = null;
+        var vaultBase = '';
+        try { vaultBase = this.app.vault.adapter.getBasePath(); } catch(e) {}
+        try { if (!vaultBase) vaultBase = this.app.vault.adapter.basePath; } catch(e) {}
+        console.log("[Calendian] vaultBase=" + vaultBase);
+
+        if (vaultBase) {
+            helperPath = nodePath.join(vaultBase, '.obsidian', 'plugins', 'calendar-macos-sync', 'calendian-helper');
+            console.log("[Calendian] Trying helperPath=" + helperPath);
+            try { if (!nodeFS.existsSync(helperPath)) helperPath = null; } catch(e) {}
+        }
+        console.log("[Calendian] Helper path: " + (helperPath || "NOT FOUND"));
+        this.registerView(VIEW_TYPE_CALENDAR, (leaf) => (this.view = new CalendarView(leaf, this, helperPath)));
         this.addCommand({
             id: "show-calendar-view",
             name: "Open view",
@@ -5142,6 +5827,29 @@ class CalendarPlugin extends obsidian.Plugin {
     }
     async loadOptions() {
         const options = await this.loadData();
+        // v0.1: Migrate old setting names to new schema
+        if (options) {
+            if (options.showMacOSCalendar !== undefined && options.enableCalendar === undefined) {
+                options.enableCalendar = options.showMacOSCalendar;
+                delete options.showMacOSCalendar;
+            }
+            if (options.showMacOSReminders !== undefined && options.enableReminders === undefined) {
+                options.enableReminders = options.showMacOSReminders;
+                delete options.showMacOSReminders;
+            }
+            if (options.macOSCalendarNames !== undefined && options.selectedCalendarIds === undefined) {
+                options.selectedCalendarIds = options.macOSCalendarNames;
+                delete options.macOSCalendarNames;
+            }
+            if (options.macOSReminderListNames !== undefined && options.selectedReminderListIds === undefined) {
+                options.selectedReminderListIds = options.macOSReminderListNames;
+                delete options.macOSReminderListNames;
+            }
+            if (options.macOSRefreshInterval !== undefined && options.refreshIntervalMinutes === undefined) {
+                options.refreshIntervalMinutes = options.macOSRefreshInterval;
+                delete options.macOSRefreshInterval;
+            }
+        }
         settings.update((old) => {
             return Object.assign(Object.assign({}, old), (options || {}));
         });
