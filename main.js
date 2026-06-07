@@ -8,7 +8,7 @@ var obsidian__default = /*#__PURE__*/_interopDefaultLegacy(obsidian);
 
 const DEFAULT_WEEK_FORMAT = "gggg-[W]ww";
 const DEFAULT_WORDS_PER_DOT = 250;
-const VIEW_TYPE_CALENDAR = "calendar-macos-sync";
+const VIEW_TYPE_CALENDAR = "calendian";
 const TRIGGER_ON_OPEN = "calendar:open";
 
 const DEFAULT_DAILY_NOTE_FORMAT = "YYYY-MM-DD";
@@ -830,11 +830,52 @@ class CalendarSettingsTab extends obsidian.PluginSettingTab {
             "Settings are stored locally in your Obsidian vault under .obsidian/plugins/calendian/data.json. No account credentials are stored by this plugin.";
     }
 
-    // REQ-DIAG-001: Basic diagnostic info without exposing private content
+    // REQ-DIAG-001: Diagnostic panel — safe, non-private info only
     addDiagnosticInfo() {
         const diagDiv = this.containerEl.createDiv("macos-diagnostics-section");
-        diagDiv.createEl("p", { cls: "setting-item-description" }).textContent =
-            "Diagnostic information is available in the calendar panel footer (refresh time, source counts). Detailed diagnostics are added in a future version and will redact private event/reminder content by default.";
+
+        const integ = this.plugin.view && this.plugin.view.macosIntegration;
+        const manifest = this.plugin.manifest || {};
+        const osModule = require("os");
+
+        const permLabel = function(state) {
+            if (state === 'granted') return '✓ granted';
+            if (state === 'denied') return '✗ denied';
+            if (state === 'timeout') return '⚠ timeout';
+            if (state === 'error') return '⚠ error';
+            return '? unknown';
+        };
+        const errorLabel = function(err) {
+            if (!err) return '—';
+            return err.type + ': ' + (err.message || '').substring(0, 80) + ' (' + err.timestamp + ')';
+        };
+        const fmtDate = function(m) {
+            return m ? m.format('YYYY-MM-DD') : '—';
+        };
+
+        const lines = [
+            'Plugin: ' + (manifest.name || 'Calendian') + ' v' + (manifest.version || '?'),
+            'Platform: ' + osModule.platform() + ' (' + osModule.type() + ')',
+            'Helper binary: ' + (integ && integ.helperPath ? '✓ found' : '✗ not found'),
+            'Calendar permission: ' + permLabel(integ ? integ.permissionState.calendar : 'unknown'),
+            'Reminders permission: ' + permLabel(integ ? integ.permissionState.reminders : 'unknown'),
+            'Calendars discovered: ' + (integ ? integ.sourceCounts.calendars : 0),
+            'Reminder lists discovered: ' + (integ ? integ.sourceCounts.reminderLists : 0),
+            'Events in cache: ' + (integ ? integ.allEvents.length : 0),
+            'Reminders in cache: ' + (integ ? integ.allReminders.length : 0),
+            'Cache range: ' + (integ ? fmtDate(integ.cacheStart) + ' → ' + fmtDate(integ.cacheEnd) : '—'),
+            'Last refresh: ' + (integ && integ.lastRefreshTime
+                ? integ.lastRefreshTime + ' (' + (integ.lastRefreshDurationMs != null ? integ.lastRefreshDurationMs + 'ms' : '?') + ')'
+                : 'never'),
+            'Last error (calendar): ' + (integ ? errorLabel(integ.lastError.calendar) : '—'),
+            'Last error (reminders): ' + (integ ? errorLabel(integ.lastError.reminders) : '—'),
+        ];
+
+        const pre = diagDiv.createEl("pre", {
+            cls: "setting-item-description",
+            attr: { style: "font-size:11px; line-height:1.5; padding:8px; background:var(--background-secondary); border-radius:4px; overflow-x:auto; white-space:pre-wrap;" }
+        });
+        pre.textContent = lines.join('\n');
     }
     addDotThresholdSetting() {
         new obsidian.Setting(this.containerEl)
@@ -4600,7 +4641,7 @@ class MacOSIntegration {
     isCacheFresh() {
         if (!this._cacheSavedAt) return false;
         // If JXA is already running, consider cache "fresh enough" — don't stack calls
-        if (this._jxaRunning) return true;
+        if (this._refreshRunning) return true;
         try {
             var savedTime = new Date(this._cacheSavedAt).getTime();
             var ageMs = Date.now() - savedTime;
@@ -5004,8 +5045,8 @@ class MacOSIntegration {
 
     // Background sync without blocking the UI
     async initBackground(initStart) {
-        if (this._jxaRunning) { console.log("[Calendian] initBackground skipped (JXA already running)"); return; }
-        this._jxaRunning = true;
+        if (this._refreshRunning) { console.log("[Calendian] initBackground skipped (refresh already running)"); return; }
+        this._refreshRunning = true;
         const opts = this.plugin.options || {};
         const promises = [];
         if (opts.enableCalendar !== false) promises.push(this.preloadAll());
@@ -5014,7 +5055,7 @@ class MacOSIntegration {
             await Promise.allSettled(promises);
         }
         console.log("[Calendian] Background sync done in " + (Date.now() - initStart) + "ms. cal=" + this.permissionState.calendar + " rem=" + this.permissionState.reminders);
-        this._jxaRunning = false;
+        this._refreshRunning = false;
         this.lastRefreshTime = new Date().toISOString();
         this.lastRefreshDurationMs = Date.now() - initStart;
         this.render();
@@ -5022,8 +5063,8 @@ class MacOSIntegration {
 
     // Refresh from JXA in background (used when cache already shown)
     async refreshInBackground() {
-        if (this._jxaRunning) { console.log("[Calendian] Background refresh skipped (JXA already running)"); return; }
-        this._jxaRunning = true;
+        if (this._refreshRunning) { console.log("[Calendian] Background refresh skipped (refresh already running)"); return; }
+        this._refreshRunning = true;
         var start = Date.now();
         console.log("[Calendian] Background refresh from macOS...");
         const opts = this.plugin.options || {};
@@ -5034,7 +5075,7 @@ class MacOSIntegration {
             await Promise.allSettled(promises);
         }
         console.log("[Calendian] Background refresh done in " + (Date.now() - start) + "ms. cal=" + this.permissionState.calendar + " rem=" + this.permissionState.reminders);
-        this._jxaRunning = false;
+        this._refreshRunning = false;
         this.lastRefreshTime = new Date().toISOString();
         this.lastRefreshDurationMs = Date.now() - start;
         this.render();
@@ -5777,7 +5818,7 @@ class CalendarPlugin extends obsidian.Plugin {
         console.log("[Calendian] vaultBase=" + vaultBase);
 
         if (vaultBase) {
-            helperPath = nodePath.join(vaultBase, '.obsidian', 'plugins', 'calendar-macos-sync', 'calendian-helper');
+            helperPath = nodePath.join(vaultBase, '.obsidian', 'plugins', 'calendian', 'calendian-helper');
             console.log("[Calendian] Trying helperPath=" + helperPath);
             try { if (!nodeFS.existsSync(helperPath)) helperPath = null; } catch(e) {}
         }
