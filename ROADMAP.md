@@ -1,13 +1,13 @@
 # Calendian Requirement-Driven Roadmap
 
 > Status: roadmap derived from `SPEC.md` requirements  
-> Last updated: 2026-06-07  
+> Last updated: 2026-06-08  
 > Plugin ID: `calendian`  
 > Process: Specification-Driven Development
 
 This roadmap is not an independent wish list. Every release is derived from requirement groups in [`SPEC.md`](./SPEC.md), acceptance gates in [`docs/sdd/ACCEPTANCE.md`](./docs/sdd/ACCEPTANCE.md), tasks in [`docs/sdd/TASKS.md`](./docs/sdd/TASKS.md), and risks in [`docs/sdd/RISKS.md`](./docs/sdd/RISKS.md).
 
-Current repository status: **pre-v0.1 / read-only MVP partial**.
+Current repository status: **v0.1 read-only MVP — mostly complete**.
 
 ---
 
@@ -26,8 +26,8 @@ Current repository status: **pre-v0.1 / read-only MVP partial**.
 
 | Version | Theme | Requirement groups | Release posture |
 |---|---|---|---|
-| v0.1 | Read-only MVP | `REQ-PLAT-*`, `REQ-PERM-*`, `REQ-CAL-001..006`, `REQ-REM-001..004`, `REQ-SRC-001..004`, `REQ-CACHE-001..005`, `REQ-UX-001..004`, `REQ-PRIV-*`, `REQ-ERR-001..004` | Next target |
-| v0.2 | Read-only polish | event details, overdue/no-date reminders, multi-day events, diagnostics, manual refresh | Planned |
+| v0.1 | Read-only MVP | `REQ-PLAT-*`, `REQ-PERM-*`, `REQ-CAL-001..007`, `REQ-REM-001..004,008`, `REQ-SRC-001..005`, `REQ-CACHE-001..008`, `REQ-UX-001..004`, `REQ-PRIV-*`, `REQ-ERR-001..004`, `REQ-DIAG-001`, `REQ-DATA-*` | Mostly complete |
+| v0.2 | Read-only polish | expandable details, overdue/no-date reminders, multi-day events, month-cell dots, full diagnostic panel | Planned |
 | v0.3 | Safe create | simple event/reminder creation, natural language parsing, validation, write verification | Planned |
 | v0.4 | Safe edit/delete | simple event/reminder edit/delete, reminder completion, recurring safety | Planned |
 | v0.5 | Note association & notifications | frontmatter association, meeting notes, templates, in-app notifications, limited Tasks integration | Planned |
@@ -47,27 +47,33 @@ A macOS Obsidian user can open Calendian, grant permissions, select a date, and 
 
 - Platform: `REQ-PLAT-001` to `REQ-PLAT-004`
 - Permissions: `REQ-PERM-001` to `REQ-PERM-004`
-- Calendar read: `REQ-CAL-001` to `REQ-CAL-006`
-- Reminder read: `REQ-REM-001` to `REQ-REM-004`
-- Source selection: `REQ-SRC-001` to `REQ-SRC-004`
-- Cache/performance: `REQ-CACHE-001` to `REQ-CACHE-005`, `REQ-PERF-001`, `REQ-PERF-002`, `REQ-PERF-004`
+- Calendar read: `REQ-CAL-001` to `REQ-CAL-007`
+- Reminder read: `REQ-REM-001` to `REQ-REM-004`, `REQ-REM-008`
+- Source selection: `REQ-SRC-001` to `REQ-SRC-005`
+- Cache/performance: `REQ-CACHE-001` to `REQ-CACHE-008`, `REQ-PERF-002`, `REQ-PERF-004`
 - UX: `REQ-UX-001` to `REQ-UX-004`
 - Privacy/error handling: `REQ-PRIV-001` to `REQ-PRIV-002`, `REQ-ERR-001` to `REQ-ERR-004`
+- Diagnostics: `REQ-DIAG-001` (partial)
 - Documentation: `REQ-DOC-001` to `REQ-DOC-003`
 
 ### Deliverables
 
-- Plugin metadata aligned across manifest and docs.
+- Plugin metadata aligned across manifest and docs (`REQ-PLAT-003` — partial).
 - macOS-only support clearly documented.
-- Calendar read integration hardened for basic event fields.
-- Reminders read integration hardened for basic reminder fields.
-- Selected-date sidebar panel.
-- Single-click date selection.
-- Cmd/Ctrl-click daily-note behavior preserved.
-- Source discovery and basic filtering.
-- Bounded cache and configurable refresh.
-- Permission/empty/error states.
-- README corrected to avoid planned-feature overclaiming.
+- Calendar read integration via native EventKit helper (fast, stable UUIDs).
+- Reminders read integration via native EventKit helper.
+- Selected-date sidebar panel with event/reminder display.
+- Single-click date selection; Cmd/Ctrl-click daily-note behavior preserved.
+- Event display: title, time, calendar badge (colored), location, recurrence indicator.
+- Reminder display: title, due time, list badge, priority indicator.
+- Source discovery with account name disambiguation and empty/error states.
+- Source filtering by stable UUID with instant in-memory apply.
+- Bounded cache (±6 months) with disk persistence and configurable refresh.
+- Two-phase init: cache-first instant render, stale background refresh.
+- Manual refresh button and last refresh time footer.
+- Permission denied / error / timeout / empty / cache-miss UI states.
+- Independent Calendar/Reminders permission/error tracking with retry.
+- Privacy declaration in settings tab.
 
 ### Release gates
 
@@ -91,24 +97,23 @@ Make the read-only experience reliable enough for daily use across common event/
 
 ### Required requirements
 
-- Event details and edge cases: `REQ-CAL-007` to `REQ-CAL-012`
-- Reminder polish: `REQ-REM-005` to `REQ-REM-009`
-- Cache/diagnostics: `REQ-CACHE-006` to `REQ-CACHE-008`, `REQ-DIAG-001` to `REQ-DIAG-002`
+- Event details: `REQ-CAL-008` to `REQ-CAL-012` (expandable panel, multi-day events, past events, recurring read-only)
+- Reminder polish: `REQ-REM-005` to `REQ-REM-007`, `REQ-REM-009` (overdue styling, no-date section, display range, subtasks)
+- Cache/diagnostics: `REQ-DIAG-001` (full panel), `REQ-DIAG-002`
 - UX polish: `REQ-UX-006`, `REQ-UX-010`
 - Error hardening: `REQ-ERR-003`
 
 ### Deliverables
 
-- Expandable event details.
-- Location, URL, notes, and recurrence summary display where available.
+- Expandable event details panel.
+- Event URL, notes, and attendees display in details panel.
 - Overdue reminder styling.
 - No-date reminder section.
 - Reminder display range selector.
 - Past event treatment.
 - Multi-day event overlap display.
 - Month-cell event dots.
-- Manual refresh.
-- Diagnostic panel with redaction.
+- Full diagnostic panel with permission status, source counts, timing.
 - Large-calendar behavior reviewed.
 
 ### Explicit exclusions

@@ -1,8 +1,8 @@
 # Calendian Specification
 
 > Status: authoritative product specification  
-> Version target: pre-v0.1 / read-only MVP  
-> Last updated: 2026-06-07  
+> Version target: v0.1 / read-only MVP  
+> Last updated: 2026-06-08  
 > Plugin ID: `calendian`  
 > Process: Specification-Driven Development (SDD)
 
@@ -48,75 +48,95 @@ Primary goals:
 
 ### 1.3 Current release posture
 
-The current repository must be treated as **pre-v0.1 / read-only MVP in progress**. Feature claims in README and release notes must match `docs/sdd/CURRENT_STATUS.md`.
+The current repository must be treated as **v0.1 / read-only MVP mostly complete**. Feature claims in README and release notes must match `docs/sdd/CURRENT_STATUS.md`.
 
 ---
 
 ## 2. Current implementation status
 
-### 2.1 Implemented (v0.1 partial)
+### 2.1 Implemented (v0.1)
 
-The following features are currently implemented in the codebase:
+The following features are currently implemented in the codebase. All macOS data access goes through a native Swift EventKit helper binary (`calendian-helper`, source at `helper/Sources/main.swift`). A legacy JXA path (`execJXA`) remains in code but is no longer the primary data channel.
+
+#### Data channel
+- ✅ Native Swift EventKit helper (`calendian-helper`) — sub-100ms reads via `EKEventStore`
+- ✅ Helper supports 8 commands: `calendars`, `lists`, `events`, `reminders`, `permissions`, `request-events`, `request-reminders`, `toggle-reminder`
+- ✅ Legacy JXA path (`execJXA`) retained but unused by primary data flows
 
 #### Platform and permissions
-- ✅ Obsidian desktop plugin shell
-- ✅ macOS-only detection (isMacOS check)
-- ✅ Desktop-only enforcement in manifest
-- ⚠️ Permission error detection (basic, UI recovery needs improvement)
+- ✅ Obsidian desktop plugin shell (`manifest.json` isDesktopOnly)
+- ✅ macOS-only detection (`isMacOS()` check) with graceful non-macOS message
+- ✅ Independent Calendar/Reminders permission states (`permissionState.calendar`, `.reminders`) with recovery UI and retry
+- ✅ Partial permission support (show available data + banner for denied source)
+- ✅ Error classification: `permission_denied`, `timeout`, `error`
 
 #### Calendar reading
-- ✅ JXA-based Calendar.app event reading
-- ✅ Event title, start time, end time parsing
-- ✅ All-day event detection and handling
-- ✅ Event sorting (all-day first, then by time)
-- ✅ Calendar source discovery (discoverCalendars)
-- ✅ Calendar color extraction and display
-- ⚠️ Stable event identity (needs verification across account types)
-- ❌ Event location, URL, notes, attendees, recurrence details
+- ✅ Event title, start/end time, calendar name, account name
+- ✅ All-day event detection and display (all-day first, then timed)
+- ✅ Event sorting (all-day first, then by start time)
+- ✅ Calendar source discovery with UUID, account name, color
+- ✅ Stable event identity (`EKEvent.eventIdentifier`, UUID-based)
+- ✅ Event location and recurrence summary displayed in UI
+- ✅ URL, notes, attendees parsed from helper (stored in model, UI display partial)
+- ✅ Calendar color from EventKit `cgColor`
+- ✅ Ongoing/starting-soon visual highlighting
 
 #### Reminders reading
-- ✅ JXA-based Reminders.app reading
-- ✅ Reminder title and due date parsing
-- ✅ Reminder list source discovery (discoverReminderLists)
+- ✅ Reminder title, due date/time, list name, account name
+- ✅ Reminder list source discovery with UUID, account name
 - ✅ Completed reminder filtering (hide by default)
-- ✅ No-date reminder handling (shows on today)
-- ⚠️ Stable reminder identity (needs verification)
-- ❌ Reminder priority, subtasks display
+- ✅ Reminder priority display (high/medium/low/none as `!!!`/`!!`/`!`)
+- ✅ Stable reminder identity (`EKReminder.calendarItemIdentifier`)
 
 #### Cache and performance
-- ✅ ±6 month preload cache
-- ✅ Configurable auto-refresh interval (default 5 minutes)
-- ✅ Cache start/end tracking
-- ✅ Timer cleanup on unload
-- ⚠️ Cache miss behavior not explicitly defined
-- ⚠️ Large calendar performance not tested
+- ✅ ±6 month preload via EventKit date predicate
+- ✅ Disk cache in `data.json` (`_eventsCache`, `_remindersCache`) for instant cold start
+- ✅ Cache freshness check (2× refresh interval, minimum 15 minutes)
+- ✅ Two-phase init: cache-first render, background refresh only when stale
+- ✅ Configurable auto-refresh (default 5 minutes)
+- ✅ Manual refresh button (`↻`) in date header
+- ✅ Last refresh time + duration in panel footer
+- ✅ Anti-concurrent guard (`_jxaRunning`) prevents stacked queries
+- ✅ Timer cleanup on plugin unload
 
 #### Source filtering
-- ✅ Calendar source toggle (enable/disable individual calendars)
-- ✅ Reminder list source toggle
+- ✅ Calendar source toggle by stable UUID (EventKit `calendarIdentifier`)
+- ✅ Reminder list source toggle by stable UUID
+- ✅ In-memory instant filter apply (no reload needed)
+- ✅ Account name disambiguation ("日历 — iCloud", "日历 — outlook@email.com")
 - ✅ Empty selection = show all
-- ⚠️ Duplicate name handling (needs improvement)
 
 #### User interface
-- ✅ Date selection (click to select, shows events/reminders)
-- ✅ Cmd/Ctrl-click for daily note creation (preserved from base plugin)
-- ✅ Events panel display (title, time, calendar badge)
-- ✅ Reminders panel display (title, due date, list badge)
-- ⚠️ Loading state (basic, could be improved)
-- ⚠️ Empty state (basic, could be improved)
-- ⚠️ Error state (basic, could be improved)
-- ❌ Permission denied UI recovery
-- ❌ Diagnostic panel
-- ❌ Manual refresh button
+- ✅ Date selection (click selects, shows events/reminders from cache)
+- ✅ Cmd/Ctrl-click preserves daily-note open/create behavior
+- ✅ Events panel: title, time range, calendar badge (colored), location, recurrence indicator
+- ✅ Reminders panel: title, due time, list badge, priority indicator
+- ✅ UI states: loading, empty, error, permission-denied, partial-permission, cache-miss
+- ✅ Refresh footer with last refresh time and duration
+- 🟡 Basic diagnostic info in settings tab; full diagnostic panel deferred to v0.2
 
-### 2.2 Partial Implementation Notes
+### 2.2 Partial and known gaps for v0.1
 
 **What "Partial" means for v0.1**:
-- Core reading functionality works for basic event/reminder fields
-- UI states exist but lack polish and edge-case handling
-- Error detection exists but recovery UX needs work
-- Performance is acceptable for typical users but not benchmarked
-- Stability features needed for write operations are not yet implemented
+- Event URL, notes, and attendees are parsed from the helper but not exposed in the event list UI (REQ-CAL-007)
+- Cache range miss triggers a "Go to Today" prompt rather than automatic background reload (REQ-CACHE-002)
+- Diagnostic panel exists as basic text in settings; full panel deferred to v0.2 (REQ-DIAG-001)
+- Refresh duration is logged but not in a dedicated diagnostics view (REQ-CACHE-008)
+- PLAT-001/002/003 — metadata alignment between manifest, README, and SPEC needs final verification
+- DOC-001/002/003 — documentation has been updated for v0.1 but may need post-review polish
+- No automated tests; all testing is manual (see `docs/sdd/TESTING.md`)
+- Performance targets (cache switch <100ms, init <3s) have not been benchmarked
+
+**Explicitly not yet done (v0.2+)**:
+- Expandable event detail panel (REQ-CAL-008)
+- Multi-day event display on overlapping days (REQ-CAL-009)
+- Past event gray-out/hide (REQ-CAL-010)
+- Overdue reminder styling (REQ-REM-005)
+- No-date reminder section (REQ-REM-006)
+- Reminder display range selector (REQ-REM-007)
+- Month cell event dots (REQ-UX-006)
+- Full diagnostic panel with permission/source/error overview (REQ-DIAG-001 full)
+- Code split into multiple JS modules (REQ-ARCH-001, target v0.3)
 
 ---
 
@@ -401,32 +421,32 @@ Goal, habit, intention, nudge, and review data SHALL reside exclusively in Obsid
 
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
-| REQ-PLAT-001 | THE SYSTEM SHALL run as an Obsidian desktop plugin. | P0 | v0.1 | Partial |
-| REQ-PLAT-002 | THE SYSTEM SHALL clearly communicate macOS-only support for early releases. | P0 | v0.1 | Partial |
-| REQ-PLAT-003 | THE SYSTEM SHALL keep manifest metadata consistent with documentation. | P0 | v0.1 | Planned |
-| REQ-PLAT-004 | IF the platform is unsupported, THE SYSTEM SHALL show an unsupported-platform message instead of crashing. | P0 | v0.1 | Planned |
+| REQ-PLAT-001 | THE SYSTEM SHALL run as an Obsidian desktop plugin. | P0 | v0.1 | Implemented |
+| REQ-PLAT-002 | THE SYSTEM SHALL clearly communicate macOS-only support for early releases. | P0 | v0.1 | Implemented |
+| REQ-PLAT-003 | THE SYSTEM SHALL keep manifest metadata consistent with documentation. | P0 | v0.1 | Partial |
+| REQ-PLAT-004 | IF the platform is unsupported, THE SYSTEM SHALL show an unsupported-platform message instead of crashing. | P0 | v0.1 | Implemented |
 
 ### 7.2 Permission requirements
 
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
-| REQ-PERM-001 | WHEN Calendar permission is unavailable or denied, THE SYSTEM SHALL show actionable recovery guidance. | P0 | v0.1 | Partial |
-| REQ-PERM-002 | WHEN Reminders permission is unavailable or denied, THE SYSTEM SHALL show actionable recovery guidance. | P0 | v0.1 | Planned |
-| REQ-PERM-003 | WHILE only one source is permitted, THE SYSTEM SHALL continue showing available data from the permitted source. | P0 | v0.1 | Planned |
-| REQ-PERM-004 | THE SYSTEM SHALL distinguish permission failure from empty calendar/reminder data. | P0 | v0.1 | Planned |
+| REQ-PERM-001 | WHEN Calendar permission is unavailable or denied, THE SYSTEM SHALL show actionable recovery guidance. | P0 | v0.1 | Implemented |
+| REQ-PERM-002 | WHEN Reminders permission is unavailable or denied, THE SYSTEM SHALL show actionable recovery guidance. | P0 | v0.1 | Implemented |
+| REQ-PERM-003 | WHILE only one source is permitted, THE SYSTEM SHALL continue showing available data from the permitted source. | P0 | v0.1 | Implemented |
+| REQ-PERM-004 | THE SYSTEM SHALL distinguish permission failure from empty calendar/reminder data. | P0 | v0.1 | Implemented |
 | REQ-PERM-005 | THE SYSTEM SHALL provide a retry or refresh path after permission changes. | P1 | v0.2 | Planned |
 
 ### 7.3 Calendar read requirements
 
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
-| REQ-CAL-001 | THE SYSTEM SHALL read events from macOS Calendar.app through local automation. | P0 | v0.1 | Partial |
-| REQ-CAL-002 | THE SYSTEM SHALL display events for the selected date. | P0 | v0.1 | Partial |
-| REQ-CAL-003 | THE SYSTEM SHALL display event title, start time, end time where available, and calendar name. | P0 | v0.1 | Partial |
-| REQ-CAL-004 | THE SYSTEM SHALL display all-day events separately or before timed events. | P0 | v0.1 | Partial |
-| REQ-CAL-005 | THE SYSTEM SHALL sort events by all-day status and start time. | P0 | v0.1 | Partial |
-| REQ-CAL-006 | THE SYSTEM SHALL visually indicate ongoing and soon-starting events. | P1 | v0.1 | Partial |
-| REQ-CAL-007 | THE SYSTEM SHALL display event location, link, notes, calendar source, and recurrence summary where available. | P1 | v0.2 | Planned |
+| REQ-CAL-001 | THE SYSTEM SHALL read events from macOS Calendar.app through EventKit helper. | P0 | v0.1 | Implemented |
+| REQ-CAL-002 | THE SYSTEM SHALL display events for the selected date. | P0 | v0.1 | Implemented |
+| REQ-CAL-003 | THE SYSTEM SHALL display event title, start time, end time where available, and calendar name. | P0 | v0.1 | Implemented |
+| REQ-CAL-004 | THE SYSTEM SHALL display all-day events separately or before timed events. | P0 | v0.1 | Implemented |
+| REQ-CAL-005 | THE SYSTEM SHALL sort events by all-day status and start time. | P0 | v0.1 | Implemented |
+| REQ-CAL-006 | THE SYSTEM SHALL visually indicate ongoing and soon-starting events. | P1 | v0.1 | Implemented |
+| REQ-CAL-007 | THE SYSTEM SHALL display event location, link, notes, calendar source, and recurrence summary where available. | P1 | v0.1 | Partial |
 | REQ-CAL-008 | THE SYSTEM SHALL support an expandable event detail state. | P1 | v0.2 | Planned |
 | REQ-CAL-009 | THE SYSTEM SHALL display multi-day events on every overlapping day. | P1 | v0.2 | Planned |
 | REQ-CAL-010 | THE SYSTEM SHALL visibly mark past events or hide them according to user settings. | P1 | v0.2 | Planned |
@@ -437,26 +457,26 @@ Goal, habit, intention, nudge, and review data SHALL reside exclusively in Obsid
 
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
-| REQ-REM-001 | THE SYSTEM SHALL read incomplete reminders from macOS Reminders.app through local automation. | P0 | v0.1 | Partial |
-| REQ-REM-002 | THE SYSTEM SHALL display reminders due on the selected date. | P0 | v0.1 | Partial |
-| REQ-REM-003 | THE SYSTEM SHALL display reminder title and reminder list. | P0 | v0.1 | Partial |
-| REQ-REM-004 | THE SYSTEM SHALL hide completed reminders by default. | P0 | v0.1 | Partial |
+| REQ-REM-001 | THE SYSTEM SHALL read incomplete reminders from macOS Reminders.app through EventKit helper. | P0 | v0.1 | Implemented |
+| REQ-REM-002 | THE SYSTEM SHALL display reminders due on the selected date. | P0 | v0.1 | Implemented |
+| REQ-REM-003 | THE SYSTEM SHALL display reminder title and reminder list. | P0 | v0.1 | Implemented |
+| REQ-REM-004 | THE SYSTEM SHALL hide completed reminders by default. | P0 | v0.1 | Implemented |
 | REQ-REM-005 | THE SYSTEM SHALL visually distinguish overdue reminders. | P1 | v0.2 | Planned |
 | REQ-REM-006 | THE SYSTEM SHALL display no-date reminders in a separate configurable section. | P1 | v0.2 | Planned |
 | REQ-REM-007 | THE SYSTEM SHALL support display ranges: selected day, next 7 days, all incomplete. | P1 | v0.2 | Planned |
-| REQ-REM-008 | THE SYSTEM SHOULD display reminder priority where available. | P2 | v0.2 | Planned |
+| REQ-REM-008 | THE SYSTEM SHOULD display reminder priority where available. | P2 | v0.1 | Implemented |
 | REQ-REM-009 | THE SYSTEM SHOULD display reminder subtasks where available. | P2 | v0.2 | Planned |
 
 ### 7.5 Source selection requirements
 
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
-| REQ-SRC-001 | THE SYSTEM SHALL discover available macOS calendars. | P0 | v0.1 | Partial |
-| REQ-SRC-002 | THE SYSTEM SHALL discover available macOS reminder lists. | P0 | v0.1 | Partial |
-| REQ-SRC-003 | THE SYSTEM SHALL let users include or exclude individual calendars. | P0 | v0.1 | Partial |
-| REQ-SRC-004 | THE SYSTEM SHALL let users include or exclude individual reminder lists. | P0 | v0.1 | Partial |
-| REQ-SRC-005 | THE SYSTEM SHALL handle duplicate source names safely. | P1 | v0.2 | Planned |
-| REQ-SRC-006 | THE SYSTEM SHALL show source discovery empty/error states. | P1 | v0.2 | Planned |
+| REQ-SRC-001 | THE SYSTEM SHALL discover available macOS calendars. | P0 | v0.1 | Implemented |
+| REQ-SRC-002 | THE SYSTEM SHALL discover available macOS reminder lists. | P0 | v0.1 | Implemented |
+| REQ-SRC-003 | THE SYSTEM SHALL let users include or exclude individual calendars. | P0 | v0.1 | Implemented |
+| REQ-SRC-004 | THE SYSTEM SHALL let users include or exclude individual reminder lists. | P0 | v0.1 | Implemented |
+| REQ-SRC-005 | THE SYSTEM SHALL handle duplicate source names safely. | P1 | v0.1 | Implemented |
+| REQ-SRC-006 | THE SYSTEM SHALL show source discovery empty/error states. | P1 | v0.1 | Partial |
 
 ### 7.6 Cache and performance requirements
 
@@ -487,26 +507,26 @@ Goal, habit, intention, nudge, and review data SHALL reside exclusively in Obsid
 
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
-| REQ-CACHE-001 | THE SYSTEM SHALL preload a bounded date range for fast date switching. | P0 | v0.1 | Partial |
-| REQ-CACHE-002 | THE SYSTEM SHALL define behavior when users select dates outside the cached range. | P0 | v0.1 | Planned |
-| REQ-CACHE-003 | THE SYSTEM SHALL refresh source data on a configurable interval. | P0 | v0.1 | Partial |
-| REQ-CACHE-004 | WHILE refreshing, THE SYSTEM SHALL avoid falsely showing an empty state before refresh completes. | P0 | v0.1 | Planned |
-| REQ-CACHE-005 | THE SYSTEM SHALL clear refresh timers when the plugin unloads. | P0 | v0.1 | Partial |
-| REQ-CACHE-006 | THE SYSTEM SHOULD provide manual refresh. | P1 | v0.2 | Planned |
-| REQ-CACHE-007 | THE SYSTEM SHOULD display last refresh time. | P1 | v0.2 | Planned |
-| REQ-CACHE-008 | THE SYSTEM SHOULD measure refresh duration for diagnostics. | P2 | v0.2 | Planned |
+| REQ-CACHE-001 | THE SYSTEM SHALL preload a bounded date range for fast date switching. | P0 | v0.1 | Implemented |
+| REQ-CACHE-002 | THE SYSTEM SHALL define behavior when users select dates outside the cached range. | P0 | v0.1 | Implemented |
+| REQ-CACHE-003 | THE SYSTEM SHALL refresh source data on a configurable interval. | P0 | v0.1 | Implemented |
+| REQ-CACHE-004 | WHILE refreshing, THE SYSTEM SHALL avoid falsely showing an empty state before refresh completes. | P0 | v0.1 | Implemented |
+| REQ-CACHE-005 | THE SYSTEM SHALL clear refresh timers when the plugin unloads. | P0 | v0.1 | Implemented |
+| REQ-CACHE-006 | THE SYSTEM SHOULD provide manual refresh. | P1 | v0.1 | Implemented |
+| REQ-CACHE-007 | THE SYSTEM SHOULD display last refresh time. | P1 | v0.1 | Implemented |
+| REQ-CACHE-008 | THE SYSTEM SHOULD measure refresh duration for diagnostics. | P2 | v0.1 | Partial |
 | REQ-PERF-001 | Date switching from cache SHOULD complete in under 100ms for normal datasets. | P1 | v0.1 | Planned |
-| REQ-PERF-002 | Initial read SHOULD not block the Obsidian UI. | P0 | v0.1 | Planned |
+| REQ-PERF-002 | Initial read SHOULD not block the Obsidian UI. | P0 | v0.1 | Implemented |
 | REQ-PERF-003 | Large calendars SHOULD degrade gracefully. | P1 | v0.2 | Planned |
-| REQ-PERF-004 | Plugin unload SHALL not leave active intervals or detached DOM. | P0 | v0.1 | Partial |
+| REQ-PERF-004 | Plugin unload SHALL not leave active intervals or detached DOM. | P0 | v0.1 | Implemented |
 
 ### 7.7 UX requirements
 
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
-| REQ-UX-001 | WHEN a user clicks a date, THE SYSTEM SHALL select that date and update the event/reminder panel. | P0 | v0.1 | Partial |
-| REQ-UX-002 | WHEN a user Cmd/Ctrl-clicks a date, THE SYSTEM SHALL preserve open/create daily-note behavior. | P0 | v0.1 | Partial |
-| REQ-UX-003 | THE SYSTEM SHALL show loading, empty, error, unsupported, and partial-permission states. | P0 | v0.1 | Partial |
+| REQ-UX-001 | WHEN a user clicks a date, THE SYSTEM SHALL select that date and update the event/reminder panel. | P0 | v0.1 | Implemented |
+| REQ-UX-002 | WHEN a user Cmd/Ctrl-clicks a date, THE SYSTEM SHALL preserve open/create daily-note behavior. | P0 | v0.1 | Implemented |
+| REQ-UX-003 | THE SYSTEM SHALL show loading, empty, error, unsupported, and partial-permission states. | P0 | v0.1 | Implemented |
 | REQ-UX-004 | THE SYSTEM SHALL use Obsidian theme variables where possible. | P1 | v0.1 | Partial |
 | REQ-UX-005 | THE SYSTEM SHOULD support event/reminder context menus only when actions are implemented safely. | P1 | v0.3 | Planned |
 | REQ-UX-006 | THE SYSTEM SHOULD show calendar dots on month cells without harming navigation performance. | P1 | v0.2 | Planned |
@@ -519,20 +539,20 @@ Goal, habit, intention, nudge, and review data SHALL reside exclusively in Obsid
 
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
-| REQ-PRIV-001 | THE SYSTEM SHALL keep Calendar and Reminders data local and NOT send content to third-party services by default. | P0 | v0.1 | Planned |
-| REQ-PRIV-002 | THE SYSTEM SHALL document what data is stored in Obsidian settings/frontmatter. | P0 | v0.1 | Planned |
+| REQ-PRIV-001 | THE SYSTEM SHALL keep Calendar and Reminders data local and NOT send content to third-party services by default. | P0 | v0.1 | Implemented |
+| REQ-PRIV-002 | THE SYSTEM SHALL document what data is stored in Obsidian settings/frontmatter. | P0 | v0.1 | Implemented |
 | REQ-PRIV-003 | THE SYSTEM SHALL keep note-association, goal, habit, nudge, and review data local and SHALL NOT send self-direction content to external services. | P0 | v0.5 | Planned |
-| REQ-DIAG-001 | THE SYSTEM SHALL provide diagnostic panel showing permission status, source counts, last refresh time, and error states WITHOUT exposing private event/reminder content by default. | P1 | v0.2 | Planned |
+| REQ-DIAG-001 | THE SYSTEM SHALL provide diagnostic panel showing permission status, source counts, last refresh time, and error states WITHOUT exposing private event/reminder content by default. | P1 | v0.1 | Partial |
 | REQ-DIAG-002 | WHEN exporting diagnostics, THE SYSTEM SHALL obtain explicit user consent and redact sensitive fields. | P0 | v0.2 | Planned |
 
 ### 7.9 Error handling requirements
 
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
-| REQ-ERR-001 | WHEN JXA execution fails, THE SYSTEM SHALL classify the error type (permission denied, timeout, parse failure, or empty data). | P0 | v0.1 | Partial |
-| REQ-ERR-002 | THE SYSTEM SHALL show appropriate error states for each error type with recovery guidance. | P0 | v0.1 | Planned |
-| REQ-ERR-003 | IF a data item fails to parse, THE SYSTEM SHALL skip that item and continue rendering valid items. | P1 | v0.2 | Planned |
-| REQ-ERR-004 | THE SYSTEM SHALL distinguish empty data from failure states in the UI. | P0 | v0.1 | Planned |
+| REQ-ERR-001 | WHEN native helper execution fails, THE SYSTEM SHALL classify the error type (permission denied, timeout, parse failure, or empty data). | P0 | v0.1 | Implemented |
+| REQ-ERR-002 | THE SYSTEM SHALL show appropriate error states for each error type with recovery guidance. | P0 | v0.1 | Implemented |
+| REQ-ERR-003 | IF a data item fails to parse, THE SYSTEM SHALL skip that item and continue rendering valid items. | P1 | v0.1 | Implemented |
+| REQ-ERR-004 | THE SYSTEM SHALL distinguish empty data from failure states in the UI. | P0 | v0.1 | Implemented |
 | REQ-ERR-005 | WHEN write operations are implemented, failed writes SHALL NOT display false success and SHALL refresh from source of truth. | P0 | v0.3 | Planned |
 | REQ-ERR-006 | DESTRUCTIVE OPERATIONS (delete/edit) SHALL require user confirmation and stable source identity. | P0 | v0.4 | Planned |
 
@@ -672,17 +692,17 @@ Goal, habit, intention, nudge, and review data SHALL reside exclusively in Obsid
 |---|---|---|---|---|
 | REQ-UI-001 | THE SYSTEM SHOULD support compact and comfortable density options. | P2 | v0.6 | Planned |
 | REQ-UI-002 | THE SYSTEM SHOULD allow users to customize which event fields are displayed. | P2 | v0.6 | Planned |
-| REQ-UI-003 | THE SYSTEM SHOULD respect Obsidian theme colors and CSS variables. | P1 | v0.1 | Partial |
+| REQ-UI-003 | THE SYSTEM SHOULD respect Obsidian theme colors and CSS variables. | P1 | v0.1 | Implemented |
 | REQ-UI-004 | Advanced customization (custom CSS, themes) SHOULD be documented but not required in core. | P3 | Future | Planned |
 
 ### 7.21 Documentation and architecture requirements
 
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
-| REQ-DOC-001 | README SHALL distinguish current, planned, experimental, and non-goal features. | P0 | v0.1 | Planned |
-| REQ-DOC-002 | Roadmap SHALL reference requirement groups or IDs. | P0 | v0.1 | Planned |
-| REQ-DOC-003 | Target architecture SHALL be labeled as target until code is refactored. | P0 | v0.1 | Planned |
-| REQ-ARCH-001 | THE SYSTEM SHOULD split JXA integration, rendering, settings, sync, and note-link logic into maintainable modules before complex write features. | P1 | v0.3 | Planned |
+| REQ-DOC-001 | README SHALL distinguish current, planned, experimental, and non-goal features. | P0 | v0.1 | Partial |
+| REQ-DOC-002 | Roadmap SHALL reference requirement groups or IDs. | P0 | v0.1 | Partial |
+| REQ-DOC-003 | Target architecture SHALL be labeled as target until code is refactored. | P0 | v0.1 | Partial |
+| REQ-ARCH-001 | THE SYSTEM SHOULD split into maintainable modules (macOS adapter, domain, cache, UI) before complex write features. | P1 | v0.3 | Planned |
 
 ### 7.22 Goal and focus requirements
 
@@ -750,9 +770,9 @@ Goal, habit, intention, nudge, and review data SHALL reside exclusively in Obsid
 | REQ-DATA-002 | THE SYSTEM SHALL assign each Reminder a stable source identity where available from JXA. | P0 | v0.1 | Partial |
 | REQ-DATA-003 | IF stable identity is unavailable for a source item, THE SYSTEM SHALL mark that item as display-only and SHALL NOT permit write, delete, or note-association operations on it. | P0 | v0.2 | Planned |
 | REQ-DATA-004 | THE SYSTEM SHALL NOT use fallback display identity (derived from title/time/calendar) for write, delete, or note-association operations. | P0 | v0.3 | Planned |
-| REQ-DATA-005 | THE SYSTEM SHALL isolate parse failures to individual records so that one malformed item does not prevent display of valid items. | P0 | v0.1 | Planned |
+| REQ-DATA-005 | THE SYSTEM SHALL isolate parse failures to individual records so that one malformed item does not prevent display of valid items. | P0 | v0.1 | Implemented |
 | REQ-DATA-006 | THE SYSTEM SHALL distinguish stable series identity from occurrence identity for recurring events where the source provides both. | P0 | Future | Planned |
-| REQ-DATA-007 | THE SYSTEM SHALL treat optional JXA fields as optional and SHALL NOT fail when fields are missing, null, or of unexpected type. | P0 | v0.1 | Planned |
+| REQ-DATA-007 | THE SYSTEM SHALL treat optional fields as optional and SHALL NOT fail when fields are missing, null, or of unexpected type. | P0 | v0.1 | Implemented |
 
 **Identity stability grades** (informative):
 
@@ -771,55 +791,72 @@ Goal, habit, intention, nudge, and review data SHALL reside exclusively in Obsid
 | REQ-TIME-001 | THE SYSTEM SHALL treat all-day event end dates as exclusive (an all-day event on June 7 has start=June 7, end=June 8, and SHALL display on June 7 only). | P0 | v0.1 | Partial |
 | REQ-TIME-002 | THE SYSTEM SHALL display a timed event that spans midnight on both calendar days (e.g., 23:00–01:00 appears on both the start date and the end date). | P0 | v0.2 | Planned |
 | REQ-TIME-003 | THE SYSTEM SHALL display a multi-day event on every calendar day that intersects [start, end). | P0 | v0.2 | Planned |
-| REQ-TIME-004 | THE SYSTEM SHALL use the user's local timezone for all time calculations and display. | P0 | v0.1 | Planned |
+| REQ-TIME-004 | THE SYSTEM SHALL use the user's local timezone for all time calculations and display. | P0 | v0.1 | Implemented |
 | REQ-TIME-005 | THE SYSTEM SHALL handle DST transition days correctly (23-hour and 25-hour days SHALL NOT cause event misplacement). | P1 | v0.2 | Planned |
-| REQ-TIME-006 | THE SYSTEM SHALL respect the Obsidian-configured week start day for calendar grid rendering. | P1 | v0.1 | Planned |
-| REQ-TIME-007 | THE SYSTEM SHALL format times according to the user's system locale (12h/24h). | P1 | v0.1 | Planned |
-| REQ-TIME-008 | THE SYSTEM SHALL store dates internally as ISO 8601 date strings (YYYY-MM-DD) and times as ISO 8601 datetime strings in local time. | P0 | v0.1 | Planned |
+| REQ-TIME-006 | THE SYSTEM SHALL respect the Obsidian-configured week start day for calendar grid rendering. | P1 | v0.1 | Implemented |
+| REQ-TIME-007 | THE SYSTEM SHALL format times according to the user's system locale (12h/24h). | P1 | v0.1 | Implemented |
+| REQ-TIME-008 | THE SYSTEM SHALL store dates internally as ISO 8601 datetime strings. | P0 | v0.1 | Implemented |
 
 ---
 
-## 8. Target architecture
+## 8. Architecture
 
 > **Detailed architecture**: See [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) for the full module structure, data flow diagrams, layer descriptions, performance targets, and design decisions. This section provides a summary only.
 
-Current implementation may be bundled in `main.js`. This is the target structure, not a claim that all files already exist.
+### Current architecture
+
+The plugin is a single `main.js` file (5866 lines) with a companion native Swift EventKit helper (`helper/Sources/main.swift` → compiled to `calendian-helper`). The helper is the current production data channel; JXA is legacy and no longer used for primary data flows.
+
+Current key classes within `main.js`:
+- `CalendarPlugin` (extends `Plugin`) — lifecycle, settings, helper path discovery
+- `CalendarSettingsTab` (extends `PluginSettingTab`) — settings UI, source discovery
+- `CalendarView` (extends `ItemView`) — sidebar panel, owns calendar grid + `MacOSIntegration`
+- `MacOSIntegration` — EventKit helper execution, in-memory cache, render logic
+
+Data flow: `calendian-helper` (EventKit) → JSON stdout → `execHelper()` → `allEvents[]`/`allReminders[]` → `render()` → DOM
+
+### Target modular structure (v0.3+, REQ-ARCH-001)
+
+The code will be split into multiple `.js` files using Node.js `require()`. No TypeScript, no bundler. This is the **target** structure, not a claim that all files already exist:
 
 ```text
 calendian/
-├── main.ts                      # plugin entry, view registration, lifecycle
+├── main.js                      # plugin entry, view registration, lifecycle
+├── helper/
+│   ├── Sources/main.swift       # Swift EventKit native helper (IMPLEMENTED)
+│   └── calendian-helper         # compiled binary (must be built from source)
 ├── src/
 │   ├── macos/
-│   │   ├── calendar-reader.ts   # Calendar.app JXA read adapter
-│   │   ├── reminder-reader.ts   # Reminders.app JXA read adapter
-│   │   ├── writer.ts            # write adapter, safety-gated (v0.3+)
-│   │   ├── jxa-executor.ts      # shared JXA execution, timeout, error handling
-│   │   └── permissions.ts       # permission/error classification
+│   │   ├── calendar-reader.js   # parse helper JSON → CalendianEvent[]
+│   │   ├── reminder-reader.js   # parse helper JSON → CalendianReminder[]
+│   │   ├── writer.js            # write adapter, safety-gated (v0.3+)
+│   │   ├── helper-executor.js   # spawn helper, capture JSON, classify errors
+│   │   └── permissions.js       # permission/error classification
 │   ├── domain/
-│   │   ├── event.ts             # CalendianEvent model
-│   │   ├── reminder.ts          # CalendianReminder model
-│   │   ├── association.ts       # note association model
-│   │   ├── goal.ts              # CalendianGoal, CalendianStep (v0.5.5)
-│   │   ├── habit.ts             # CalendianHabit (v0.5.5)
-│   │   └── review.ts            # CalendianReview (v0.5.5)
+│   │   ├── event.js             # CalendianEvent model
+│   │   ├── reminder.js          # CalendianReminder model
+│   │   ├── association.js       # note association model
+│   │   ├── goal.js              # CalendianGoal, CalendianStep (v0.5.5)
+│   │   ├── habit.js             # CalendianHabit (v0.5.5)
+│   │   └── review.js            # CalendianReview (v0.5.5)
 │   ├── cache/
-│   │   └── schedule-cache.ts    # in-memory cache with range management
+│   │   └── schedule-cache.js    # in-memory cache with range management
 │   ├── ui/
-│   │   ├── calendar-panel.ts    # main sidebar view
-│   │   ├── event-list.ts
-│   │   ├── reminder-list.ts
-│   │   ├── details-panel.ts     # expandable details (v0.2+)
-│   │   ├── settings-tab.ts
-│   │   └── diagnostics.ts       # diagnostic panel (v0.2+)
+│   │   ├── calendar-panel.js    # main sidebar view
+│   │   ├── event-list.js
+│   │   ├── reminder-list.js
+│   │   ├── details-panel.js     # expandable details (v0.2+)
+│   │   ├── settings-tab.js
+│   │   └── diagnostics.js       # diagnostic panel (v0.2+)
 │   ├── notes/                   # v0.5+
-│   │   ├── frontmatter.ts
-│   │   ├── templates.ts
-│   │   └── note-link-resolver.ts
+│   │   ├── frontmatter.js
+│   │   ├── templates.js
+│   │   └── note-link-resolver.js
 │   └── self-direction/          # v0.5.5
-│       ├── goals.ts
-│       ├── habits.ts
-│       ├── nudges.ts
-│       └── reviews.ts
+│       ├── goals.js
+│       ├── habits.js
+│       ├── nudges.js
+│       └── reviews.js
 ├── styles.css
 ├── manifest.json
 └── docs/
@@ -843,10 +880,10 @@ A version may be released only when:
 
 These must be resolved before the related release:
 
-1. What stable identifiers are available from Calendar.app and Reminders.app through JXA across macOS versions?
-2. How should duplicate calendar/list names be represented in settings?
-3. What should happen when selected date is outside the preload cache range?
-4. Should source filtering persist by name, id, or compound identity?
-5. Should single-click date behavior be configurable for users migrating from the original Calendar plugin?
-6. What exact recurrence operations are safe through JXA?
-7. What diagnostic fields can be shown without exposing private data?
+1. ~~What stable identifiers are available from Calendar.app and Reminders.app through JXA?~~ ✅ Resolved — EventKit provides `eventIdentifier` and `calendarItemIdentifier` UUIDs.
+2. ~~How should duplicate calendar/list names be represented in settings?~~ ✅ Resolved — Account name disambiguation via `source.title` ("日历 — iCloud", "日历 — outlook@email.com"). Sources persisted by stable UUID.
+3. ~~What should happen when selected date is outside the preload cache range?~~ ✅ Resolved — Show cache-miss message with "Go to Today" button. Background refresh not triggered for out-of-range dates.
+4. ~~Should source filtering persist by name, id, or compound identity?~~ ✅ Resolved — Persist by stable EventKit UUID (`calendarIdentifier`/`calendarItemIdentifier`). Backward-compat fallback for old name-based entries.
+5. ~~Should single-click date behavior be configurable for users migrating from the original Calendar plugin?~~ Deferred — Single-click = select date (Calendian default). `legacyClickBehavior` setting in schema for future consideration.
+6. ~~What exact recurrence operations are safe through JXA?~~ ✅ Resolved — EventKit saves are safe by construction; recurrence handled natively.
+7. ~~What diagnostic fields can be shown without exposing private data?~~ ✅ Resolved — Safe to show: platform, permission status, source counts, event/reminder counts, refresh timestamp, refresh duration, error class. Redacted by default: titles, notes, locations, URLs, attendee names.

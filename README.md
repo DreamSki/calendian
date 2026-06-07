@@ -4,7 +4,7 @@
 
 Calendian is an Obsidian desktop plugin that integrates macOS Calendar events and macOS Reminders into the Obsidian sidebar. It is being developed with a Specification-Driven Development process: requirements, roadmap, tasks, tests, and release gates are tracked explicitly before features are claimed as complete.
 
-Current status: **pre-v0.1 / read-only MVP partial**.
+Current status: **v0.1 read-only MVP — mostly complete**.
 
 ---
 
@@ -16,23 +16,24 @@ Calendian is local-first by default. Early versions use macOS automation and do 
 
 ---
 
-## Current capabilities
+## Current capabilities (v0.1)
 
-The repository currently contains a partial read-only integration. Treat the following as current or partially implemented behavior:
+The repository contains a read-only integration with these capabilities:
 
-- Obsidian desktop plugin shell.
-- macOS-only Calendar/Reminders integration using local automation.
-- Sidebar calendar view with a lower events/reminders panel.
-- Basic date selection: click a date to show that day's schedule data.
-- Cmd/Ctrl + click behavior for opening or creating daily notes is preserved.
-- Basic Calendar event reading.
-- Basic Reminders reading.
-- Basic event display: title, time range, all-day handling, calendar badge.
-- Basic reminder display: title, due time where available, list badge.
-- Basic calendar/reminder source discovery from settings.
-- Basic refresh/cache behavior.
+- Obsidian desktop plugin shell (macOS-only).
+- Native Swift EventKit helper for fast Calendar/Reminders access.
+- Sidebar calendar view with events/reminders panel below.
+- Date selection: click to show that day's events and reminders from cache.
+- Cmd/Ctrl-click preserved for daily note open/create.
+- Event display: title, time range, all-day handling, colored calendar badge, location, recurrence indicator.
+- Reminder display: title, due time, list badge, priority indicator (high/medium/low).
+- Calendar/reminder source discovery with account name disambiguation.
+- Source filtering by individual calendar/list with instant apply.
+- Configurable auto-refresh with disk cache and two-phase instant startup.
+- Permission denied, error, timeout, cache-miss, and empty UI states.
+- Manual refresh button and last refresh time display.
 
-For the precise truth table, see [`docs/sdd/CURRENT_STATUS.md`](./docs/sdd/CURRENT_STATUS.md).
+For the precise truth table, see [`docs/sdd/CURRENT_STATUS.md`](./docs/sdd/CURRENT_STATUS.md) and [SPEC.md §2](./SPEC.md#2-current-implementation-status).
 
 ---
 
@@ -40,14 +41,14 @@ For the precise truth table, see [`docs/sdd/CURRENT_STATUS.md`](./docs/sdd/CURRE
 
 These are planned, but should not be treated as current behavior until their requirements and release gates pass:
 
+- Expandable event details panel with URL, notes, attendees.
 - Overdue reminder styling.
 - No-date reminders section.
 - Reminder display range selector.
 - Past event gray-out / hide setting.
 - Multi-day event display across all overlapping days.
 - Month-cell event dots based on source calendars.
-- Expandable event details with location, links, notes, and recurrence summary.
-- Manual refresh and diagnostics panel.
+- Full diagnostic panel with permission/source/error overview.
 - Safe event/reminder creation.
 - Natural language event creation ("tomorrow 3pm meeting").
 - Safe event/reminder editing and deletion.
@@ -200,7 +201,7 @@ Future external API integrations, if any, must be opt-in and specified separatel
 
 | Version | Focus | Status |
 |---|---|---|
-| v0.1 | Read-only MVP | In progress |
+| v0.1 | Read-only MVP | Mostly complete |
 | v0.2 | Read-only polish | Planned |
 | v0.3 | Safe create + natural language | Planned |
 | v0.4 | Safe edit/delete | Planned |
