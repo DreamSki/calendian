@@ -12,18 +12,24 @@ If resuming from a previous session: read `docs/sdd/CURRENT_STATUS.md#active-ses
 # Compile native helper (required — plugin is a shell without it)
 swiftc -parse-as-library helper/Sources/main.swift -o calendian-helper
 
-# Then reload Obsidian. No npm, no build step, no TypeScript.
+# Concatenate src/ modules into main.js (one-time after editing src/ files)
+./build-main.sh
+
+# Then reload Obsidian.
 ```
 
 ## Architecture
 
-All code in `main.js` (5866 lines). The first ~4400 lines are upstream Calendar plugin code (Svelte calendar grid, daily/weekly notes). Calendian code starts at line 4444:
+All code in `main.js` (concatenated from `main-head.js` + `src/*.js` modules). The first ~4400 lines are upstream Calendar plugin code (Svelte calendar grid, daily/weekly notes). Calendian code starts at line 4444. Edit in `src/` modules, run `./build-main.sh` to rebuild `main.js`.
 
-| Lines | Class | Role |
+| Lines (in main-head.js / src/) | Class | Role |
 |-------|-------|------|
-| 4444–5481 | `MacOSIntegration` | Spawns native Swift helper (`execHelper`), caches events/reminders, renders sidebar panel. Contains legacy `execJXA`/`parseEvents` — not used by primary data paths. |
-| 5483–5743 | `CalendarView` | Obsidian `ItemView`. Bridges Svelte calendar to `MacOSIntegration`. Owns cache read/write helpers. |
-| 5746–5864 | `CalendarPlugin` | Lifecycle, settings, discovers helper binary path, view registration. |
+| main-head.js | `MacOSIntegration` (skeleton) | Constructor, state init, constants |
+| src/macos/helper-executor.js | `MacOSIntegration` (prototype) | Spawns native Swift helper (`execHelper`), caches events/reminders, renders sidebar panel. Contains legacy `execJXA`/`parseEvents` — not used by primary data paths. |
+| src/cache/schedule-cache.js | `MacOSIntegration` (prototype) | Cache save/load, preload, date queries |
+| src/macos/writer.js | `MacOSIntegration` (prototype) | Event/reminder create via helper |
+| main-head.js (end) | `CalendarView` | Obsidian `ItemView`. Bridges Svelte calendar to `MacOSIntegration`. Owns cache read/write helpers. |
+| main-head.js (end) | `CalendarPlugin` | Lifecycle, settings, discovers helper binary path, view registration. |
 
 Data flow: `calendian-helper` (EventKit) → JSON stdout → `execHelper()` → in-memory cache → `render()` → DOM. Disk cache written to `data.json` on each successful load.
 
@@ -43,11 +49,33 @@ See SPEC.md §7.6.1 and ARCHITECTURE.md §3 for full refresh architecture.
 
 ## What NOT to do
 
-- **Do not introduce npm, TypeScript, esbuild, or any build toolchain.** The project is plain JS loaded directly by Obsidian. Target multi-file split (v0.3) uses `require()` only.
-- **Do not implement write operations** (create/edit/delete events or reminders). v0.1–v0.2 are read-only. REQ-ARCH-001 gates writes behind safety requirements that don't exist yet.
+- **Do not introduce npm or external package dependencies.** The project is plain JS with zero `node_modules`.
+- **Do not implement write operations** (create/edit/delete events or reminders) beyond what v0.3 already supports (safe create). REQ-ARCH-001 gates further writes behind safety requirements.
 - **Do not change code without updating docs.** See SDD workflow below — this is the #1 cause of project drift.
 - **Do not remove legacy JXA code** (`execJXA`, `parseEvents`, `parseReminders`). It's unused but kept as fallback reference.
 - **Do not log event titles, notes, locations, or reminder text.** Use `console.log("[Calendian] ...")` prefix for all logging.
+
+### Module split (REQ-ARCH-001): `cat`-based concatenation
+
+The code is split across `src/` modules for maintainability and concatenated into `main.js` for Obsidian. This is the only "build step" allowed — zero external tools, just Unix `cat`.
+
+**Module format**: Each `src/` file exports methods via `MacOSIntegration.prototype.xxx = function() {...}`. The concatenation inserts them after the `MacOSIntegration` class skeleton.
+
+**Concatenation order** (build-main.sh):
+```bash
+#!/bin/bash
+# Concatenate Calendian modules into main.js
+# main.js = upstream calendar code + Calendian skeleton + src modules in order
+
+cat \
+  main-head.js \
+  src/macos/helper-executor.js \
+  src/cache/schedule-cache.js \
+  src/macos/writer.js \
+  > main.js
+```
+
+**Editing workflow**: Always edit files in `src/`. Run `./build-main.sh` before reloading Obsidian. Never edit `main.js` directly when its content lives in `src/`.
 
 ## SDD workflow (mandatory after every code change)
 

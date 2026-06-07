@@ -1,10 +1,10 @@
 # Calendian Architecture
 
-> Status: architecture document (partially implemented; helper is current; multi-file JS split is target)
+> Status: architecture document (up-to-date for v0.3; helper is current; multi-file JS split in progress via `cat` concatenation)
 > Last updated: 2026-06-08
 > Plugin ID: `calendian`
 
-This document describes the architecture of Calendian. The Swift EventKit helper (`helper/Sources/main.swift` → compiled `calendian-helper`) is the current production data channel. The JS code is bundled in `main.js`; the target structure splits it into multiple `.js` modules before complex write features ship (see `REQ-ARCH-001`).
+This document describes the architecture of Calendian. The Swift EventKit helper (`helper/Sources/main.swift` → compiled `calendian-helper`) is the current production data channel. The JS codebase is split across `src/` modules and concatenated into `main.js` via `build-main.sh` (`cat`-based, zero external tools). See `REQ-ARCH-001`.
 
 ---
 
@@ -177,61 +177,69 @@ User submits create/edit/delete form
 
 All refresh paths converge on `MacOSIntegration.init()`, which is gated by `_refreshRunning` to prevent concurrent helper invocations.
 
-#### Current triggers
+#### Current triggers (all implemented v0.3)
 
 ```
 Timer fires (refreshIntervalMinutes, default 5)
  Manual refresh button (↻ in date header)
   Permission retry button
-   Cache freshness check on startup (2× interval, min 15min)
-    Source filter toggle in settings
-         │
-         ▼
-    MacOSIntegration.init()
-         │
-    _refreshRunning? ── true ──→ skip (log "refresh already running")
-         │ false
-         ▼
-    execHelper(['events'/'reminders', fromISO, toISO, ...])
-         │
-    caldian-helper → EventKit → JSON stdout
-         │
-    JSON.parse() → domain model (CalendianEvent[] / CalendianReminder[])
-         │
-    this.allEvents / this.allReminders updated
-         │
-    saveEventsToCache() / saveRemindersToCache() → data.json
-         │
-    render() → DOM update
-         │
-    _refreshRunning = false
+   Window focus (window.addEventListener('focus'))
+    macOS system notification (calendian-helper watch → EKEventStoreChanged → signal file poll)
+     Post-write refresh (after create-event / create-reminder)
+      Cache freshness check on startup (2× interval, min 15min)
+       Source filter toggle in settings
+            │
+            ▼
+       MacOSIntegration.init()
+            │
+       _refreshRunning? ── true ──→ skip (or pass-through for force=true, REQ-SYNC-008)
+            │ false/force
+            ▼
+       execHelper(['events'/'reminders', fromISO, toISO, ...])
+            │
+       calendian-helper → EventKit → JSON stdout
+            │
+       JSON.parse() → domain model (CalendianEvent[] / CalendianReminder[])
+            │
+       this.allEvents / this.allReminders updated
+            │
+       saveEventsToCache() / saveRemindersToCache() → data.json
+            │
+       render() → DOM update
+            │
+       _refreshRunning = false
 ```
 
-#### Planned triggers (v0.3)
-
-| Trigger | Version | Mechanism |
+| Trigger | Status | Mechanism |
 |---|---|---|
-| Window focus | v0.3 | `window.onfocus` → `init()` if cache stale |
-| macOS system notification | v0.3 | `calendian-helper watch` subscribes `EKEventStoreChangedNotification` → writes signal → JS calls `init()` |
-| Post-write refresh | v0.3 | After create/edit/delete via helper → `init()` immediately |
-| Watch process failure | v0.3 | Fall back to timer-based refresh |
+| Configurable timer | Implemented | `setInterval` on `refreshIntervalMinutes` (default 5) |
+| Manual refresh | Implemented | ↻ button in date header |
+| Cache stale check | Implemented | `isCacheFresh()` — 2× interval, min 15min |
+| Permission retry | Implemented | Retry button calls `init()` |
+| Source filter toggle | Implemented | `render()` with in-memory filter |
+| Window focus | Implemented | `window.addEventListener('focus')` → `refreshInBackground()` always |
+| macOS system notification | Implemented | `calendian-helper watch` subscribes `EKEventStoreChanged` → writes timestamp to signal file → JS polls every 2s → `refreshInBackground()` |
+| Post-write refresh | Implemented | After `create-event`/`create-reminder` → `init(true)` |
+| Watch process failure | Implemented | Watch exit logs warning → timer-based refresh remains active as fallback |
 
 ---
 
-## 4. Source file layout (target)
+## 4. Source file layout (current v0.3 + target)
 
-```text
+```
 calendian/
-├── main.js                      # Plugin entry, view registration, lifecycle
+├── main.js                      # Concatenated output (build-main.sh → cat)
+├── main-head.js                 # Plugin entry, upstream calendar code, Calendian class skeletons
+├── build-main.sh                # Concatenation script (cat src/ modules into main.js)
 ├── helper/
 │   ├── Sources/main.swift       # Native Swift EventKit helper
-│   └── calendian-helper         # Compiled binary
+│   └── calendian-helper         # Compiled binary (swiftc -parse-as-library)
 ├── src/
 │   ├── macos/
+│   │   ├── helper-executor.js   # Spawn helper, capture JSON, classify errors, refresh lifecycle [IMPLEMENTED]
+│   │   ├── writer.js            # Write adapter (create-event, create-reminder), validation [IMPLEMENTED]
 │   │   ├── calendar-reader.js   # Parses helper JSON → CalendianEvent[]
 │   │   ├── reminder-reader.js   # Parses helper JSON → CalendianReminder[]
-│   │   ├── writer.js            # Write adapter, safety-gated (v0.3+)
-│   │   ├── helper-executor.js   # Spawn helper, capture JSON, classify errors
 │   │   └── permissions.js       # Permission/error classification
 │   ├── domain/
 │   │   ├── event.js             # CalendianEvent interface
@@ -241,14 +249,14 @@ calendian/
 │   │   ├── habit.js             # CalendianHabit (v0.5.5)
 │   │   └── review.js            # CalendianReview (v0.5.5)
 │   ├── cache/
-│   │   └── schedule-cache.js    # In-memory cache with range management
+│   │   └── schedule-cache.js    # In-memory cache + preload + date queries [IMPLEMENTED]
 │   ├── ui/
-│   │   ├── calendar-panel.js    # Main sidebar view
+│   │   ├── calendar-panel.js    # Main sidebar view (CalendarView)
 │   │   ├── event-list.js        # Event rendering
 │   │   ├── reminder-list.js     # Reminder rendering
-│   │   ├── details-panel.js     # Expandable details (v0.2+)
+│   │   ├── details-panel.js     # Expandable details
 │   │   ├── settings-tab.js      # Plugin settings
-│   │   └── diagnostics.js       # Diagnostic panel (v0.2+)
+│   │   └── diagnostics.js       # Diagnostic panel
 │   ├── notes/                   # v0.5+
 │   │   ├── frontmatter.js
 │   │   ├── templates.js
@@ -275,6 +283,8 @@ calendian/
         └── RISKS.md
 ```
 
+**Module concatenation** (REQ-ARCH-001): `src/` modules use `MacOSIntegration.prototype.xxx = function() {...}` format. `build-main.sh` runs `cat` to concatenate them into `main.js`. No npm, no bundler. Edit in `src/`, run `./build-main.sh`, reload Obsidian.
+
 ---
 
 ## 5. Key design decisions
@@ -290,11 +300,11 @@ All Calendar/Reminders data flows through Apple's EventKit framework via the nat
 
 There is no direct CalDAV, Google API, or Microsoft Graph client in the current architecture. Calendian sees only what macOS has configured. If a calendar account is removed from System Settings, its data disappears from Calendian automatically.
 
-### 5.2 In-memory cache, not persistent
+### 5.2 Memory + disk cache
 
-Calendar data changes outside Obsidian (user adds event in Calendar.app). Persistent cache would create staleness problems. In-memory cache with auto-refresh is simpler and more correct.
+Events and reminders are held in-memory for instant date switching (<100ms). A disk cache in `data.json` (`_eventsCache`, `_remindersCache`) enables near-instant cold start. Cache freshness is checked against a configurable interval (2× refresh interval, minimum 15 minutes). Stale cache triggers background refresh; fresh cache is shown immediately and background refresh is skipped.
 
-Exception: plugin settings (source filters, refresh interval) ARE persisted to `data.json`.
+Plugin settings (source filters, refresh interval, API keys) are also persisted to `data.json`. No external services.
 
 ### 5.3 Independent Calendar and Reminders state
 

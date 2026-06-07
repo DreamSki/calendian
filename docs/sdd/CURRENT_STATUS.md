@@ -24,9 +24,9 @@ This document records the actual repository state. It intentionally separates im
 | Permission handling | Implemented | Independent calendar/reminder permission states with recovery guidance and retry buttons. Partial permission support (show available data + banner for denied source). |
 | Error states | Implemented | Error classification (permission_denied, timeout, error). Per-source error banners with retry. Parse-failure isolation. Empty vs error distinction. |
 | Month cell event dots | Implemented | Calendar-colored dots on month cells showing event presence per calendar. Hollow reminder dot. Multi-day event span support. Uses in-memory cache only (no helper calls). Respects source filters. Dynamic CSS injection for per-calendar colors. |
-| Refresh / sync | Partial | Timer-driven refresh (configurable interval, default 5min). Manual refresh button. `_refreshRunning` concurrency guard. Window focus and EKEventStoreChangedNotification watch deferred beyond v0.2. Post-write refresh planned for v0.3. See SPEC.md §7.6.1. |
+| Refresh / sync | Implemented | Timer-driven refresh (configurable interval, default 5min). Manual refresh button. Window focus refresh (REQ-SYNC-004). `_refreshRunning` concurrency guard. EKEventStoreChanged notification watch (REQ-SYNC-005). Post-write refresh (REQ-SYNC-006). Watch fallback to timer (REQ-SYNC-007). See SPEC.md §7.6.1. |
 | Right-click actions | Planned | Current day/week context menu is inherited from calendar note behavior; Calendian event/reminder actions are not complete. |
-| Write operations | **Partial (v0.3)** | Event/reminder creation via `EventCreateModal`/`ReminderCreateModal`. NL quick-create (TASK-023) with English + expanded Chinese regex parser + optional AI backend. QuickEventModal dual-path (Event/Reminder). Default calendar/list settings. Positional arg bug fixed. Edit/delete planned for v0.4. |
+| Write operations | **Implemented (v0.3)** | Event/reminder creation via `EventCreateModal`/`ReminderCreateModal`. NL quick-create with English + Chinese regex + optional AI backend. QuickEventModal dual-path (Event/Reminder). Post-write refresh. Write error handling. Default calendar/list. Edit/delete planned for v0.4. |
 | Note association | Planned | Existing daily/weekly note integration comes from the base calendar plugin behavior; Calendian event/reminder frontmatter association is not complete. |
 | Tasks integration | Planned | Current task dots for daily notes exist from base plugin behavior; macOS Reminders sync with Obsidian Tasks is not implemented. |
 | Timeline / week / statistics views | Planned | Not current behavior. |
@@ -38,7 +38,7 @@ This document records the actual repository state. It intentionally separates im
 
 ## Current release label
 
-Current repository state: **v0.3 safe create — nearly complete**. Event/reminder creation (10/10), natural language parsing (5/5), default settings (1/1). Only code split (blocked) and deferred v0.2 items remain.
+Current repository state: **v0.3 safe create — complete**. All v0.3 requirements implemented. 8/8 acceptance gates passed. 11/11 deferred v0.2 items resolved. Code split via `cat` concatenation (REQ-ARCH-001). Only recurring safety UX and subtask display deferred to v0.4 / blocked by Apple API.
 
 ## README policy
 
@@ -83,17 +83,13 @@ Everything else must be marked as planned, experimental, or future.
 
 > Updated by AI after every meaningful step. Next session reads this to continue without re-explaining context.
 
-- **Doing:** Final doc alignment after v0.3 NL + AI implementation burst.
-- **Done in v0.3:**
-  - **Write backend**: `create-event`/`create-reminder` Swift commands + `EventCreateModal`/`ReminderCreateModal`.
-  - **NL regex parser**: `parseNaturalLanguage()` English + expanded Chinese (compact dates, numerals, duration).
-  - **QuickEventModal**: Regex live preview, dual "→ Event"/"→ Reminder" buttons, AI on Enter.
-  - **AI parsing**: `callAIForParsing()` OpenAI-compatible, Enter-only, 10s timeout, cancel-on-type, JSON mode, raw output.
-  - **Bug fixes**: Positional arg placeholders, ISO ms stripping, AI JSON extraction, AI result lock.
+- **Doing:** v0.3 完成 —— 最终文档审计 + commit + push。
 - **Decisions:**
-  - require() to local files does NOT work in Obsidian plugin context.
-  - AI parsing is Enter-only — never auto-fires on keystrokes.
-  - NL quick-create is dual-path: user decides event vs reminder after seeing parsed result.
-  - All personal info (calendar IDs, API keys) stays in gitignored `data.json`.
-- **Next:** Deferred v0.2 items (9 items). v0.4 edit/delete.
-- **Last action:** 2026-06-08 — full doc audit after NL + AI implementation burst.
+  - 同前，已记录。
+- **v0.3 final state:**
+  - 8/8 acceptance gates passed.
+  - 11/11 deferred v0.2 items resolved.
+  - REQ-ARCH-001 code split done (`cat` concatenation).
+  - only REQ-REC-002/003/007 deferred to v0.4, REQ-REM-009 blocked by Apple API.
+- **Next:** v0.4 edit/delete.
+- **Last action:** 2026-06-08 — 最终文档审计完成。所有文档版本状态、deliverables、requirement status 已对齐。

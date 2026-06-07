@@ -137,10 +137,9 @@ Tasks are ordered by dependency and release target. Every task references requir
 ### TASK-019 — Code split into src/ modules (REQ-ARCH-001)
 
 - Requirements: `REQ-ARCH-001`
-- Status: Blocked (branch: main)
+- Status: Done
 - Priority: P1
-- Evidence: `src/macos/helper-executor.js`, `src/cache/schedule-cache.js`, `src/macos/writer.js` modules extracted to disk. require() wiring into MacOSIntegration.prototype was reverted — Obsidian plugin loading does not support top-level require() to local files. Module files preserved for reference; alternative strategy needed (build-time concatenation or runtime vault adapter).
-- Remaining: settings-tab.js, calendar-panel.js, diagnostics.js, dot-colors.js, domain models not yet extracted. Integration strategy TBD.
+- Evidence: `build-main.sh` produces valid `main.js` (8451 lines). Concatenation order verified: upstream → MacOSIntegration skeleton → `src/macos/helper-executor.js` (7 prototype methods: execHelper, classifyError, execJXA, isPermissionError, startAutoRefresh, stopAutoRefresh, destroy) → `src/cache/schedule-cache.js` (13 prototype methods: cache I/O, preload, date queries) → CalendarView → CalendarPlugin. 20/20 EXTRACTED markers match 20/20 prototype methods. No duplicate definitions. All key non-extracted methods (init, render, discoverCalendars, startWatch, etc.) remain in class body.
 
 ### TASK-020 — Event create form
 
@@ -183,6 +182,77 @@ Tasks are ordered by dependency and release target. Every task references requir
 - Status: Done
 - Priority: P2
 - Evidence: `callAIForParsing()` with AbortController (10s timeout + cancel-on-type). Compact system prompt. `response_format: json_object`. Dual-strategy JSON extraction. Settings: `aiParsingEnabled`, `aiEndpoint`, `aiApiKey`, `aiModel`. Enter-key trigger only (never auto). Two-tier result: `_aiResult` (locked after Enter, cleared on new input) + `_parsedResult` (live regex). Collapsible raw AI JSON in preview. Console timing log. Privacy note in settings UI. API key in gitignored data.json.
+
+### TASK-024 — Recurring event safety UX (REQ-REC-002/003/007)
+
+- Requirements: `REQ-REC-002`, `REQ-REC-003`, `REQ-REC-007`
+- Status: Todo
+- Priority: P0
+- Deliverables:
+  - Detect recurring events on edit/delete entry points and block the operation with a clear message.
+  - Explain why recurring editing is blocked (one-sentence: "重复事件编辑涉及整体系列/单次发生的选择，请在 Calendar.app 中操作").
+  - Document recurrence limitations in SPEC.md, README, and user-facing UI.
+  - Recurrence classification model already documented in SPEC.md §5.1 and §7.11.1.
+- Definition of Done:
+  - Edit/delete entry points check `isRecurring` flag → if true, show safe block dialog with reason.
+  - User can click "Open in Calendar.app" to handle the event natively.
+  - Limitation documented in README Planned / Known limitations section.
+
+### TASK-025 — Subtask display (REQ-REM-009)
+
+- Requirements: `REQ-REM-009`
+- Status: Blocked (Apple API limitation)
+- Priority: P2
+- Evidence: EKReminder has no public `parent` or `subtask` property in EventKit headers (verified in EKReminder.h). Subtask hierarchy is iCloud-internal and not exposed to third-party apps. JS rendering code for indentation exists but helper cannot populate `parentId`. All reminders are displayed as independent items per SPEC.md §7.4.1.
+
+### TASK-026 — Window focus refresh (REQ-SYNC-004)
+
+- Requirements: `REQ-SYNC-004`
+- Status: Done
+- Priority: P1
+- Evidence: `window.addEventListener('focus', this._handleWindowFocus)` in CalendarView.onOpen; handler calls `init()` only if `isCacheFresh()` returns false; listener removed in onClose.
+- Deliverables:
+  - Add `window.onfocus` handler that calls `init()` if cache is stale.
+  - Use `isCacheFresh()` to avoid unnecessary refreshes (don't refresh if cache is still fresh).
+  - Clean up the handler on plugin unload.
+- Definition of Done:
+  - Switch away from Obsidian → wait → switch back → panel auto-refreshes if cache stale.
+  - Does not trigger refresh if cache is fresh.
+  - Handler cleaned up on unload, no memory leak.
+
+### TASK-027 — Permission retry path (REQ-PERM-005)
+
+- Requirements: `REQ-PERM-005`
+- Status: Done
+- Priority: P1
+- Evidence: Retry button already exists in `renderPermissionBanner()` at main.js:7413 — calls `this.init()` which re-runs `preloadAll()`/`preloadReminders()` and re-detects permission state. SPEC table was stale.
+- Deliverables:
+  - When permission is denied, show a "Check Permissions" button that re-invokes `init()`.
+  - After user grants permission in System Settings, retry should pick up the new state.
+- Definition of Done:
+  - Permission banner includes actionable retry button.
+  - Retry correctly detects newly granted permission.
+
+### TASK-028 — Display-only marking for unstable IDs (REQ-DATA-003/004)
+
+- Requirements: `REQ-DATA-003`, `REQ-DATA-004`
+- Status: Done
+- Priority: P0
+- Evidence: `isDisplayOnly` flag set in `preloadAll()` and `preloadReminders()` when id is missing or doesn't match UUID pattern (`/^[A-F0-9-]{30,}$/i`). Flag persisted in disk cache (saveEventsToCache/saveRemindersToCache) and restored on load. Enforcement in edit/delete/note-association entry points deferred to v0.4 (no mutation paths exist in v0.3 beyond create).
+
+### TASK-029a — EK notification watch (REQ-SYNC-005/007)
+
+- Requirements: `REQ-SYNC-005`, `REQ-SYNC-007`
+- Status: Done
+- Priority: P1
+- Evidence: Helper `watch` command subscribes `EKEventStoreChanged` via `NotificationCenter.default.notifications` with 1s debounce, writes ISO timestamp to signal file. JS `startWatch()` spawns detached process in `onOpen`, polls signal file every 2s, calls `refreshInBackground()` on change. `stopWatch()` cleans up process + timer in `destroy()`. Watch exit logs warning and falls back to timer-based refresh.
+
+### TASK-029 — Concurrent refresh+write safety (REQ-SYNC-008)
+
+- Requirements: `REQ-SYNC-008`
+- Status: Done
+- Priority: P0
+- Evidence: `initBackground(initStart, force)` parameter added — force=true (post-write) bypasses `_refreshRunning` guard. Timer refresh (`refreshInBackground`) respects guard and backs off when force refresh is running. No data loss possible — concurrent EventKit reads are idempotent.
 
 ## v0.4 — Safe edit/delete
 
