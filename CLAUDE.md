@@ -10,7 +10,7 @@ If resuming from a previous session: read `docs/sdd/CURRENT_STATUS.md#active-ses
 
 ```bash
 # Compile native helper (required — plugin is a shell without it)
-swiftc helper/Sources/main.swift -o calendian-helper
+swiftc -parse-as-library helper/Sources/main.swift -o calendian-helper
 
 # Then reload Obsidian. No npm, no build step, no TypeScript.
 ```
@@ -65,7 +65,7 @@ After any code change:
 
 Before marking any task Done, verify it actually works. Code-reading is not verification.
 
-1. **Compile the helper** — `swiftc helper/Sources/main.swift -o calendian-helper`. If it fails, nothing downstream works.
+1. **Compile the helper** — `swiftc -parse-as-library helper/Sources/main.swift -o calendian-helper`. If it fails, nothing downstream works.
 2. **Test the data channel** — `./calendian-helper calendars` and `./calendian-helper events <from> <to>`. Confirm valid JSON, no stderr.
 3. **Eye-check in Obsidian** — reload the plugin (disable/re-enable in Community Plugins), open calendar panel. Confirm: events and reminders visible, refresh button works, source toggles render, no blank or broken states.
 4. **Walk the version gates** — read `docs/sdd/ACCEPTANCE.md` for the current version's gates. For each gate: test the behavior in the Obsidian panel, not just in the code. A gate verified only by code-reading is not passed.
