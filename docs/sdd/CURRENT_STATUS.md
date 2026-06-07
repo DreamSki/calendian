@@ -97,4 +97,6 @@ Everything else must be marked as planned, experimental, or future.
 - **Natural language parsing (TASK-023, 023a)**: `parseNaturalLanguage()` with English + expanded Chinese locale support (明早/明晚/今早/今晚, 下下周, 周末, X天后/周后/月后, 下个月/明年, X月Y日/号, 凌晨X点, X点一刻/三刻, X小时Y分钟, 一个半小时, YYMMDD, Chinese numeral hours, period hint cleanup). Optional AI-powered parsing via `callAIForParsing()` with configurable OpenAI-compatible backend (DeepSeek, etc).
 - **Bug fixes**: Reminder priority always defaulted to "none" due to positional arg mismatch (JS conditional push vs Swift positional parse). Fixed by always pushing placeholders for all optional args in both create-event and create-reminder.
 - **Next:** Deferred v0.2 items (REQ-UX-010, REQ-PERF-003, REQ-PERM-005, REQ-SYNC-004/005/007, REQ-DATA-003, REQ-TIME-005). v0.4 edit/delete.
-- **Last action:** 2026-06-08 — NL event parsing implemented (TASK-023 done).
+- **AI trigger safety**: AI parsing only fires on Enter key press (not on every keystroke). Regex parser continues to run on 300ms debounce for free live preview.
+- **QuickEventModal now dual-path**: "→ Event" and "→ Reminder" buttons both pre-fill from parsed NL. ReminderCreateModal accepts prefill. "白天" added as period hint (→ 09:00).
+- **Last action:** 2026-06-08 — AI trigger fixed (Enter-only), QuickEventModal dual event/reminder paths, 白天 period hint.
