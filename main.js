@@ -753,6 +753,9 @@ const defaultSettings = Object.freeze({
     // Reminder display settings (v0.2 schema)
     showNoDateReminders: true,
     reminderDisplayRange: 'today',
+    // Default calendar/reminder list for create modals (v0.3 schema)
+    defaultCalendarId: '',
+    defaultReminderListId: '',
 });
 function appHasPeriodicNotesPluginLoaded() {
     var _a, _b;
@@ -818,6 +821,8 @@ class CalendarSettingsTab extends obsidian.PluginSettingTab {
         this.addReminderDisplaySettings();
         this.addMacOSRefreshIntervalSetting();
         this.addMacOSPastEventDisplaySetting();
+        this.addDefaultCalendarSetting();
+        this.addDefaultReminderListSetting();
 
         // === Privacy & Diagnostics Section ===
         this.containerEl.createEl("h3", {
@@ -1277,6 +1282,59 @@ class CalendarSettingsTab extends obsidian.PluginSettingTab {
             });
         });
     }
+
+    // v0.3: Default calendar for event creation
+    addDefaultCalendarSetting() {
+        var self = this;
+        var setting = new obsidian.Setting(this.containerEl)
+            .setName("Default calendar for new events")
+            .setDesc("Pre-selected when creating an event. Leave empty for auto-detect (prefers Outlook).");
+        var dropdown;
+        setting.addDropdown(function(cmp) {
+            dropdown = cmp;
+            cmp.addOption("", "Auto-detect");
+        });
+        // Populate from discovered calendars
+        var view = this.plugin.view;
+        if (view && view.macosIntegration) {
+            view.macosIntegration.discoverCalendars().then(function(cals) {
+                for (var i = 0; i < cals.length; i++) {
+                    dropdown.addOption(cals[i].id, cals[i].name);
+                }
+                var current = self.plugin.options.defaultCalendarId || '';
+                if (current) dropdown.setValue(current);
+            }).catch(function() {});
+        }
+        dropdown.onChange(async function(value) {
+            await self.plugin.writeOptions(function() { return { defaultCalendarId: value }; });
+        });
+    }
+
+    // v0.3: Default reminder list for reminder creation
+    addDefaultReminderListSetting() {
+        var self = this;
+        var setting = new obsidian.Setting(this.containerEl)
+            .setName("Default list for new reminders")
+            .setDesc("Pre-selected when creating a reminder. Leave empty for auto-detect (prefers Outlook).");
+        var dropdown;
+        setting.addDropdown(function(cmp) {
+            dropdown = cmp;
+            cmp.addOption("", "Auto-detect");
+        });
+        var view = this.plugin.view;
+        if (view && view.macosIntegration) {
+            view.macosIntegration.discoverReminderLists().then(function(lists) {
+                for (var i = 0; i < lists.length; i++) {
+                    dropdown.addOption(lists[i].id, lists[i].name);
+                }
+                var current = self.plugin.options.defaultReminderListId || '';
+                if (current) dropdown.setValue(current);
+            }).catch(function() {});
+        }
+        dropdown.onChange(async function(value) {
+            await self.plugin.writeOptions(function() { return { defaultReminderListId: value }; });
+        });
+    }
 }
 
 const classList = (obj) => {
@@ -1634,13 +1692,22 @@ class EventCreateModal extends obsidian.Modal {
                 for (var i = 0; i < cals.length; i++) {
                     cmp.addOption(cals[i].id, cals[i].name);
                 }
-                // Default to Outlook account calendar if available
+                // Default calendar: use setting if set, otherwise prefer Outlook
                 if (cals.length > 0) {
                     var defaultId = cals[0].id;
-                    for (var j = 0; j < cals.length; j++) {
-                        if (cals[j].accountHint && cals[j].accountHint.toLowerCase().indexOf('outlook') !== -1) {
-                            defaultId = cals[j].id;
-                            break;
+                    var prefId = (integ.plugin.options && integ.plugin.options.defaultCalendarId) || '';
+                    if (prefId) {
+                        // Use user's saved preference if it still exists
+                        for (var j = 0; j < cals.length; j++) {
+                            if (cals[j].id === prefId) { defaultId = prefId; break; }
+                        }
+                    } else {
+                        // Auto-detect: prefer Outlook account calendars
+                        for (var j = 0; j < cals.length; j++) {
+                            if (cals[j].accountHint && cals[j].accountHint.toLowerCase().indexOf('outlook') !== -1) {
+                                defaultId = cals[j].id;
+                                break;
+                            }
                         }
                     }
                     cmp.setValue(defaultId);
@@ -1809,23 +1876,32 @@ class ReminderCreateModal extends obsidian.Modal {
                 for (var i = 0; i < lists.length; i++) {
                     cmp.addOption(lists[i].id, lists[i].name);
                 }
-                // Default to Outlook account's "任务" list if available
+                // Default list: use setting if set, otherwise prefer Outlook "任务"
                 if (lists.length > 0) {
                     var defaultId = lists[0].id;
-                    for (var j = 0; j < lists.length; j++) {
-                        var acc = (lists[j].accountHint || "").toLowerCase();
-                        var name = (lists[j].rawName || lists[j].name || "").toLowerCase();
-                        if (acc.indexOf('outlook') !== -1 && name.indexOf('任务') !== -1) {
-                            defaultId = lists[j].id;
-                            break;
+                    var prefId = (integ.plugin.options && integ.plugin.options.defaultReminderListId) || '';
+                    if (prefId) {
+                        // Use user's saved preference if it still exists
+                        for (var j = 0; j < lists.length; j++) {
+                            if (lists[j].id === prefId) { defaultId = prefId; break; }
                         }
-                    }
-                    // Fallback: any Outlook list
-                    if (defaultId === lists[0].id) {
-                        for (var k = 0; k < lists.length; k++) {
-                            if ((lists[k].accountHint || "").toLowerCase().indexOf('outlook') !== -1) {
-                                defaultId = lists[k].id;
+                    } else {
+                        // Auto-detect: prefer Outlook account's "任务" list
+                        for (var j = 0; j < lists.length; j++) {
+                            var acc = (lists[j].accountHint || "").toLowerCase();
+                            var rName = (lists[j].rawName || lists[j].name || "").toLowerCase();
+                            if (acc.indexOf('outlook') !== -1 && rName.indexOf('任务') !== -1) {
+                                defaultId = lists[j].id;
                                 break;
+                            }
+                        }
+                        // Fallback: any Outlook list
+                        if (defaultId === lists[0].id) {
+                            for (var k = 0; k < lists.length; k++) {
+                                if ((lists[k].accountHint || "").toLowerCase().indexOf('outlook') !== -1) {
+                                    defaultId = lists[k].id;
+                                    break;
+                                }
                             }
                         }
                     }
