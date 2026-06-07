@@ -1726,8 +1726,10 @@ class EventCreateModal extends obsidian.Modal {
                             errorEl.style.display = "block";
                             return;
                         }
-                        var startISO = startMoment.toISOString();
-                        var endISO = endMoment.toISOString();
+                        // Strip fractional seconds — ISO8601DateFormatter in Swift
+                        // does not parse .000Z by default (see preloadAll pattern)
+                        var startISO = startMoment.toISOString().replace(/\.\d{3}Z$/, 'Z');
+                        var endISO = endMoment.toISOString().replace(/\.\d{3}Z$/, 'Z');
 
                         var args = ["create-event", title, startISO, endISO, calendarId, isAllDay ? "true" : "false"];
                         if (location) args.push(location);
@@ -1882,7 +1884,7 @@ class ReminderCreateModal extends obsidian.Modal {
                         if (dueDateStr) {
                             var dueMoment = window.moment(dueDateStr, "YYYY-MM-DD");
                             if (dueMoment.isValid()) {
-                                args.push(dueMoment.toISOString());
+                                args.push(dueMoment.toISOString().replace(/\.\d{3}Z$/, 'Z'));
                             } else {
                                 errorEl.textContent = "Invalid due date format. Use YYYY-MM-DD.";
                                 errorEl.style.display = "block";
