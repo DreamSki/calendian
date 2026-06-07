@@ -26,7 +26,7 @@ This document records the actual repository state. It intentionally separates im
 | Month cell event dots | Implemented | Calendar-colored dots on month cells showing event presence per calendar. Hollow reminder dot. Multi-day event span support. Uses in-memory cache only (no helper calls). Respects source filters. Dynamic CSS injection for per-calendar colors. |
 | Refresh / sync | Partial | Timer-driven refresh (configurable interval, default 5min). Manual refresh button. `_refreshRunning` concurrency guard. Window focus and EKEventStoreChangedNotification watch deferred beyond v0.2. Post-write refresh planned for v0.3. See SPEC.md §7.6.1. |
 | Right-click actions | Planned | Current day/week context menu is inherited from calendar note behavior; Calendian event/reminder actions are not complete. |
-| Write operations | **Partial (v0.3)** | Event and reminder creation implemented via Swift helper `create-event`/`create-reminder` commands + `EventCreateModal`/`ReminderCreateModal`. Edit/delete planned for v0.4. Natural language parsing (TASK-023) pending. Default calendar/list settings implemented. |
+| Write operations | **Partial (v0.3)** | Event and reminder creation implemented via Swift helper `create-event`/`create-reminder` commands + `EventCreateModal`/`ReminderCreateModal`. Natural language quick-create (TASK-023) done. Default calendar/list settings implemented. Edit/delete planned for v0.4. |
 | Note association | Planned | Existing daily/weekly note integration comes from the base calendar plugin behavior; Calendian event/reminder frontmatter association is not complete. |
 | Tasks integration | Planned | Current task dots for daily notes exist from base plugin behavior; macOS Reminders sync with Obsidian Tasks is not implemented. |
 | Timeline / week / statistics views | Planned | Not current behavior. |
@@ -38,7 +38,7 @@ This document records the actual repository state. It intentionally separates im
 
 ## Current release label
 
-Current repository state: **v0.3 safe create — partial**. Event and reminder creation complete (10/10 REQ-WRITE requirements). Natural language parsing (TASK-023) and deferred v0.2 items pending.
+Current repository state: **v0.3 safe create — nearly complete**. Event/reminder creation (10/10), natural language parsing (5/5), default settings (1/1). Only code split (blocked) and deferred v0.2 items remain.
 
 ## README policy
 
@@ -94,5 +94,7 @@ Everything else must be marked as planned, experimental, or future.
   - Settings stored in `data.json` (gitignored) — no personal data in git.
   - Auto-detect mode uses "outlook" substring matching (generic, not personal).
 - **Next:** Natural language event parsing (TASK-023). Deferred v0.2 items.
+- **Natural language parsing (TASK-023)**: `parseNaturalLanguage()` with English + Chinese locale support. `QuickEventModal` with live preview + confidence badge. `EventCreateModal` accepts optional prefill. "⚡" button in sidebar header.
 - **Bug fixes**: Reminder priority always defaulted to "none" due to positional arg mismatch (JS conditional push vs Swift positional parse). Fixed by always pushing placeholders for all optional args in both create-event and create-reminder.
-- **Last action:** 2026-06-08 — fixed reminder priority + event optional-field positional arg bugs.
+- **Next:** Deferred v0.2 items (REQ-UX-010, REQ-PERF-003, REQ-PERM-005, REQ-SYNC-004/005/007, REQ-DATA-003, REQ-TIME-005). v0.4 edit/delete.
+- **Last action:** 2026-06-08 — NL event parsing implemented (TASK-023 done).

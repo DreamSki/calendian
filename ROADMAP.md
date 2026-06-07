@@ -7,7 +7,7 @@
 
 This roadmap is not an independent wish list. Every release is derived from requirement groups in [`SPEC.md`](./SPEC.md), acceptance gates in [`docs/sdd/ACCEPTANCE.md`](./docs/sdd/ACCEPTANCE.md), tasks in [`docs/sdd/TASKS.md`](./docs/sdd/TASKS.md), and risks in [`docs/sdd/RISKS.md`](./docs/sdd/RISKS.md).
 
-Current repository status: **v0.3 safe create — partial**. Event/reminder creation complete. Natural language parsing and deferred v0.2 items pending.
+Current repository status: **v0.3 safe create — nearly complete**. Event/reminder creation + NL parsing done. Only code split (blocked) and deferred v0.2 items remain.
 
 ---
 
@@ -161,8 +161,8 @@ Allow users to create simple non-recurring events and simple reminders from Obsi
 - ✅ Safe failure state (error classification + red error banner).
 - ✅ Recurring event creation blocked (only `.thisEvent` span).
 - ✅ Default calendar/list settings (`defaultCalendarId`, `defaultReminderListId`).
-- ❌ Natural language event creation ("tomorrow 3pm meeting") — TASK-023.
-- ❌ Confirmation dialog for ambiguous NL parsing.
+- ✅ Natural language event creation (`QuickEventModal` + `parseNaturalLanguage()`, English + Chinese).
+- ✅ NL confirmation dialog (live preview with confidence badge, Fill Form opens EventCreateModal pre-filled).
 - ❌ Module refactor completed — `src/` files on disk but require() blocked.
 - ❌ Subtask display (helper `parentId` needed, REQ-REM-009).
 

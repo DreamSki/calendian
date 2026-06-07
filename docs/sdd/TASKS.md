@@ -173,14 +173,9 @@ Tasks are ordered by dependency and release target. Every task references requir
 ### TASK-023 — Natural language event creation
 
 - Requirements: `REQ-NL-001` to `REQ-NL-005`
-- Status: Todo
+- Status: Done
 - Priority: P1
-- Deliverables:
-  - Natural language input field for quick event creation.
-  - Extract title, date, time, and duration from NL input.
-  - Confirmation dialog for ambiguous parsing.
-  - Keep manual creation form available alongside NL input.
-  - Locale-aware date/time expression support.
+- Evidence: `parseNaturalLanguage()` function with English + Chinese locale support (date: today/tomorrow/weekdays/next-weekday/in-N-days/YYYY-MM-DD/Chinese 今天明天周一下周一; time: 3pm/15:00/at-noon/from-to/for-duration/Chinese 下午3点/3点半; duration: for-X-hours/Xh). `QuickEventModal` class with live preview showing extracted fields + confidence badge. "⚡" button in sidebar header. "Fill Form" opens EventCreateModal pre-filled; "Manual Form" keeps manual path. `EventCreateModal` accepts optional `prefill` parameter. Code at main.js:1610-1995 (parser + helpers), main.js:2302-2435 (QuickEventModal), main.js:6717-6728 (header button).
 
 ## v0.4 — Safe edit/delete
 

@@ -729,11 +729,11 @@ All refresh paths go through `init()`, which has a `_refreshRunning` boolean gat
 
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
-| REQ-NL-001 | THE SYSTEM SHOULD support natural language parsing for quick event creation (e.g., "tomorrow 3pm meeting"). | P1 | v0.3 | Planned |
-| REQ-NL-002 | WHEN parsing natural language, THE SYSTEM SHOULD extract title, date, time, and duration. | P1 | v0.3 | Planned |
-| REQ-NL-003 | IF natural language parsing is ambiguous, THE SYSTEM SHOULD show a confirmation dialog with extracted fields. | P1 | v0.3 | Planned |
-| REQ-NL-004 | Natural language parsing SHALL be optional; manual event creation MUST remain available. | P0 | v0.3 | Planned |
-| REQ-NL-005 | THE SYSTEM SHOULD support common date/time expressions in the user's locale. | P2 | v0.3 | Planned |
+| REQ-NL-001 | THE SYSTEM SHOULD support natural language parsing for quick event creation (e.g., "tomorrow 3pm meeting"). | P1 | v0.3 | Implemented |
+| REQ-NL-002 | WHEN parsing natural language, THE SYSTEM SHOULD extract title, date, time, and duration. | P1 | v0.3 | Implemented |
+| REQ-NL-003 | IF natural language parsing is ambiguous, THE SYSTEM SHOULD show a confirmation dialog with extracted fields. | P1 | v0.3 | Implemented |
+| REQ-NL-004 | Natural language parsing SHALL be optional; manual event creation MUST remain available. | P0 | v0.3 | Implemented |
+| REQ-NL-005 | THE SYSTEM SHOULD support common date/time expressions in the user's locale. | P2 | v0.3 | Implemented |
 
 ### 7.18 In-app notification requirements
 
