@@ -5008,6 +5008,30 @@ class MacOSIntegration {
                     parentId: r.parentId || ""
                 });
             }
+            // Fetch no-due-date reminders and merge
+            try {
+                var nodateArgs = ['reminders-nodate'];
+                if (filterIds.length > 0) { nodateArgs = nodateArgs.concat(filterIds); }
+                var rawNoDate = await this.execHelper(nodateArgs);
+                for (var j = 0; j < rawNoDate.length; j++) {
+                    var nd = rawNoDate[j];
+                    reminders.push({
+                        id: nd.id || "",
+                        source: "macos-reminders",
+                        title: nd.title || "",
+                        dueDate: "",
+                        due: null,
+                        listName: nd.listName || "",
+                        listId: nd.listId || "",
+                        priority: nd.priority || "none",
+                        completed: false,
+                        notes: nd.notes || "",
+                        parentId: nd.parentId || ""
+                    });
+                }
+            } catch (nodateErr) {
+                console.warn("[Calendian] No-date reminders fetch failed:", nodateErr.stderr || nodateErr.message);
+            }
             this.allReminders = reminders;
             this.permissionState.reminders = 'granted';
             this.lastError.reminders = null;
@@ -5067,17 +5091,18 @@ class MacOSIntegration {
 
         var d = date.toDate();
         var y = d.getFullYear(), m = d.getMonth(), day = d.getDate();
-        var start = new Date(y, m, day, 0, 0, 0);
+        // Start far in the past so overdue reminders are always included;
+        // the range controls how far into the future we look.
+        var start = new Date(2000, 0, 1, 0, 0, 0);
         var end;
 
         if (displayRange === '7days') {
-            // From selected date through +7 days
             end = new Date(y, m, day + 7, 23, 59, 59);
         } else if (displayRange === 'all') {
             // Show all incomplete reminders (full cache range)
             end = new Date(y + 10, m, day, 23, 59, 59);
         } else {
-            // 'today' — selected date only
+            // 'today' — overdue + today only
             end = new Date(y, m, day, 23, 59, 59);
         }
 
@@ -5843,7 +5868,7 @@ class MacOSIntegration {
             '<option value="all">All incomplete</option>';
         rangeSelector.value = opts.reminderDisplayRange || 'today';
         rangeSelector.addEventListener("change", function() {
-            self.plugin.writeOptions(function() { return { reminderDisplayRange: rangeSelector.value }; });
+            self.plugin.calendarPlugin.writeOptions(function() { return { reminderDisplayRange: rangeSelector.value }; });
             self.render();
         });
 
@@ -5907,7 +5932,7 @@ class MacOSIntegration {
             // Due time — with overdue date styling
             if (rem.due) {
                 const timeEl = itemEl.createDiv("macos-item-time calendian-reminder-due");
-                timeEl.textContent = this.formatTime(rem.due);
+                timeEl.textContent = this.formatDueDate(rem.due);
                 if (isOverdue) {
                     timeEl.addClass("calendian-reminder-overdue-due");
                 }
@@ -6014,6 +6039,21 @@ class MacOSIntegration {
     formatTime(date) {
         if (!date) return "";
         return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    }
+
+    // Format due date: show time only for today, date+time for other days
+    formatDueDate(date) {
+        if (!date) return "";
+        var today = new Date();
+        var isToday = date.getFullYear() === today.getFullYear() &&
+                      date.getMonth() === today.getMonth() &&
+                      date.getDate() === today.getDate();
+        if (isToday) {
+            return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        }
+        var dateStr = (date.getMonth() + 1) + "/" + date.getDate();
+        var timeStr = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        return dateStr + " " + timeStr;
     }
 
     // --- Discover available calendars ---

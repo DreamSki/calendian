@@ -92,6 +92,9 @@ struct CalendianHelper {
                 try await requestEventsAccess()
             case "request-reminders":
                 try await requestRemindersAccess()
+            case "reminders-nodate":
+                let nodateIDs = args.count > 2 ? Array(args[2...]) : []
+                try await printNoDateReminders(listIDs: nodateIDs)
             case "toggle-reminder":
                 guard args.count >= 3 else { printUsage(); exit(1) }
                 try toggleReminder(args[2])
@@ -223,6 +226,36 @@ struct CalendianHelper {
         printJSON(reminders)
     }
 
+    // MARK: - No-date Reminders
+
+    static func printNoDateReminders(listIDs: [String]) async throws {
+        _ = try await requestRemindersAccessIfNeeded()
+
+        let calendars: [EKCalendar]?
+        if listIDs.isEmpty {
+            calendars = nil
+        } else {
+            let filtered = store.calendars(for: .reminder).filter { listIDs.contains($0.calendarIdentifier) }
+            calendars = filtered.isEmpty ? nil : filtered
+        }
+
+        let predicate = store.predicateForIncompleteReminders(
+            withDueDateStarting: nil as Date?,
+            ending: nil as Date?,
+            calendars: calendars
+        )
+
+        let reminders: [CalendianReminder] = await withCheckedContinuation { continuation in
+            store.fetchReminders(matching: predicate) { ekReminders in
+                let filtered = (ekReminders ?? []).filter { $0.dueDateComponents == nil }
+                let mapped = filtered.map { mapReminder($0) }
+                continuation.resume(returning: mapped)
+            }
+        }
+
+        printJSON(reminders)
+    }
+
     static func mapReminder(_ ek: EKReminder) -> CalendianReminder {
         let dueDateStr: String? = {
             guard let comps = ek.dueDateComponents,
@@ -345,6 +378,7 @@ struct CalendianHelper {
               lists                              List reminder lists (JSON)
               events <from> <to> [ids...]        Fetch events (ISO 8601 dates)
               reminders <from> <to> [ids...]     Fetch reminders (ISO 8601 dates)
+              reminders-nodate [ids...]          Fetch reminders without due date
               permissions                        Check authorization status
               request-events                     Request Calendar access
               request-reminders                  Request Reminders access
