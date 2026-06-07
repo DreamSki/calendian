@@ -749,6 +749,7 @@ const defaultSettings = Object.freeze({
     selectedCalendarIds: [],
     selectedReminderListIds: [],
     refreshIntervalMinutes: 5,
+    pastEventDisplay: 'dimmed',
 });
 function appHasPeriodicNotesPluginLoaded() {
     var _a, _b;
@@ -812,6 +813,7 @@ class CalendarSettingsTab extends obsidian.PluginSettingTab {
         this.addMacOSCalendarNamesSetting();
         this.addMacOSReminderListNamesSetting();
         this.addMacOSRefreshIntervalSetting();
+        this.addMacOSPastEventDisplaySetting();
 
         // === Privacy & Diagnostics Section ===
         this.containerEl.createEl("h3", {
@@ -1211,6 +1213,25 @@ class CalendarSettingsTab extends obsidian.PluginSettingTab {
             textfield.onChange(async (value) => {
                 const num = Math.max(1, Number(value) || 5);
                 this.plugin.writeOptions(() => ({ refreshIntervalMinutes: num }));
+            });
+        });
+    }
+    // REQ-CAL-010: Past event display setting
+    addMacOSPastEventDisplaySetting() {
+        new obsidian.Setting(this.containerEl)
+            .setName("Past events")
+            .setDesc("How to display events that have already ended")
+            .addDropdown((dropdown) => {
+            dropdown.addOption("normal", "Show normally");
+            dropdown.addOption("dimmed", "Dim past events");
+            dropdown.addOption("hidden", "Hide past events");
+            dropdown.setValue(this.plugin.options.pastEventDisplay || 'dimmed');
+            dropdown.onChange(async (value) => {
+                await this.plugin.writeOptions(() => ({ pastEventDisplay: value }));
+                var view = this.plugin.view;
+                if (view && view.macosIntegration) {
+                    view.macosIntegration.render();
+                }
             });
         });
     }
@@ -4525,6 +4546,8 @@ class MacOSIntegration {
         this.lastRefreshTime = null;
         this.lastRefreshDurationMs = null;
         this.sourceCounts = { calendars: 0, reminderLists: 0 };
+        // REQ-CAL-008: Expandable event detail state
+        this._expandedEvents = new Set();
     }
 
     // --- Execute native helper (EventKit, fast) ---
@@ -4845,11 +4868,12 @@ class MacOSIntegration {
     }
 
     // --- Get events for a specific date from cache ---
+    // REQ-CAL-009: Multi-day events appear on every overlapping day
     getEventsForDate(date) {
         var d = date.toDate();
         var y = d.getFullYear(), m = d.getMonth(), day = d.getDate();
-        var start = new Date(y, m, day, 0, 0, 0);
-        var end = new Date(y, m, day, 23, 59, 59);
+        var dayStart = new Date(y, m, day, 0, 0, 0);
+        var dayEnd = new Date(y, m, day, 23, 59, 59);
         var filterIds = (this.plugin.options && this.plugin.options.selectedCalendarIds) || [];
         var calColors = this.calendarColors || {};
         return this.allEvents.filter(function(e) {
@@ -4860,17 +4884,14 @@ class MacOSIntegration {
                 var eColor = calColors[eName] || "";
                 var eCompoundId = eName + "|||" + eColor;
                 var eId = e.calendarId || e.id || "";
-                // Match by compound ID, then by raw ID, then by name (backward compat)
                 var matched = filterIds.includes(eCompoundId) || filterIds.includes(eId) || filterIds.includes(eName);
                 if (!matched) return false;
             }
-            var isAllDay = e.isAllDay !== undefined ? e.isAllDay : e.allday;
-            if (isAllDay) {
-                var es = new Date(e.start.getFullYear(), e.start.getMonth(), e.start.getDate());
-                var ee = e.end ? new Date(e.end.getFullYear(), e.end.getMonth(), e.end.getDate(), 23, 59, 59) : es;
-                return es <= end && ee >= start;
-            }
-            return e.start >= start && e.start <= end;
+            // Check if event overlaps with this day [dayStart, dayEnd]
+            var evtStart = e.start;
+            var evtEnd = e.end || e.start;
+            // Event overlaps day if evtStart <= dayEnd AND evtEnd >= dayStart
+            return evtStart <= dayEnd && evtEnd >= dayStart;
         }).sort(function(a, b) {
             var aAllDay = a.isAllDay !== undefined ? a.isAllDay : a.allday;
             var bAllDay = b.isAllDay !== undefined ? b.isAllDay : b.allday;
@@ -5297,6 +5318,10 @@ class MacOSIntegration {
     }
 
     // --- Render events section ---
+    // REQ-CAL-007: Event details (location, link, notes, attendees, recurrence)
+    // REQ-CAL-008: Expandable event detail state (click to expand/collapse)
+    // REQ-CAL-010: Past event display (normal/dimmed/hidden)
+    // REQ-CAL-011: Recurring event read-only indicator
     renderEventsSection(parent, events) {
         const sectionEl = parent.createDiv("macos-section");
         const headerEl = sectionEl.createDiv("macos-section-header");
@@ -5308,9 +5333,30 @@ class MacOSIntegration {
             return;
         }
 
+        const opts = this.plugin.options || {};
+        const pastDisplay = opts.pastEventDisplay || 'dimmed';
+        const now = new Date();
+
         for (let i = 0; i < events.length; i++) {
             const evt = events[i];
+
+            // REQ-CAL-010: Past event treatment
+            var evtEnd = evt.end || evt.start;
+            var isPast = evtEnd && evtEnd < now;
+            // For all-day events on a past day, check against end of selected day
+            var isAllDay = evt.isAllDay !== undefined ? evt.isAllDay : evt.allday;
+            if (isAllDay && this.selectedDate.isBefore(window.moment(), 'day')) {
+                isPast = true;
+            }
+            if (pastDisplay === 'hidden' && isPast) continue;
+
             const itemEl = sectionEl.createDiv("macos-item");
+            itemEl.addClass("calendian-event-item");
+
+            // REQ-CAL-010: Dim past events
+            if (isPast && pastDisplay === 'dimmed') {
+                itemEl.addClass("calendian-event-past");
+            }
 
             // Highlight: starting soon or ongoing
             if (this.isStartingSoon(evt)) {
@@ -5321,7 +5367,6 @@ class MacOSIntegration {
 
             // Time column
             const timeEl = itemEl.createDiv("macos-item-time");
-            var isAllDay = evt.isAllDay !== undefined ? evt.isAllDay : evt.allday;
             if (isAllDay) {
                 timeEl.textContent = "All day";
                 timeEl.addClass("macos-time-allday");
@@ -5331,21 +5376,27 @@ class MacOSIntegration {
 
             // Title + optional details column
             const detailsCol = itemEl.createDiv("macos-item-details");
-            const titleEl = detailsCol.createDiv("macos-item-title");
+            const titleRow = detailsCol.createDiv("calendian-event-title-row");
+            const titleEl = titleRow.createDiv("macos-item-title");
             titleEl.textContent = evt.title || evt.summary || "";
 
-            // Recurrence badge
+            // REQ-CAL-011: Recurring event indicator (read-only)
             if (evt.isRecurring) {
-                const recEl = detailsCol.createDiv("macos-item-meta");
-                recEl.textContent = "↻ " + (evt.recurrenceSummary || "Recurring");
-                recEl.addClass("macos-meta-recurring");
+                const recEl = titleRow.createDiv("calendian-event-recurring");
+                recEl.textContent = "⟳";
+                recEl.setAttribute("title", evt.recurrenceSummary || "Recurring event");
             }
 
-            // Location
+            // Inline meta: location and recurrence summary shown inline
             if (evt.location) {
                 const locEl = detailsCol.createDiv("macos-item-meta");
-                locEl.textContent = evt.location;
+                locEl.textContent = "📍 " + evt.location;
                 locEl.addClass("macos-meta-location");
+            }
+            if (evt.isRecurring && evt.recurrenceSummary) {
+                const recEl = detailsCol.createDiv("macos-item-meta");
+                recEl.textContent = "↻ " + evt.recurrenceSummary;
+                recEl.addClass("macos-meta-recurring");
             }
 
             // Calendar badge with color
@@ -5358,6 +5409,74 @@ class MacOSIntegration {
                 if (color) {
                     badgeEl.style.backgroundColor = color;
                     badgeEl.style.color = "#fff";
+                }
+            }
+
+            // REQ-CAL-008: Click to expand/collapse detail panel
+            var evtId = evt.id || (evt.title + "-" + (evt.start ? evt.start.getTime() : i));
+            var self = this;
+            itemEl.addEventListener("click", function(e) {
+                if (self._expandedEvents.has(evtId)) {
+                    self._expandedEvents.delete(evtId);
+                } else {
+                    self._expandedEvents.add(evtId);
+                }
+                self.render();
+            });
+
+            // REQ-CAL-007: Expanded detail panel
+            if (this._expandedEvents.has(evtId)) {
+                itemEl.addClass("calendian-event-expanded");
+                var detailEl = sectionEl.createDiv("calendian-event-detail");
+
+                // Location
+                if (evt.location) {
+                    var field = detailEl.createDiv("calendian-event-detail-field");
+                    field.createEl("strong").textContent = "Location";
+                    field.appendText(": " + evt.location);
+                }
+
+                // URL
+                if (evt.url) {
+                    var field = detailEl.createDiv("calendian-event-detail-field");
+                    field.createEl("strong").textContent = "Link";
+                    var link = field.createEl("a", {
+                        attr: { href: evt.url, target: "_blank", rel: "noopener" }
+                    });
+                    link.textContent = evt.url.length > 60 ? evt.url.substring(0, 57) + "..." : evt.url;
+                    link.style.color = "var(--text-accent)";
+                }
+
+                // Notes
+                if (evt.notes) {
+                    var field = detailEl.createDiv("calendian-event-detail-field");
+                    field.createEl("strong").textContent = "Notes";
+                    var notesText = evt.notes.length > 200 ? evt.notes.substring(0, 197) + "..." : evt.notes;
+                    field.createEl("div", { cls: "calendian-event-detail-notes" }).textContent = notesText;
+                }
+
+                // Attendees
+                if (evt.attendees && evt.attendees.length > 0) {
+                    var field = detailEl.createDiv("calendian-event-detail-field");
+                    field.createEl("strong").textContent = "Attendees";
+                    field.appendText(": " + evt.attendees.join(", "));
+                }
+
+                // Calendar source
+                if (calName) {
+                    var field = detailEl.createDiv("calendian-event-detail-field");
+                    field.createEl("strong").textContent = "Calendar";
+                    field.appendText(": " + calName);
+                    if (evt.accountName) {
+                        field.appendText(" (" + evt.accountName + ")");
+                    }
+                }
+
+                // Recurrence summary
+                if (evt.isRecurring && evt.recurrenceSummary) {
+                    var field = detailEl.createDiv("calendian-event-detail-field");
+                    field.createEl("strong").textContent = "Recurrence";
+                    field.appendText(": " + evt.recurrenceSummary);
                 }
             }
         }
