@@ -51,6 +51,12 @@ interface CalendianSettings {
   defaultCalendarId: string;        // default: "" (empty = auto-detect, prefers Outlook)
   defaultReminderListId: string;    // default: "" (empty = auto-detect, prefers Outlook "任务")
 
+  // ---- AI NL parsing (v0.3, optional) ----
+  aiParsingEnabled: boolean;        // default: false
+  aiEndpoint: string;               // default: "https://api.deepseek.com/v1/chat/completions"
+  aiApiKey: string;                 // default: "" (stored in gitignored data.json)
+  aiModel: string;                  // default: "deepseek-chat"
+
   // ---- Notifications (v0.5) ----
   notificationsEnabled: boolean;            // default: true
   eventNotificationLeadMinutes: number;     // default: 5, min: 0, max: 60
@@ -106,6 +112,10 @@ interface CalendianSourceMetadata {
   "legacyClickBehavior": false,
   "defaultCalendarId": "",
   "defaultReminderListId": "",
+  "aiParsingEnabled": false,
+  "aiEndpoint": "https://api.deepseek.com/v1/chat/completions",
+  "aiApiKey": "",
+  "aiModel": "deepseek-chat",
   "notificationsEnabled": true,
   "eventNotificationLeadMinutes": 5,
   "overdueReminderNotifications": true,

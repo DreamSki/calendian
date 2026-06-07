@@ -94,7 +94,7 @@ Everything else must be marked as planned, experimental, or future.
   - Settings stored in `data.json` (gitignored) — no personal data in git.
   - Auto-detect mode uses "outlook" substring matching (generic, not personal).
 - **Next:** Natural language event parsing (TASK-023). Deferred v0.2 items.
-- **Natural language parsing (TASK-023)**: `parseNaturalLanguage()` with English + expanded Chinese locale support (明早/明晚/今早/今晚, 下下周, 周末, X天后/周后/月后, 下个月/明年, X月Y日/号, 凌晨X点, X点一刻/三刻, X小时Y分钟, 一个半小时, period hint cleanup).
+- **Natural language parsing (TASK-023, 023a)**: `parseNaturalLanguage()` with English + expanded Chinese locale support (明早/明晚/今早/今晚, 下下周, 周末, X天后/周后/月后, 下个月/明年, X月Y日/号, 凌晨X点, X点一刻/三刻, X小时Y分钟, 一个半小时, YYMMDD, Chinese numeral hours, period hint cleanup). Optional AI-powered parsing via `callAIForParsing()` with configurable OpenAI-compatible backend (DeepSeek, etc).
 - **Bug fixes**: Reminder priority always defaulted to "none" due to positional arg mismatch (JS conditional push vs Swift positional parse). Fixed by always pushing placeholders for all optional args in both create-event and create-reminder.
 - **Next:** Deferred v0.2 items (REQ-UX-010, REQ-PERF-003, REQ-PERM-005, REQ-SYNC-004/005/007, REQ-DATA-003, REQ-TIME-005). v0.4 edit/delete.
 - **Last action:** 2026-06-08 — NL event parsing implemented (TASK-023 done).

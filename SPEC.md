@@ -735,6 +735,8 @@ All refresh paths go through `init()`, which has a `_refreshRunning` boolean gat
 | REQ-NL-004 | Natural language parsing SHALL be optional; manual event creation MUST remain available. | P0 | v0.3 | Implemented |
 | REQ-NL-005 | THE SYSTEM SHOULD support common date/time expressions in the user's locale. | P2 | v0.3 | Implemented |
 
+> **v0.3 enhancement:** Optional AI-powered NL parsing via configurable OpenAI-compatible API (e.g., DeepSeek). When enabled in settings, the QuickEventModal sends typed text to the configured LLM for parsing, falling back to regex if unavailable. Settings (`aiParsingEnabled`, `aiEndpoint`, `aiApiKey`, `aiModel`) stored in gitignored `data.json`. Only user-typed NL text is sent — no calendar data.
+
 ### 7.18 In-app notification requirements
 
 | ID | Requirement | Priority | Target | Status |
