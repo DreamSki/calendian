@@ -554,3 +554,47 @@
 .macos-refresh-btn + .macos-refresh-btn {
     margin-left: 6px;
 }
+
+/* ════════════════════════════════════════════════════════════ */
+/* v0.3 Quick Event Modal (REQ-NL-001)                          */
+/* ════════════════════════════════════════════════════════════ */
+
+.calendian-quick-hint {
+    font-size: 0.65em;
+    font-weight: normal;
+    color: var(--text-muted);
+    margin-left: 8px;
+}
+
+.calendian-quick-input {
+    width: 100%;
+    padding: 8px;
+    font-size: 14px;
+    margin-bottom: 8px;
+    border-radius: 4px;
+    border: 1px solid var(--background-modifier-border);
+    background-color: var(--background-primary);
+    color: var(--text-normal);
+}
+
+.calendian-quick-input:focus {
+    border-color: var(--interactive-accent);
+    outline: none;
+}
+
+.calendian-quick-preview {
+    min-height: 60px;
+    padding: 10px;
+    margin-bottom: 8px;
+    border-radius: 4px;
+    background-color: var(--background-secondary);
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.calendian-preview-label {
+    font-weight: 600;
+    color: var(--text-muted);
+    display: inline-block;
+    min-width: 80px;
+}

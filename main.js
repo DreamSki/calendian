@@ -1609,18 +1609,489 @@ async function tryToCreateDailyNote(date, inNewSplit, settings, cb) {
 // v0.3 Event & Reminder creation modals (REQ-WRITE-001..010)
 // ═══════════════════════════════════════════════════════════════
 
+// ── Natural Language Parser (REQ-NL-001, REQ-NL-002, REQ-NL-005) ─
+
+/**
+ * Parse a natural language event expression and extract structured fields.
+ *
+ * Supported patterns (English):
+ *   "tomorrow 3pm meeting with Sarah"
+ *   "next Monday 10am dentist"
+ *   "today meeting" / "meeting today"
+ *   "Friday 2pm lunch" / "lunch Friday at 2pm"
+ *   "in 3 days 4pm call"
+ *   "from 3pm to 5pm deep work"
+ *   "meeting at noon" / "morning yoga" / "evening run"
+ *   "3pm team sync for 1 hour"
+ *   "on 2026-12-25 Christmas dinner"
+ *
+ * Supported patterns (Chinese):
+ *   "明天下午3点开会" / "明天3点开会"
+ *   "周五上午10点看牙医"
+ *   "今天中午吃饭" / "晚上8点跑步"
+ *   "下周一早上9点评审"
+ *
+ * @param {string} text - Natural language input
+ * @param {moment} refDate - Reference date (defaults to today)
+ * @returns {{ title: string, date: moment|null, time: string|null, endTime: string|null, allDay: boolean, confidence: string }}
+ */
+function parseNaturalLanguage(text, refDate) {
+    if (!text || typeof text !== 'string') return null;
+    var input = text.trim();
+    if (!input) return null;
+
+    refDate = (refDate && refDate.clone()) || window.moment();
+    // Start from the beginning of the reference day for clean comparisons
+    refDate = refDate.clone().startOf('day');
+
+    var working = input;
+    var date = null;
+    var time = null;
+    var endTime = null;
+    var allDay = false;
+    var confidenceScore = 0;
+    var titleRemaining = '';
+
+    // ── Chinese date detection ──────────────────────────────
+
+    var cnAbsDate = { '今天': 0, '明天': 1, '后天': 2, '大后天': 3, '昨天': -1, '前天': -2 };
+    for (var cnKey in cnAbsDate) {
+        if (working.indexOf(cnKey) !== -1) {
+            date = refDate.clone().add(cnAbsDate[cnKey], 'days');
+            working = working.split(cnKey).join(' ');
+            confidenceScore += 3;
+            break;
+        }
+    }
+
+    // Chinese weekday: 下周一, 周一, 星期一, 下星期一
+    if (!date) {
+        var cnDayNum = { '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '日': 0, '天': 0 };
+        var cnWdRe = /(下)?周\s*([一二三四五六日天])|星期\s*([一二三四五六日天])/;
+        var cnWdMatch = working.match(cnWdRe);
+        if (cnWdMatch) {
+            var targetDow = cnDayNum[cnWdMatch[2] || cnWdMatch[3]];
+            var cnNextWeek = !!cnWdMatch[1];
+            date = refDate.clone().day(targetDow + (cnNextWeek ? 7 : 0));
+            if (date.isBefore(refDate, 'day') && !cnNextWeek) date.add(7, 'days');
+            if (date.isSame(refDate, 'day') && !cnNextWeek) date.add(7, 'days');
+            working = working.replace(cnWdMatch[0], ' ');
+            confidenceScore += 3;
+        }
+    }
+
+    // ── English absolute dates ──────────────────────────────
+
+    if (!date && /\btonight\b/i.test(working)) {
+        date = refDate.clone();
+        if (!time) time = '20:00';
+        working = working.replace(/\btonight\b/gi, ' ');
+        confidenceScore += 3;
+    }
+    if (!date && /\btoday\b/i.test(working)) {
+        date = refDate.clone();
+        working = working.replace(/\btoday\b/gi, ' ');
+        confidenceScore += 3;
+    }
+    if (!date && /\btomorrow\b/i.test(working)) {
+        date = refDate.clone().add(1, 'days');
+        working = working.replace(/\btomorrow\b/gi, ' ');
+        confidenceScore += 3;
+    }
+
+    // English: "next Monday/Tuesday/..."
+    if (!date) {
+        var enDaysFull = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
+        var enDaysAbbr = ['mon','tue','wed','thu','fri','sat','sun'];
+        var nextRe = /\bnext\s+(mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)\b/i;
+        var nextMatch = working.match(nextRe);
+        if (nextMatch) {
+            var target = nextMatch[1].toLowerCase();
+            for (var di = 0; di < enDaysFull.length; di++) {
+                if (target === enDaysFull[di] || target === enDaysAbbr[di]) {
+                    var targetDow2 = di < 6 ? di + 1 : 0; // Sun=0, Mon=1..Sat=6
+                    date = refDate.clone().day(targetDow2 + 7);
+                    break;
+                }
+            }
+            working = working.replace(nextMatch[0], ' ');
+            confidenceScore += 3;
+        }
+    }
+
+    // English: bare weekday names (next occurrence, not today)
+    if (!date) {
+        var bareWdRe = /\b(mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)\b/i;
+        var bareMatch = working.match(bareWdRe);
+        if (bareMatch) {
+            var bareTarget = bareMatch[1].toLowerCase();
+            for (var dj = 0; dj < enDaysFull.length; dj++) {
+                if (bareTarget === enDaysFull[dj] || bareTarget === enDaysAbbr[dj]) {
+                    var targetDow3 = dj < 6 ? dj + 1 : 0;
+                    date = refDate.clone().day(targetDow3);
+                    // Next occurrence (skip today)
+                    if (date.isSame(refDate, 'day') || date.isBefore(refDate, 'day')) {
+                        date.add(7, 'days');
+                    }
+                    break;
+                }
+            }
+            if (date) {
+                working = working.replace(bareMatch[0], ' ');
+                confidenceScore += 2;
+            }
+        }
+    }
+
+    // "in N days/weeks"
+    if (!date) {
+        var inRe = /\bin\s+(\d+)\s*(day|week|month)s?\b/i;
+        var inMatch = working.match(inRe);
+        if (inMatch) {
+            var inNum = parseInt(inMatch[1], 10);
+            var inUnit = inMatch[2].toLowerCase();
+            date = refDate.clone();
+            if (inUnit === 'day') date.add(inNum, 'days');
+            else if (inUnit === 'week') date.add(inNum * 7, 'days');
+            else if (inUnit === 'month') date.add(inNum, 'months');
+            working = working.replace(inMatch[0], ' ');
+            confidenceScore += 2;
+        }
+    }
+
+    // "on YYYY-MM-DD" or "on MM/DD"
+    if (!date) {
+        var isoDateRe = /\b(on\s+)?(\d{4})-(\d{2})-(\d{2})\b/;
+        var isoMatch = working.match(isoDateRe);
+        if (isoMatch) {
+            var parsedDate = window.moment(isoMatch[0].replace(/^on\s+/i, ''), 'YYYY-MM-DD');
+            if (parsedDate.isValid()) {
+                date = parsedDate;
+                working = working.replace(isoMatch[0], ' ');
+                confidenceScore += 3;
+            }
+        }
+    }
+    if (!date) {
+        var slashDateRe = /\b(on\s+)?(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/;
+        var slashMatch = working.match(slashDateRe);
+        if (slashMatch) {
+            var fmt = slashMatch[4] ? 'MM/DD/YYYY' : 'MM/DD';
+            var parsedSlash = window.moment(slashMatch[0].replace(/^on\s+/i, ''), fmt);
+            if (parsedSlash.isValid()) {
+                date = parsedSlash;
+                working = working.replace(slashMatch[0], ' ');
+                confidenceScore += 3;
+            }
+        }
+    }
+
+    // ── Time range detection (range first, before single time) ─
+
+    // English: "from X to/until Y" (where X,Y are times)
+    var fromToRe = /\bfrom\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s*(?:to|until|till|–|-)\s*(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\b/i;
+    var ftMatch = working.match(fromToRe);
+    if (ftMatch) {
+        var t1 = parseTimeExpression(ftMatch[1]);
+        var t2 = parseTimeExpression(ftMatch[2]);
+        if (t1) { time = t1; confidenceScore += 2; }
+        if (t2) { endTime = t2; confidenceScore += 1; }
+        working = working.replace(ftMatch[0], ' ');
+    }
+
+    // Chinese: "X点到Y点"
+    if (!time || !endTime) {
+        var cnRangeRe = /(\d{1,2})点(?:到|至|~|～)(\d{1,2})点/;
+        var cnRangeMatch = working.match(cnRangeRe);
+        if (cnRangeMatch) {
+            var cnT1 = parseInt(cnRangeMatch[1], 10);
+            var cnT2 = parseInt(cnRangeMatch[2], 10);
+            // Determine AM/PM from context
+            var periodHint = getChinesePeriodHint(working);
+            time = cnHourTo24(cnT1, periodHint);
+            endTime = cnHourTo24(cnT2, periodHint);
+            if (endTime && time && parseInt(endTime.split(':')[0]) < parseInt(time.split(':')[0])) {
+                // e.g., "3点到5点" in afternoon context → both PM
+                // cross-noon case: if t1<t2 and both in PM, fine; if t2<t1, t2 is next day
+            }
+            working = working.replace(cnRangeMatch[0], ' ');
+            confidenceScore += 2;
+        }
+    }
+
+    // ── Duration detection ──────────────────────────────────
+
+    // "for X hours/minutes", "Xh", "Xm"
+    if (time && !endTime) {
+        var durRe = /\bfor\s+(\d+(?:\.\d+)?)\s*(hour|hr|minute|min)s?\b|\b(\d+(?:\.\d+)?)\s*(h|m)\b/i;
+        var durMatch = working.match(durRe);
+        if (durMatch) {
+            var durNum = parseFloat(durMatch[1] || durMatch[3]);
+            var durUnitFull = (durMatch[2] || '').toLowerCase();
+            var durUnitShort = (durMatch[4] || '').toLowerCase();
+            var durMinutes = 0;
+            if (durUnitFull === 'hour' || durUnitFull === 'hr' || durUnitShort === 'h') {
+                durMinutes = Math.round(durNum * 60);
+            } else if (durUnitFull === 'minute' || durUnitFull === 'min' || durUnitShort === 'm') {
+                durMinutes = Math.round(durNum);
+            }
+            if (durMinutes > 0) {
+                var timeParts = time.split(':');
+                var startMin = parseInt(timeParts[0], 10) * 60 + parseInt(timeParts[1], 10);
+                var endMin = startMin + durMinutes;
+                var endH = Math.floor(endMin / 60) % 24;
+                var endM = endMin % 60;
+                endTime = ('0' + endH).slice(-2) + ':' + ('0' + endM).slice(-2);
+                confidenceScore += 1;
+            }
+            working = working.replace(durMatch[0], ' ');
+        }
+    }
+
+    // ── Single time detection ───────────────────────────────
+
+    // Chinese time: 上午/下午/中午/晚上/早上 + N点/N点半
+    if (!time) {
+        var cnTimeRe = /(早上|上午|中午|下午|晚上|傍晚)?(\d{1,2})点(半|(\d{1,2})分?)?/;
+        var cnTimeMatch = working.match(cnTimeRe);
+        if (cnTimeMatch) {
+            var cnPeriod = cnTimeMatch[1] || '';
+            var cnHour = parseInt(cnTimeMatch[2], 10);
+            var cnHalf = cnTimeMatch[3] === '半';
+            var cnMin = cnTimeMatch[4] ? parseInt(cnTimeMatch[4], 10) : 0;
+            if (cnHalf) cnMin = 30;
+            time = cnHourTo24(cnHour, cnPeriod);
+            if (!cnPeriod) {
+                // Heuristic: if hour <= 7 and no period hint, assume PM
+                var fullPeriod = getChinesePeriodHint(working);
+                if (!fullPeriod && cnHour <= 7) {
+                    time = cnHourTo24(cnHour, '下午');
+                }
+            }
+            if (time) {
+                // Adjust minutes
+                if (cnMin > 0) {
+                    var tp = time.split(':');
+                    time = tp[0] + ':' + ('0' + cnMin).slice(-2);
+                }
+                confidenceScore += 2;
+            }
+            working = working.replace(cnTimeMatch[0], ' ');
+        }
+    }
+
+    // Chinese standalone period words
+    if (!time && !date) {
+        var cnPeriodAlone = { '中午': '12:00', '早上': '09:00', '上午': '09:00', '下午': '14:00', '晚上': '19:00' };
+        for (var cp in cnPeriodAlone) {
+            if (working.indexOf(cp) !== -1) {
+                time = cnPeriodAlone[cp];
+                working = working.split(cp).join(' ');
+                confidenceScore += 1;
+                break;
+            }
+        }
+    }
+
+    // English time patterns
+    if (!time) {
+        // "at 3pm", "at 3:00pm", "at 15:00"
+        var atTimeRe = /\bat\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\b/i;
+        var atMatch = working.match(atTimeRe);
+        if (atMatch) {
+            var parsed = parseTimeExpression(atMatch[1]);
+            if (parsed) { time = parsed; confidenceScore += 2; }
+            working = working.replace(atMatch[0], ' ');
+        }
+    }
+
+    if (!time) {
+        // Bare time: "3pm", "3:00pm", "15:00", "3:00"
+        var bareTimeRe = /\b(\d{1,2}:\d{2}\s*(?:am|pm)?|\d{1,2}\s*(?:am|pm))\b/i;
+        var bareTimeMatch = working.match(bareTimeRe);
+        if (bareTimeMatch) {
+            var btParsed = parseTimeExpression(bareTimeMatch[1]);
+            if (btParsed) { time = btParsed; confidenceScore += 2; }
+            working = working.replace(bareTimeMatch[0], ' ');
+        }
+    }
+
+    // English standalone period words
+    if (!time) {
+        var enPeriod = { 'noon': '12:00', 'midday': '12:00', 'midnight': '00:00' };
+        for (var ep in enPeriod) {
+            var epRe = new RegExp('\\b' + ep + '\\b', 'i');
+            if (epRe.test(working)) {
+                time = enPeriod[ep];
+                working = working.replace(epRe, ' ');
+                confidenceScore += 1;
+                break;
+            }
+        }
+    }
+    if (!time) {
+        var enVagueRe = /\b(morning)\b/i;  var vm = working.match(enVagueRe);
+        if (vm) { time = '09:00'; working = working.replace(vm[0], ' '); confidenceScore += 1; }
+    }
+    if (!time) {
+        var afterRe = /\b(afternoon)\b/i;  var am2 = working.match(afterRe);
+        if (am2) { time = '14:00'; working = working.replace(am2[0], ' '); confidenceScore += 1; }
+    }
+    if (!time) {
+        var eveRe = /\b(evening)\b/i;  var em = working.match(eveRe);
+        if (em) { time = '18:00'; working = working.replace(em[0], ' '); confidenceScore += 1; }
+    }
+
+    // ── All-day detection ───────────────────────────────────
+
+    if (!time && !endTime) {
+        var allDayRe = /\b(all[- ]?day|全天|whole[- ]?day)\b/i;
+        if (allDayRe.test(working)) {
+            allDay = true;
+            working = working.replace(allDayRe, ' ');
+            confidenceScore += 1;
+        }
+    }
+
+    // ── Title extraction ────────────────────────────────────
+
+    // Remove connecting words
+    var connectors = /\b(at|on|for|about|from|to|until|till|in|the|a|an|with|every|each|our|my)\b/gi;
+    working = working.replace(connectors, ' ');
+
+    // Collapse whitespace and trim
+    titleRemaining = working.replace(/\s+/g, ' ').trim();
+
+    // Remove leading/trailing punctuation
+    titleRemaining = titleRemaining.replace(/^[^\w一-鿿]+/, '').replace(/[^\w一-鿿]+$/, '');
+
+    // If nothing meaningful remains, use original input as title
+    if (!titleRemaining || titleRemaining.length < 2) {
+        titleRemaining = input;
+        // But strip the date/time we already parsed to make a cleaner title
+        if (date) {
+            // Re-extract: just use original title pattern more loosely
+            titleRemaining = input;
+        }
+    }
+
+    // ── Confidence ──────────────────────────────────────────
+
+    var confidence;
+    if (confidenceScore >= 4) confidence = 'high';
+    else if (confidenceScore >= 2) confidence = 'medium';
+    else confidence = 'low';
+
+    // Only return if we found something useful
+    if (!date && !time && !endTime && !allDay && confidenceScore === 0) {
+        // No structured data found — just a bare title
+        return { title: titleRemaining || input, date: null, time: null, endTime: null, allDay: false, confidence: 'low' };
+    }
+
+    return {
+        title: titleRemaining || input,
+        date: date,
+        time: time,
+        endTime: endTime,
+        allDay: allDay,
+        confidence: confidence
+    };
+}
+
+/**
+ * Parse a time expression like "3pm", "3:00pm", "15:00", "3:00" → "HH:MM"
+ */
+function parseTimeExpression(str) {
+    if (!str) return null;
+    str = str.trim().toLowerCase();
+    var isPM = str.indexOf('pm') !== -1;
+    var isAM = str.indexOf('am') !== -1;
+    str = str.replace(/\s*(am|pm)\s*/i, '').trim();
+
+    var parts = str.split(':');
+    var hour = parseInt(parts[0], 10);
+    var min = parts.length > 1 ? parseInt(parts[1], 10) : 0;
+
+    if (isNaN(hour) || hour < 0 || hour > 23 || isNaN(min) || min < 0 || min > 59) return null;
+
+    if (isPM && hour < 12) hour += 12;
+    if (isAM && hour === 12) hour = 0;
+
+    return ('0' + hour).slice(-2) + ':' + ('0' + min).slice(-2);
+}
+
+/**
+ * Convert Chinese hour (1-12) + period hint to 24-hour "HH:MM".
+ */
+function cnHourTo24(hour, period) {
+    if (hour < 1 || hour > 12) return null;
+    var h = hour;
+    if (period === '上午' || period === '早上') {
+        // 上午12点 = midnight (0:00), not noon
+        // but usually 上午12点 means 0:00; 上午 can be 0-11
+        // 12 AM (凌晨) = 0
+        if (h === 12) h = 0;
+    } else if (period === '下午' || period === '晚上' || period === '傍晚') {
+        if (h < 12) h += 12;
+    } else if (period === '中午') {
+        if (h >= 11 && h <= 13) h = 12;
+        else if (h < 11) h += 12; // ambiguous
+    }
+    // No period hint: keep as-is (could be AM or PM, caller should adjust)
+    return ('0' + h).slice(-2) + ':00';
+}
+
+/**
+ * Scan working text for a Chinese period hint (上午/下午/晚上/早上/中午).
+ */
+function getChinesePeriodHint(text) {
+    if (/早上|上午/.test(text)) return '上午';
+    if (/下午/.test(text)) return '下午';
+    if (/晚上|傍晚/.test(text)) return '晚上';
+    if (/中午/.test(text)) return '中午';
+    return '';
+}
+
+/** Escape HTML entities for safe preview rendering. */
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/** Format "HH:MM" string for display in preview. */
+function formatTimeHM(t) {
+    if (!t) return '';
+    var parts = t.split(':');
+    var h = parseInt(parts[0], 10);
+    var m = parseInt(parts[1], 10);
+    var ampm = h >= 12 ? 'PM' : 'AM';
+    var h12 = h % 12 || 12;
+    return h12 + ':' + ('0' + m).slice(-2) + ' ' + ampm;
+}
+
+// ═══════════════════════════════════════════════════════════════
+
 class EventCreateModal extends obsidian.Modal {
-    constructor(app, macosIntegration) {
+    constructor(app, macosIntegration, prefill) {
         super(app);
         this.integ = macosIntegration;
+        this.prefill = prefill || null;
     }
 
     onOpen() {
         var self = this;
         var integ = this.integ;
         var selDate = integ.selectedDate ? integ.selectedDate.clone() : window.moment();
+        var pf = this.prefill;
 
-        this.titleEl.setText("Create Event");
+        // Determine prefill values
+        var pfTitle = (pf && pf.title) ? pf.title : '';
+        var pfDate = (pf && pf.date) ? pf.date.clone() : selDate.clone();
+        var pfTime = (pf && pf.time) ? pf.time : '';
+        var pfEndTime = (pf && pf.endTime) ? pf.endTime : '';
+        var pfAllDay = (pf && pf.allDay) ? true : false;
+
+        this.titleEl.setText(pfTitle ? "Create Event — " + pfTitle : "Create Event");
 
         // ── Title ──────────────────────────────────────────
         var titleSetting = new obsidian.Setting(this.contentEl)
@@ -1630,6 +2101,7 @@ class EventCreateModal extends obsidian.Modal {
         titleSetting.addText(function(cmp) {
             titleInput = cmp.inputEl;
             cmp.setPlaceholder("e.g. Meeting with team");
+            if (pfTitle) cmp.setValue(pfTitle);
         });
 
         // ── All-day toggle ────────────────────────────────
@@ -1638,6 +2110,7 @@ class EventCreateModal extends obsidian.Modal {
             .setName("All-day event")
             .addToggle(function(cmp) {
                 allDayToggle = cmp;
+                if (pfAllDay) cmp.setValue(true);
             });
 
         // ── Start date ────────────────────────────────────
@@ -1647,7 +2120,7 @@ class EventCreateModal extends obsidian.Modal {
             .setDesc("YYYY-MM-DD")
             .addText(function(cmp) {
                 startDateInput = cmp.inputEl;
-                cmp.setValue(selDate.format("YYYY-MM-DD"));
+                cmp.setValue(pfDate.format("YYYY-MM-DD"));
             });
 
         // ── Start time ────────────────────────────────────
@@ -1657,7 +2130,8 @@ class EventCreateModal extends obsidian.Modal {
             .setDesc("HH:MM (ignored if all-day)")
             .addText(function(cmp) {
                 startTimeInput = cmp.inputEl;
-                cmp.setPlaceholder("e.g. 14:00");
+                if (pfTime) cmp.setValue(pfTime);
+                else cmp.setPlaceholder("e.g. 14:00");
             });
 
         // ── End date ──────────────────────────────────────
@@ -1667,7 +2141,7 @@ class EventCreateModal extends obsidian.Modal {
             .setDesc("YYYY-MM-DD")
             .addText(function(cmp) {
                 endDateInput = cmp.inputEl;
-                cmp.setValue(selDate.format("YYYY-MM-DD"));
+                cmp.setValue(pfDate.format("YYYY-MM-DD"));
             });
 
         // ── End time ──────────────────────────────────────
@@ -1677,7 +2151,8 @@ class EventCreateModal extends obsidian.Modal {
             .setDesc("HH:MM (ignored if all-day)")
             .addText(function(cmp) {
                 endTimeInput = cmp.inputEl;
-                cmp.setPlaceholder("e.g. 15:00");
+                if (pfEndTime) cmp.setValue(pfEndTime);
+                else cmp.setPlaceholder("e.g. 15:00");
             });
 
         // ── Calendar ──────────────────────────────────────
@@ -1836,6 +2311,167 @@ class EventCreateModal extends obsidian.Modal {
                 btn.setButtonText("Cancel")
                     .onClick(function() { self.close(); });
             });
+    }
+}
+
+// ── Quick Event Modal (NL parsing, REQ-NL-001..005) ─────────
+
+class QuickEventModal extends obsidian.Modal {
+    constructor(app, macosIntegration) {
+        super(app);
+        this.integ = macosIntegration;
+        this._parsedResult = null;
+    }
+
+    onOpen() {
+        var self = this;
+        var integ = this.integ;
+        var refDate = integ.selectedDate ? integ.selectedDate.clone() : window.moment();
+
+        this.titleEl.setText("Quick Create Event");
+        this.titleEl.createEl("span", {
+            text: " — type naturally, e.g. \"tomorrow 3pm meeting\"",
+            cls: "calendian-quick-hint"
+        });
+
+        // ── NL text input ───────────────────────────────────
+        var inputEl = this.contentEl.createEl("input", {
+            type: "text",
+            placeholder: "e.g. tomorrow 3pm meeting with Sarah",
+            cls: "calendian-quick-input"
+        });
+        inputEl.style.width = "100%";
+        inputEl.style.padding = "8px";
+        inputEl.style.fontSize = "14px";
+        inputEl.style.marginBottom = "8px";
+        inputEl.style.borderRadius = "4px";
+        inputEl.style.border = "1px solid var(--background-modifier-border)";
+        inputEl.style.backgroundColor = "var(--background-primary)";
+        inputEl.style.color = "var(--text-normal)";
+
+        // ── Preview area ────────────────────────────────────
+        var previewEl = this.contentEl.createDiv("calendian-quick-preview");
+        previewEl.style.minHeight = "60px";
+        previewEl.style.padding = "10px";
+        previewEl.style.marginBottom = "8px";
+        previewEl.style.borderRadius = "4px";
+        previewEl.style.backgroundColor = "var(--background-secondary)";
+        previewEl.style.fontSize = "13px";
+        previewEl.style.display = "none";
+
+        // ── Error / hint area ───────────────────────────────
+        var errorEl = this.contentEl.createDiv("calendian-form-error");
+        errorEl.style.display = "none";
+
+        // ── Debounced parse on input ────────────────────────
+        var parseTimer = null;
+        inputEl.addEventListener('input', function() {
+            var text = inputEl.value.trim();
+            if (!text) {
+                previewEl.style.display = 'none';
+                self._parsedResult = null;
+                return;
+            }
+            if (parseTimer) clearTimeout(parseTimer);
+            parseTimer = setTimeout(function() {
+                var result = parseNaturalLanguage(text, refDate);
+                self._parsedResult = result;
+                if (result) {
+                    self._renderPreview(previewEl, result, integ);
+                } else {
+                    previewEl.style.display = 'none';
+                }
+            }, 300);
+        });
+
+        // Focus the input
+        setTimeout(function() { inputEl.focus(); }, 50);
+
+        // ── Buttons ─────────────────────────────────────────
+        new obsidian.Setting(this.contentEl)
+            .addButton(function(btn) {
+                btn.setButtonText("Fill Form")
+                    .setCta()
+                    .onClick(function() {
+                        var prefill = self._parsedResult;
+                        if (!prefill || !prefill.title) {
+                            // Parse one more time on current text
+                            var text = inputEl.value.trim();
+                            if (text) {
+                                prefill = parseNaturalLanguage(text, refDate);
+                                self._parsedResult = prefill;
+                            }
+                        }
+                        if (prefill && prefill.title && !prefill.date) {
+                            // No date parsed — default to selected date
+                            prefill.date = refDate.clone();
+                        }
+                        if (!prefill || !prefill.title) {
+                            errorEl.textContent = "Please enter a description (e.g. \"tomorrow 3pm meeting\").";
+                            errorEl.style.display = "block";
+                            return;
+                        }
+                        self.close();
+                        new EventCreateModal(integ.plugin.app, integ, prefill).open();
+                    });
+            })
+            .addButton(function(btn) {
+                btn.setButtonText("Manual Form")
+                    .onClick(function() {
+                        self.close();
+                        new EventCreateModal(integ.plugin.app, integ).open();
+                    });
+            })
+            .addButton(function(btn) {
+                btn.setButtonText("Cancel")
+                    .onClick(function() { self.close(); });
+            });
+    }
+
+    _renderPreview(el, result, integ) {
+        el.empty();
+        el.style.display = 'block';
+
+        var rows = [];
+
+        // Title
+        if (result.title) {
+            rows.push('<span class="calendian-preview-label">Title:</span> ' + escapeHtml(result.title));
+        }
+
+        // Date
+        if (result.date) {
+            rows.push('<span class="calendian-preview-label">Date:</span> ' + result.date.format('dddd, MMM D, YYYY'));
+        } else {
+            rows.push('<span class="calendian-preview-label">Date:</span> <em>(no date parsed — will use selected date)</em>');
+        }
+
+        // Time
+        if (result.time) {
+            var timeStr = formatTimeHM(result.time);
+            if (result.endTime) {
+                timeStr += ' → ' + formatTimeHM(result.endTime);
+            }
+            rows.push('<span class="calendian-preview-label">Time:</span> ' + timeStr);
+        } else if (!result.allDay) {
+            rows.push('<span class="calendian-preview-label">Time:</span> <em>(no time — will be all-day or start-of-day)</em>');
+        }
+
+        // All-day
+        if (result.allDay) {
+            rows.push('<span class="calendian-preview-label">Type:</span> All-day');
+        }
+
+        // Confidence
+        var confBadge = '';
+        if (result.confidence === 'high') confBadge = '🟢';
+        else if (result.confidence === 'medium') confBadge = '🟡';
+        else confBadge = '🔴';
+        rows.push('<span class="calendian-preview-label">Confidence:</span> ' + confBadge + ' ' + result.confidence);
+
+        el.innerHTML = rows.map(function(r) {
+            return '<div style="margin-bottom:3px;line-height:1.5">' + r + '</div>';
+        }).join('');
     }
 }
 
@@ -6078,7 +6714,7 @@ class MacOSIntegration {
         refreshBtn.setAttribute("title", "Refresh calendar data");
         refreshBtn.addEventListener("click", () => { this.init(true); });
 
-        // v0.3: Create buttons (REQ-WRITE-001, REQ-WRITE-006)
+        // v0.3: Create buttons (REQ-WRITE-001, REQ-WRITE-006, REQ-NL-001)
         if (showCal && calPerm === 'granted') {
             const addEventBtn = headerRow.createDiv("macos-refresh-btn");
             addEventBtn.textContent = "+Event";
@@ -6086,6 +6722,15 @@ class MacOSIntegration {
             addEventBtn.style.marginLeft = "4px";
             addEventBtn.addEventListener("click", () => {
                 new EventCreateModal(this.plugin.app, this).open();
+            });
+
+            // Quick-create with NL parsing (REQ-NL-001)
+            const quickBtn = headerRow.createDiv("macos-refresh-btn");
+            quickBtn.textContent = "⚡";
+            quickBtn.setAttribute("title", "Quick create with natural language (e.g. \"tomorrow 3pm meeting\")");
+            quickBtn.style.marginLeft = "2px";
+            quickBtn.addEventListener("click", () => {
+                new QuickEventModal(this.plugin.app, this).open();
             });
         }
         if (showRem && remPerm === 'granted') {
