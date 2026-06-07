@@ -207,14 +207,14 @@ Timer fires (refreshIntervalMinutes, default 5)
     _refreshRunning = false
 ```
 
-#### Planned triggers (v0.2–v0.3)
+#### Planned triggers (v0.3)
 
 | Trigger | Version | Mechanism |
 |---|---|---|
-| Window focus | v0.2 | `window.onfocus` → `init()` if cache stale |
-| macOS system notification | v0.2 | `calendian-helper watch` subscribes `EKEventStoreChangedNotification` → writes signal → JS calls `init()` |
+| Window focus | v0.3 | `window.onfocus` → `init()` if cache stale |
+| macOS system notification | v0.3 | `calendian-helper watch` subscribes `EKEventStoreChangedNotification` → writes signal → JS calls `init()` |
 | Post-write refresh | v0.3 | After create/edit/delete via helper → `init()` immediately |
-| Watch process failure | v0.2 | Fall back to timer-based refresh |
+| Watch process failure | v0.3 | Fall back to timer-based refresh |
 
 ---
 

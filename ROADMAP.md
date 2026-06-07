@@ -26,7 +26,7 @@ Current repository status: **v0.2 read-only polish — complete**.
 
 | Version | Theme | Requirement groups | Release posture |
 |---|---|---|---|
-| v0.1 | Read-only MVP | `REQ-PLAT-*`, `REQ-PERM-*`, `REQ-CAL-001..007`, `REQ-REM-001..004,008`, `REQ-SRC-001..005`, `REQ-CACHE-001..008`, `REQ-UX-001..004`, `REQ-PRIV-*`, `REQ-ERR-001..004`, `REQ-DIAG-001`, `REQ-DATA-*` | Mostly complete |
+| v0.1 | Read-only MVP | `REQ-PLAT-*`, `REQ-PERM-*`, `REQ-CAL-001..007`, `REQ-REM-001..004,008`, `REQ-SRC-001..005`, `REQ-CACHE-001..008`, `REQ-UX-001..004`, `REQ-PRIV-*`, `REQ-ERR-001..004`, `REQ-DIAG-001`, `REQ-DATA-*` | Complete |
 | v0.2 | Read-only polish | expandable details, overdue/no-date reminders, multi-day events, month-cell dots, full diagnostic panel | Complete |
 | v0.3 | Safe create | simple event/reminder creation, natural language parsing, validation, write verification + deferred v0.2 sync/polish items | Planned |
 | v0.4 | Safe edit/delete | simple event/reminder edit/delete, reminder completion, recurring safety | Planned |

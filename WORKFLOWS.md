@@ -2,7 +2,7 @@
 
 > This document provides practical examples of how to use Calendian in your daily Obsidian workflow.
 
-> **Status**: Current capabilities only (v0.1 read-only MVP)
+> **Status**: Current capabilities only (v0.1–v0.2 read-only)
 
 ---
 
@@ -30,9 +30,9 @@
    - Events panel shows all calendar events for today
    - Reminders panel shows incomplete reminders due today
 
-3. **View Event Details** (Planned - not yet available)
-   - Click an event to see location, attendees, notes
-   - Currently limited to title, time, and calendar source
+3. **View Event Details**
+   - Click an event to expand details: location, URL, notes, attendees, calendar source, recurrence summary
+   - Recurring events show a read-only indicator (⟳)
 
 4. **Navigate to Other Days**
    - Click any date to see that day's schedule
@@ -197,19 +197,21 @@
    - Each reminder shows title and list source
 
 2. **View Overdue Reminders**
-   - Reminders past their due date appear in the panel
-   - Overdue visual distinction planned for v0.2
+   - Reminders past their due date appear with red border and "overdue" badge
+   - Due date displayed in red alongside the reminder
 
 3. **No-Date Reminders**
-   - Reminders without due dates show on today's panel
-   - Dedicated section planned for v0.2
+   - Reminders without due dates appear in a collapsible section
+   - Toggle visibility by clicking the section header
+
+4. **Display Range Selector**
+   - Filter reminders: selected day / next 7 days / all incomplete
 
 ### Limitations
 
 - ❌ Cannot create reminders from Obsidian (planned v0.3)
 - ❌ Cannot mark reminders complete (planned v0.4)
 - ❌ Cannot edit reminders (planned v0.4)
-- ❌ No overdue styling (planned v0.2)
 
 ### Workaround
 
@@ -386,6 +388,6 @@ Want to help shape Calendian's future? Check out:
 
 ## Version Notes
 
-This document describes **v0.1 read-only MVP** capabilities.
+This document describes **v0.1–v0.2 read-only** capabilities.
 
 Features marked as "Planned" or "Future" are not yet implemented and may change.

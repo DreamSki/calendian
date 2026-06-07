@@ -44,7 +44,7 @@ See SPEC.md §7.6.1 and ARCHITECTURE.md §3 for full refresh architecture.
 ## What NOT to do
 
 - **Do not introduce npm, TypeScript, esbuild, or any build toolchain.** The project is plain JS loaded directly by Obsidian. Target multi-file split (v0.3) uses `require()` only.
-- **Do not implement write operations** (create/edit/delete events or reminders). v0.1 is read-only. REQ-ARCH-001 gates writes behind safety requirements that don't exist yet.
+- **Do not implement write operations** (create/edit/delete events or reminders). v0.1–v0.2 are read-only. REQ-ARCH-001 gates writes behind safety requirements that don't exist yet.
 - **Do not change code without updating docs.** See SDD workflow below — this is the #1 cause of project drift.
 - **Do not remove legacy JXA code** (`execJXA`, `parseEvents`, `parseReminders`). It's unused but kept as fallback reference.
 - **Do not log event titles, notes, locations, or reminder text.** Use `console.log("[Calendian] ...")` prefix for all logging.

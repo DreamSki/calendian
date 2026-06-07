@@ -43,7 +43,7 @@ Calendian reads from Calendar.app and Reminders.app through a native Swift Event
 | Notes | Yes | Displayed if present | Yes | |
 | Account name | Yes | Yes | Yes | From EKSource.title |
 | Stable reminder ID | Yes | Internal only | Yes | EKReminder.calendarItemIdentifier |
-| Subtasks | No (v0.2) | No (v0.2) | No | |
+| Subtasks | Rendering ready, data-dependent | Rendering ready, data-dependent | Rendering ready, data-dependent | Helper parentId not yet populated (v0.3) | |
 
 ---
 
@@ -53,7 +53,7 @@ Calendian reads from Calendar.app and Reminders.app through a native Swift Event
 
 Stored in `<vault>/.obsidian/plugins/calendian/data.json`.
 
-**Current fields (v0.1):**
+**Current fields (v0.1–v0.2):**
 
 ```json
 {
@@ -69,7 +69,9 @@ Stored in `<vault>/.obsidian/plugins/calendian/data.json`.
 
 The disk cache (`_eventsCache`, `_remindersCache`) stores event/reminder fields (title, time, calendar name, location, notes, etc.) for fast cold-start — see §1 for the full field list. This cache is stored inside the vault and never leaves the device.
 
-**Planned fields (v0.2+):** `cacheRangeMonthsPast`, `cacheRangeMonthsFuture`, `showPastEvents`, `reminderRange`, `showCompletedReminders`, and self-direction fields (nudge config, etc.) will be added as the corresponding features ship. See [`SETTINGS_SCHEMA.md`](./SETTINGS_SCHEMA.md) for the full target schema.
+**Fields added in v0.2:** `pastEventDisplay`, `reminderDisplayRange`, `showNoDateReminders`.
+
+**Planned fields (v0.3+):** `cacheRangeMonthsPast`, `cacheRangeMonthsFuture`, `showCompletedReminders`, and self-direction fields (nudge config, etc.) will be added as the corresponding features ship. See [`SETTINGS_SCHEMA.md`](./SETTINGS_SCHEMA.md) for the full target schema.
 
 Event titles, locations, URLs, notes, and calendar/list names are stored in the disk cache inside `data.json` for cold-start performance. This data stays inside the Obsidian vault and is never sent to external services. See §1 for the full per-field storage matrix.
 

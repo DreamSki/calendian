@@ -32,7 +32,7 @@ This matrix links product goals to requirements, implementation tasks, acceptanc
 | Version | Primary requirement IDs | Acceptance gates | Test suites |
 |---|---|---|---|
 | v0.1 Read-only MVP | `REQ-PLAT-001..004`, `REQ-PERM-001..004`, `REQ-DATA-001..002`, `REQ-DATA-005`, `REQ-DATA-007`, `REQ-CAL-001..007`, `REQ-REM-001..004,008`, `REQ-SRC-001..005`, `REQ-CACHE-001..008`, `REQ-UX-001..004`, `REQ-PRIV-001..002`, `REQ-ERR-001..004`, `REQ-DIAG-001`, `REQ-TIME-001,004,006..008` | `GATE-V001-*` | `TS-001` to `TS-006` |
-| v0.2 Read-only polish | `REQ-CAL-008..012`, `REQ-REM-005..007,009`, `REQ-DIAG-001..002`, `REQ-UX-006`, `REQ-UX-010`, `REQ-ERR-003`, `REQ-DATA-003`, `REQ-TIME-002,003,005` | v0.2 gates | `TS-003` to `TS-006` |
+| v0.2 Read-only polish | `REQ-CAL-008..012`, `REQ-REM-005..007`, `REQ-DIAG-001..002`, `REQ-UX-006`, `REQ-ERR-003`, `REQ-TIME-002,003` | v0.2 gates | `TS-003` to `TS-006` |
 | v0.3 Safe create | `REQ-WRITE-001..010`, `REQ-NL-001..005`, `REQ-ERR-005..006`, `REQ-REC-001..003`, `REQ-ARCH-001` | v0.3 gates | `TS-007` |
 | v0.4 Safe edit/delete | `REQ-WRITE-011..020`, `REQ-REC-004..008` | v0.4 gates | `TS-008` |
 | v0.5 Note association & notifications | `REQ-NOTE-001..010`, `REQ-TASK-001..004`, `REQ-NOTIF-001..005`, `REQ-PRIV-003` | v0.5 gates | `TS-009` |

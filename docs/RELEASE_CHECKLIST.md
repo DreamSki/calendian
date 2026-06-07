@@ -94,27 +94,27 @@ This checklist must be completed and signed off before any version is released. 
 
 ### v0.1 — Read-only MVP
 
-- [ ] `GATE-V001-01`: Plugin loads on supported macOS + Obsidian desktop.
-- [ ] `GATE-V001-02`: Calendar events display for selected date (basic fields).
-- [ ] `GATE-V001-03`: Incomplete reminders display for selected date.
-- [ ] `GATE-V001-04`: Date selection updates panel from cache; single-click does NOT open/create note.
-- [ ] `GATE-V001-05`: Cmd/Ctrl + click retains daily-note open/create behavior.
-- [ ] `GATE-V001-06`: Source discovery lists available calendars/lists or shows safe failure.
-- [ ] `GATE-V001-07`: Auto-refresh timer clears on plugin unload.
-- [ ] `GATE-V001-08`: README labels this release as read-only and partial where appropriate.
-- [ ] `TS-001` through `TS-006` pass.
+- [x] `GATE-V001-01`: Plugin loads on supported macOS + Obsidian desktop.
+- [x] `GATE-V001-02`: Calendar events display for selected date (basic fields).
+- [x] `GATE-V001-03`: Incomplete reminders display for selected date.
+- [x] `GATE-V001-04`: Date selection updates panel from cache; single-click does NOT open/create note.
+- [x] `GATE-V001-05`: Cmd/Ctrl + click retains daily-note open/create behavior.
+- [x] `GATE-V001-06`: Source discovery lists available calendars/lists or shows safe failure.
+- [x] `GATE-V001-07`: Auto-refresh timer clears on plugin unload.
+- [x] `GATE-V001-08`: README labels this release as read-only and partial where appropriate.
+- [x] `TS-001` through `TS-006` pass.
 
 ### v0.2 — Read-only polish
 
-- [ ] Overdue reminders are visually distinct.
-- [ ] No-date reminders have a configurable section.
-- [ ] Past events can be grayed out or hidden.
-- [ ] Multi-day events appear on every overlapping day.
-- [ ] Month cells can show event dots without performance regression.
-- [ ] Event details expose location, links, notes, recurrence summary.
-- [ ] Diagnostic panel shows permission status, counts, timing.
-- [ ] Manual refresh is available.
-- [ ] Last refresh time is displayed.
+- [x] Overdue reminders are visually distinct.
+- [x] No-date reminders have a configurable section.
+- [x] Past events can be grayed out or hidden.
+- [x] Multi-day events appear on every overlapping day.
+- [x] Month cells can show event dots without performance regression.
+- [x] Event details expose location, links, notes, recurrence summary.
+- [x] Diagnostic panel shows permission status, counts, timing.
+- [x] Manual refresh is available.
+- [x] Last refresh time is displayed.
 
 ### v0.3 — Safe create
 
