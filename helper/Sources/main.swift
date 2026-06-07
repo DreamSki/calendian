@@ -1,4 +1,4 @@
-import EventKit
+@preconcurrency import EventKit
 import Foundation
 
 // MARK: - Models (match SPEC §5.1 / §5.2)
@@ -122,6 +122,9 @@ struct CalendianHelper {
                 try await createReminder(title: args[2], listID: args[3],
                                          dueDate: dueDate, dueTime: dueTime,
                                          priority: priority, notes: notes)
+            case "watch":
+                let signalFile = args.count > 2 ? args[2] : "/tmp/calendian-watch-signal"
+                try await watchChanges(signalFile: signalFile)
             default:
                 printUsage()
                 exit(1)
@@ -452,6 +455,37 @@ struct CalendianHelper {
         return try await store.requestFullAccessToReminders()
     }
 
+    // MARK: - Watch (long-lived process for REQ-SYNC-005)
+
+    static func watchChanges(signalFile: String) async throws {
+        _ = try await requestEventsAccessIfNeeded()
+        _ = try await requestRemindersAccessIfNeeded()
+
+        // Write initial signal so JS knows we're watching
+        writeSignal(signalFile)
+
+        // Debounce: EKEventStoreChanged can fire rapidly during sync
+        var lastSignal: Date = .distantPast
+        let debounceMs: Double = 1000  // 1 second minimum between signals
+
+        let stream = NotificationCenter.default.notifications(
+            named: .EKEventStoreChanged,
+            object: store
+        )
+        for await _ in stream {
+            let now = Date()
+            if now.timeIntervalSince(lastSignal) * 1000 >= debounceMs {
+                writeSignal(signalFile)
+                lastSignal = now
+            }
+        }
+    }
+
+    static func writeSignal(_ path: String) {
+        let ts = ISO8601DateFormatter().string(from: Date())
+        try? ts.write(toFile: path, atomically: true, encoding: .utf8)
+    }
+
     // MARK: - Helpers
 
     static func colorString(from cgColor: CGColor?) -> String {
@@ -490,6 +524,7 @@ struct CalendianHelper {
               toggle-reminder <id>               Toggle reminder completion
               create-event <title> <start> <end> <calId> <isAllDay> [location] [notes] [url]
               create-reminder <title> <listId> [dueDate] [dueTime] [priority] [notes]
+              watch [signal-file]                Watch for Calendar/Reminders changes (long-running)
 
             """, stderr)
     }
