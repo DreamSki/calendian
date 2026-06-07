@@ -23,6 +23,7 @@ This document records the actual repository state. It intentionally separates im
 | Source filtering | Implemented | Toggle individual calendars/lists via settings. Filter by stable UUID (EventKit `calendarIdentifier`). In-memory instant apply via `render()`. Persisted in `data.json`. |
 | Permission handling | Implemented | Independent calendar/reminder permission states with recovery guidance and retry buttons. Partial permission support (show available data + banner for denied source). |
 | Error states | Implemented | Error classification (permission_denied, timeout, error). Per-source error banners with retry. Parse-failure isolation. Empty vs error distinction. |
+| Month cell event dots | Implemented | Calendar-colored dots on month cells showing event presence per calendar. Hollow reminder dot. Multi-day event span support. Uses in-memory cache only (no helper calls). Respects source filters. Dynamic CSS injection for per-calendar colors. |
 | Refresh / sync | Partial | Timer-driven refresh (configurable interval, default 5min). Manual refresh button. `_refreshRunning` concurrency guard. Window focus and EKEventStoreChangedNotification watch planned for v0.2. Post-write refresh planned for v0.3. See SPEC.md §7.6.1. |
 | Right-click actions | Planned | Current day/week context menu is inherited from calendar note behavior; Calendian event/reminder actions are not complete. |
 | Write operations | Planned | Native EventKit helper supports writes (`EKEventStore.save`). `toggle-reminder` command already implemented in helper. Full CRUD planned for v0.3-v0.4. |
@@ -74,12 +75,12 @@ Everything else must be marked as planned, experimental, or future.
 
 > Updated by AI after every meaningful step. Next session reads this to continue without re-explaining context.
 
-- **Doing:** Merging all v0.2 branches into main.
-- **Done this session:** All v0.2 tasks implemented in parallel:
+- **Doing:** All v0.2 tasks merged into main. Awaiting final verification.
+- **Done this session:** All v0.2 tasks implemented in parallel across 4 worktrees:
   - TASK-014: Diagnostic export with consent modal and redaction (REQ-DIAG-002).
   - TASK-010+011: Event details panel, multi-day events, past event display, recurring indicator (REQ-CAL-007..011).
   - TASK-012: Reminder polish — overdue styling, no-date section, display range selector, subtasks (REQ-REM-005..009).
   - TASK-013: Month cell event dots with calendar colors (REQ-UX-006).
-- **Decisions:** 4 parallel worktrees, each touching distinct line ranges. Merge conflicts only in doc files. REQ-REM-009 subtasks marked Partial (helper does not yet populate parentId).
-- **Next:** Final verification — compile helper, syntax check, eye-check in Obsidian.
-- **Last action:** 2026-06-08 — merging branches into main.
+- **Decisions:** 4 parallel worktrees, each touching distinct line ranges. All conflicts were "keep both sides". REQ-REM-009 subtasks marked Partial (helper does not yet populate parentId).
+- **Next:** Final verification — syntax check, compile helper, eye-check in Obsidian.
+- **Last action:** 2026-06-08 — all branches merged into main.

@@ -530,3 +530,12 @@
     text-decoration: line-through;
     opacity: 0.5;
 }
+
+/* ======================================== */
+/* Month Cell Event Dots (REQ-UX-006)       */
+/* ======================================== */
+
+/* Reminder dot: hollow with muted color */
+.calendian-reminder-dot.hollow {
+    stroke: var(--text-muted) !important;
+}
