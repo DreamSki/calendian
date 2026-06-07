@@ -1623,18 +1623,24 @@ class EventCreateModal extends obsidian.Modal {
             });
 
         // ── Calendar ──────────────────────────────────────
-        var calendarSelect;
+        var calendarSelect = null;
+        var calendarsReady = false;
         var calendarSetting = new obsidian.Setting(this.contentEl)
             .setName("Calendar")
             .setDesc("Loading calendars...");
-        var calendarsPromise = integ.discoverCalendars().then(function(cals) {
-            calendarSetting.setDesc("Choose a calendar");
+        integ.discoverCalendars().then(function(cals) {
             calendarSetting.addDropdown(function(cmp) {
                 calendarSelect = cmp;
                 for (var i = 0; i < cals.length; i++) {
                     cmp.addOption(cals[i].id, cals[i].name);
                 }
+                if (cals.length > 0) cmp.setValue(cals[0].id);
             });
+            calendarSetting.setDesc(cals.length > 0 ? "Choose a calendar" : "No calendars found");
+            calendarsReady = true;
+        }).catch(function() {
+            calendarSetting.setDesc("Failed to load calendars");
+            calendarsReady = true;
         });
 
         // ── Location (optional) ───────────────────────────
@@ -1730,8 +1736,9 @@ class EventCreateModal extends obsidian.Modal {
                                 errorEl.style.display = "block";
                             }
                         } catch (err) {
-                            console.error("[Calendian] Event creation failed:", err);
-                            errorEl.textContent = "Error: " + ((err.stderr || err.error?.message || err.message || "Unknown error"));
+                            var errMsg = err.stderr || (err.error && err.error.message) || err.message || JSON.stringify(err);
+                            console.error("[Calendian] Event creation failed:", errMsg);
+                            errorEl.textContent = "Error: " + errMsg;
                             errorEl.style.display = "block";
                         }
                     });
@@ -1769,18 +1776,24 @@ class ReminderCreateModal extends obsidian.Modal {
             });
 
         // ── List ───────────────────────────────────────────
-        var listSelect;
+        var listSelect = null;
+        var listsReady = false;
         var listSetting = new obsidian.Setting(this.contentEl)
             .setName("List")
             .setDesc("Loading lists...");
-        var listsPromise = integ.discoverReminderLists().then(function(lists) {
-            listSetting.setDesc("Choose a reminder list");
+        integ.discoverReminderLists().then(function(lists) {
             listSetting.addDropdown(function(cmp) {
                 listSelect = cmp;
                 for (var i = 0; i < lists.length; i++) {
                     cmp.addOption(lists[i].id, lists[i].name);
                 }
+                if (lists.length > 0) cmp.setValue(lists[0].id);
             });
+            listSetting.setDesc(lists.length > 0 ? "Choose a reminder list" : "No lists found");
+            listsReady = true;
+        }).catch(function() {
+            listSetting.setDesc("Failed to load lists");
+            listsReady = true;
         });
 
         // ── Due date ──────────────────────────────────────
@@ -1885,8 +1898,9 @@ class ReminderCreateModal extends obsidian.Modal {
                                 errorEl.style.display = "block";
                             }
                         } catch (err) {
-                            console.error("[Calendian] Reminder creation failed:", err);
-                            errorEl.textContent = "Error: " + ((err.stderr || err.error?.message || err.message || "Unknown error"));
+                            var errMsg = err.stderr || (err.error && err.error.message) || err.message || JSON.stringify(err);
+                            console.error("[Calendian] Reminder creation failed:", errMsg);
+                            errorEl.textContent = "Error: " + errMsg;
                             errorEl.style.display = "block";
                         }
                     });
