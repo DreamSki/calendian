@@ -2399,33 +2399,33 @@ function addMinutesToTime(t, mins) {
  * The API key and endpoint are read from plugin settings (data.json, gitignored).
  * Only the user-typed quick-create text is sent — no calendar data.
  */
-async function callAIForParsing(text, settings, refDate) {
+async function callAIForParsing(text, settings, refDate, signal) {
     if (!settings || !settings.aiEndpoint || !settings.aiApiKey) return null;
 
-    var refDateStr = (refDate || window.moment()).format('YYYY-MM-DD dddd');
-    var todayStr = window.moment().format('YYYY-MM-DD');
+    var todayStr = (refDate || window.moment()).format('YYYY-MM-DD');
 
+    // Compact system prompt — every token costs time
     var systemPrompt = [
-        'You are a date/time parser. Extract event details from the user\'s natural language input as JSON.',
-        'Today is ' + todayStr + ' (' + refDateStr + ').',
-        'Output a JSON object with exactly these fields:',
-        '  "title": string — the event description/title (required)',
-        '  "date": string|null — ISO date "YYYY-MM-DD", or null if not found',
-        '  "time": string|null — "HH:MM" in 24h format, or null',
-        '  "endTime": string|null — "HH:MM" in 24h format, or null (only if duration specified)',
-        '  "allDay": boolean — true only if explicitly all-day',
-        '  "confidence": "high"|"medium"|"low"',
-        'Rules:',
-        '- Support both English and Chinese.',
-        '- Vague times: morning=09:00 afternoon=14:00 evening=18:00 noon=12:00.',
-        '- Chinese: 早上/上午=09:00 中午=12:00 下午=14:00 晚上=19:00 凌晨=03:00.',
-        '- tomorrow/明天 = ' + todayStr + ' + 1 day.',
-        '- If duration given, compute endTime from time+duration.',
-        '- If no time specified, set time and endTime to null.',
-        '- Output ONLY the JSON object, no other text.',
-    ].join('\n');
+        'Parse event text to JSON. Today=' + todayStr + '.',
+        'Fields: title(string), date(string|null YYYY-MM-DD), time(string|null HH:MM), endTime(string|null HH:MM), allDay(boolean), confidence("high"|"medium"|"low").',
+        'EN: morning=09:00 afternoon=14:00 evening=18:00 noon=12:00.',
+        'ZH: 早上/上午=09:00 中午=12:00 下午=14:00 晚上=19:00 凌晨=03:00.',
+        'ZH: 明天=' + todayStr + '+1day. If duration→compute endTime. No time→null.',
+        'Output ONLY JSON.',
+    ].join(' ');
+
+    // Timeout: 10s for the whole request
+    var timeoutMs = 10000;
+    var controller = new AbortController();
+    var timeoutId = setTimeout(function() { controller.abort(); }, timeoutMs);
+
+    // If caller provided a signal, link it
+    if (signal) {
+        signal.addEventListener('abort', function() { controller.abort(); });
+    }
 
     try {
+        var t0 = Date.now();
         var resp = await fetch(settings.aiEndpoint, {
             method: 'POST',
             headers: {
@@ -2439,12 +2439,16 @@ async function callAIForParsing(text, settings, refDate) {
                     { role: 'user', content: text },
                 ],
                 temperature: 0,
-                max_tokens: 512,
+                max_tokens: 256,
                 response_format: { type: "json_object" },
             }),
+            signal: controller.signal,
         });
+        clearTimeout(timeoutId);
 
-        // Read response as text first (so we can log it on parse failure)
+        var elapsed = Date.now() - t0;
+        console.log('[Calendian] AI responded in ' + elapsed + 'ms');
+
         var respText = await resp.text();
         if (!resp.ok) {
             console.log('[Calendian] AI HTTP ' + resp.status + ': ' + respText.substring(0, 300));
@@ -2461,37 +2465,29 @@ async function callAIForParsing(text, settings, refDate) {
 
         var content = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
         if (!content) {
-            console.log('[Calendian] AI returned empty content. Full response:', JSON.stringify(data).substring(0, 500));
+            console.log('[Calendian] AI empty content. Response:', JSON.stringify(data).substring(0, 500));
             return null;
         }
 
-        console.log('[Calendian] AI raw content (' + content.length + ' chars):', content.substring(0, 300));
-
-        // Extract JSON from response (may have markdown fences)
+        // Extract JSON object from content
         var jsonStr = content.trim();
-
-        // Strategy 1: strip ```json ... ``` fences
-        var jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-        if (jsonMatch && jsonMatch[1].trim()) {
-            jsonStr = jsonMatch[1].trim();
-        } else {
-            // Strategy 2: find first { ... } JSON object in the text
+        // Strip markdown fences
+        var fenceMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (fenceMatch && fenceMatch[1].trim()) jsonStr = fenceMatch[1].trim();
+        // Fallback: find first { ... }
+        if (!/^\s*\{/.test(jsonStr)) {
             var braceMatch = jsonStr.match(/\{[\s\S]*\}/);
-            if (braceMatch) {
-                jsonStr = braceMatch[0];
-            }
+            if (braceMatch) jsonStr = braceMatch[0];
         }
 
         if (!jsonStr) {
-            console.log('[Calendian] AI content has no JSON:', content.substring(0, 200));
+            console.log('[Calendian] AI no JSON in content:', content.substring(0, 200));
             return null;
         }
 
         var parsed = JSON.parse(jsonStr);
+        console.log('[Calendian] AI OK (' + elapsed + 'ms):', jsonStr.substring(0, 200));
 
-        console.log('[Calendian] AI parsed OK:', jsonStr.substring(0, 200));
-
-        // Convert to internal format
         var result = {
             title: parsed.title || text,
             date: parsed.date ? window.moment(parsed.date, 'YYYY-MM-DD') : null,
@@ -2499,14 +2495,19 @@ async function callAIForParsing(text, settings, refDate) {
             endTime: parsed.endTime || null,
             allDay: !!parsed.allDay,
             confidence: parsed.confidence || 'high',
-            _aiParsed: true,      // marker for UI display
-            _aiRawJson: jsonStr,  // raw AI response for debug display
+            _aiParsed: true,
+            _aiRawJson: jsonStr,
         };
 
         if (result.date && !result.date.isValid()) result.date = null;
         return result;
     } catch (err) {
-        console.log('[Calendian] AI parsing failed:', err.message || err);
+        clearTimeout(timeoutId);
+        if (err.name === 'AbortError') {
+            console.log('[Calendian] AI request aborted (timeout or cancelled)');
+        } else {
+            console.log('[Calendian] AI parsing failed:', err.message || err);
+        }
         return null;
     }
 }
@@ -2855,6 +2856,10 @@ class QuickEventModal extends obsidian.Modal {
             }
         };
 
+        // ── Cancel in-flight AI request when user types ─────
+        var aiAbortController = null;
+        var aiRunning = false;
+
         inputEl.addEventListener('input', function() {
             var text = inputEl.value.trim();
             if (!text) {
@@ -2862,6 +2867,12 @@ class QuickEventModal extends obsidian.Modal {
                 self._parsedResult = null;
                 self._aiResult = null;
                 return;
+            }
+            // Cancel any in-flight AI request — text has changed
+            if (aiAbortController) {
+                aiAbortController.abort();
+                aiAbortController = null;
+                aiRunning = false;
             }
             // Any new typing invalidates the AI result (it was for old text)
             if (self._aiResult) {
@@ -2874,7 +2885,6 @@ class QuickEventModal extends obsidian.Modal {
         });
 
         // ── Enter key → AI parse (only when enabled & configured) ─
-        var aiRunning = false;
         inputEl.addEventListener('keydown', async function(e) {
             if (e.key !== 'Enter') return;
             e.preventDefault();
@@ -2886,30 +2896,36 @@ class QuickEventModal extends obsidian.Modal {
             var useAI = !!(opts.aiParsingEnabled && opts.aiEndpoint && opts.aiApiKey);
             if (!useAI) return; // no AI configured, Enter does nothing extra
 
-            // Show AI parsing indicator
+            // Show AI parsing indicator immediately
             previewEl.style.display = 'block';
             previewEl.innerHTML = '<div style="color:var(--text-muted);font-style:italic">🤖 AI parsing...</div>';
 
+            // Create abort controller — cancelled if user types during request
+            aiAbortController = new AbortController();
             aiRunning = true;
+            var aiSignal = aiAbortController.signal;
+
             try {
                 var aiResult = await callAIForParsing(text, {
                     aiEndpoint: opts.aiEndpoint,
                     aiApiKey: opts.aiApiKey,
                     aiModel: opts.aiModel || 'deepseek-chat',
-                }, refDate);
+                }, refDate, aiSignal);
                 if (aiResult) {
                     self._aiResult = aiResult;
-                    self._parsedResult = aiResult; // sync for _getOrParse
+                    self._parsedResult = aiResult;
                     self._renderPreview(previewEl, aiResult, integ);
                     aiRunning = false;
+                    aiAbortController = null;
                     return;
                 }
             } catch (err) {
-                console.log('[Calendian] AI parse error:', err.message || err);
+                // Error already logged in callAIForParsing
             }
             aiRunning = false;
+            aiAbortController = null;
 
-            // AI failed — fall back to regex, clear any stale AI result
+            // AI failed/aborted — fall back to regex
             self._aiResult = null;
             doRegexParse(text);
         });
