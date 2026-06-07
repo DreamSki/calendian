@@ -7,7 +7,7 @@
 
 This roadmap is not an independent wish list. Every release is derived from requirement groups in [`SPEC.md`](./SPEC.md), acceptance gates in [`docs/sdd/ACCEPTANCE.md`](./docs/sdd/ACCEPTANCE.md), tasks in [`docs/sdd/TASKS.md`](./docs/sdd/TASKS.md), and risks in [`docs/sdd/RISKS.md`](./docs/sdd/RISKS.md).
 
-Current repository status: **v0.2 read-only polish — complete**.
+Current repository status: **v0.3 safe create — partial**. Event/reminder creation complete. Natural language parsing and deferred v0.2 items pending.
 
 ---
 
@@ -28,7 +28,7 @@ Current repository status: **v0.2 read-only polish — complete**.
 |---|---|---|---|
 | v0.1 | Read-only MVP | `REQ-PLAT-*`, `REQ-PERM-*`, `REQ-CAL-001..007`, `REQ-REM-001..004,008`, `REQ-SRC-001..005`, `REQ-CACHE-001..008`, `REQ-UX-001..004`, `REQ-PRIV-*`, `REQ-ERR-001..004`, `REQ-DIAG-001`, `REQ-DATA-*` | Complete |
 | v0.2 | Read-only polish | expandable details, overdue/no-date reminders, multi-day events, month-cell dots, full diagnostic panel | Complete |
-| v0.3 | Safe create | simple event/reminder creation, natural language parsing, validation, write verification + deferred v0.2 sync/polish items | Planned |
+| v0.3 | Safe create | simple event/reminder creation, natural language parsing, validation, write verification + deferred v0.2 sync/polish items | **Partial** — create done; NL parsing + most deferred items pending |
 | v0.4 | Safe edit/delete | simple event/reminder edit/delete, reminder completion, recurring safety | Planned |
 | v0.5 | Note association & notifications | frontmatter association, meeting notes, templates, in-app notifications, limited Tasks integration | Planned |
 | v0.5.5 | Self-direction | goals, habits, nudges, reflections, encouragement statistics | Planned |
@@ -153,17 +153,18 @@ Allow users to create simple non-recurring events and simple reminders from Obsi
 
 ### Deliverables
 
-- Event creation form or side panel.
-- Reminder creation form or side panel.
-- Required-field validation.
-- Save feedback.
-- Refresh-after-create verification.
-- Safe failure state.
-- Natural language event creation ("tomorrow 3pm meeting").
-- Confirmation dialog for ambiguous NL parsing.
-- Recurring event creation blocked until separately specified.
-- Module refactor started before write complexity grows.
-- Subtask display (populate helper `parentId` for reminders, complete REQ-REM-009).
+- ✅ Event creation form (`EventCreateModal`).
+- ✅ Reminder creation form (`ReminderCreateModal`).
+- ✅ Required-field validation.
+- ✅ Save feedback (Obsidian notice + error display).
+- ✅ Refresh-after-create verification (`init(true)` after write).
+- ✅ Safe failure state (error classification + red error banner).
+- ✅ Recurring event creation blocked (only `.thisEvent` span).
+- ✅ Default calendar/list settings (`defaultCalendarId`, `defaultReminderListId`).
+- ❌ Natural language event creation ("tomorrow 3pm meeting") — TASK-023.
+- ❌ Confirmation dialog for ambiguous NL parsing.
+- ❌ Module refactor completed — `src/` files on disk but require() blocked.
+- ❌ Subtask display (helper `parentId` needed, REQ-REM-009).
 
 ### Explicit exclusions
 
