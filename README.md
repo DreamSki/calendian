@@ -1,208 +1,178 @@
 # Calendian
 
-> 🗓️ macOS Calendar & Reminders, deeply integrated into your Obsidian workflow.
+> 🗓️ macOS Calendar & Reminders inside your Obsidian workflow.
+
+Calendian is an Obsidian desktop plugin that integrates macOS Calendar events and macOS Reminders into the Obsidian sidebar. It is being developed with a Specification-Driven Development process: requirements, roadmap, tasks, tests, and release gates are tracked explicitly before features are claimed as complete.
+
+Current status: **pre-v0.1 / read-only MVP partial**.
 
 ---
 
 ## What is Calendian?
 
-Calendian brings your macOS Calendar events and Reminders directly into Obsidian's sidebar. No more switching between apps — see your daily schedule, manage reminders, and link notes to events, all in one place.
+Calendian helps Obsidian users view their daily schedule and reminders without switching out of their vault. It reads from the Calendar.app and Reminders.app data already configured on the user's Mac, including accounts that macOS Calendar/Reminders can access such as iCloud, Google, Exchange/Outlook, CalDAV, and local calendars.
 
-It accesses **all accounts** configured in your macOS Calendar app — iCloud, Exchange/Outlook, Google Calendar, CalDAV, and local calendars — through the native macOS automation interface (JXA).
+Calendian is local-first by default. Early versions use macOS automation and do not send calendar or reminder data to third-party services.
 
 ---
 
-## Features
+## Current capabilities
 
-### 📅 Calendar Events
-- **Instant day view** — Click any date to see that day's events instantly (cached ±6 months)
-- **Calendar colors** — Each event shows its calendar's native color as a badge
-- **Duration display** — Shows full time range like `14:00 - 16:00 (2h)`
-- **All-day events** — Displayed at the top with a distinct style
-- **Live status** — Ongoing events (green highlight) and upcoming events (orange highlight)
-- **Past events** — Grayed out but still visible
-- **Multi-day events** — Appear on each day they span
-- **Event details** — Click to expand: location, links, notes, recurrence info
+The repository currently contains a partial read-only integration. Treat the following as current or partially implemented behavior:
 
-### ✅ Reminders
-- **Today's reminders** — Due items for the selected date
-- **No-date reminders** — Separate section for undated items
-- **Overdue alerts** — Past-due reminders highlighted in red
-- **Display range** — Switch between today / next 7 days / all incomplete
-- **Priority levels** — High/Medium/Low from macOS Reminders
+- Obsidian desktop plugin shell.
+- macOS-only Calendar/Reminders integration using local automation.
+- Sidebar calendar view with a lower events/reminders panel.
+- Basic date selection: click a date to show that day's schedule data.
+- Cmd/Ctrl + click behavior for opening or creating daily notes is preserved.
+- Basic Calendar event reading.
+- Basic Reminders reading.
+- Basic event display: title, time range, all-day handling, calendar badge.
+- Basic reminder display: title, due time where available, list badge.
+- Basic calendar/reminder source discovery from settings.
+- Basic refresh/cache behavior.
 
-### 🎨 Visual Design
-- **Claude.ai-inspired style** — Warm, elegant interface with rounded cards and amber accents
-- **Adjustable split** — Drag the divider between calendar and event panel
-- **Theme-aware** — Adapts to your Obsidian theme (dark/light)
-- **Calendar source colors** — Date cells show colored dots for events
+For the precise truth table, see [`docs/sdd/CURRENT_STATUS.md`](./docs/sdd/CURRENT_STATUS.md).
 
-### ⚡ Performance
-- **Pre-loaded cache** — ±6 months of data loaded at startup (~3-5s)
-- **Instant switching** — Date changes are < 100ms from cache
-- **Background refresh** — Configurable auto-refresh interval (default: 5 min)
+---
 
-### 🔧 Settings
-- **Calendar source picker** — "Discover" button auto-lists all calendars with toggle switches
-- **Reminder list picker** — Same discover-and-toggle pattern for reminder lists
-- **Display options** — Toggle past events, no-date reminders, notifications
-- **Keyboard shortcuts** — Navigate dates, switch views, create events
+## Planned capabilities
+
+These are planned, but should not be treated as current behavior until their requirements and release gates pass:
+
+- Overdue reminder styling.
+- No-date reminders section.
+- Reminder display range selector.
+- Past event gray-out / hide setting.
+- Multi-day event display across all overlapping days.
+- Month-cell event dots based on source calendars.
+- Expandable event details with location, links, notes, and recurrence summary.
+- Manual refresh and diagnostics panel.
+- Safe event/reminder creation.
+- Safe event/reminder editing and deletion.
+- Recurring event safety model.
+- Event/reminder note association through frontmatter.
+- Meeting-note templates.
+- Copy-as-Markdown.
+- Timeline view, week view, local search, and statistics.
+
+See [`ROADMAP.md`](./ROADMAP.md) for the requirement-driven plan.
+
+---
+
+## Explicit non-goals for v0.1
+
+v0.1 is read-only. It does **not** include:
+
+- creating Calendar events;
+- editing Calendar events;
+- deleting Calendar events;
+- creating, editing, deleting, or completing Reminders;
+- recurring event mutation;
+- automatic Tasks ↔ Reminders sync;
+- Android, Windows, Linux, or web support;
+- direct Google Calendar API or Microsoft Graph API integration;
+- cloud sync managed by Calendian.
 
 ---
 
 ## Installation
 
-### Manual Installation
+### Manual installation
 
-1. Download or clone this repository
-2. Copy the `calendian` folder to your Obsidian vault:
-   ```
+1. Download or clone this repository.
+2. Copy the plugin folder to your Obsidian vault:
+
+   ```text
    your-vault/.obsidian/plugins/calendian/
    ```
-3. Open Obsidian → Settings → Community Plugins
-4. **Disable** the original Calendar plugin (if enabled)
-5. **Enable** "Calendian"
-6. The calendar view will appear in the right sidebar
 
-### First-Time Setup
+3. Open Obsidian → Settings → Community Plugins.
+4. Enable the plugin.
+5. Open the calendar view from the right sidebar or command palette.
 
-When you first open the calendar view, macOS will prompt you to grant automation permissions:
+### First-time setup
 
-> **"Obsidian wants to control Calendar.app"** → Click **Allow**
+When the calendar view first tries to access system data, macOS may ask for automation permission:
 
-> **"Obsidian wants to control Reminders.app"** → Click **Allow**
+- `Obsidian wants to control Calendar.app`
+- `Obsidian wants to control Reminders.app`
 
-If you accidentally denied access, go to:
-**System Settings → Privacy & Security → Automation** and re-enable Obsidian's access.
+Click **Allow** if you want Calendian to read those sources.
 
----
+If permission is denied accidentally, go to:
 
-## Usage
-
-### Basic Navigation
-
-| Action | Result |
-|--------|--------|
-| **Click** a date | Shows that day's events and reminders |
-| **Cmd/Ctrl + Click** a date | Opens or creates a daily note |
-| Click **← Today** button | Returns to today's view |
-| **← / →** arrow keys | Navigate to previous/next day |
-
-### Viewing Events
-
-Events are displayed in a card-style list below the calendar:
-- **All-day events** appear at the top with an italic "All day" label
-- **Timed events** show the full time range and duration
-- **Calendar badge** shows which calendar the event belongs to (with native color)
-- **Status indicators**: green bar = ongoing, orange bar = starting within 30 min
-
-### Managing Calendar Sources
-
-1. Open **Settings → Calendian → Calendar Sources**
-2. Click **"Discover"** to scan all available calendars
-3. Toggle individual calendars on/off
-4. Same process for **Reminder Sources**
-
-### Right-Click Menus
-
-Right-click on events, reminders, or dates for quick actions:
-- **Event**: Edit, Delete, Open in Calendar.app, Associate note
-- **Reminder**: Mark complete, Edit, Delete, Associate note
-- **Date**: New event, New reminder, Open daily note
-
----
-
-## Plugin Settings
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| Show Calendar Events | On | Display events from macOS Calendar |
-| Show Reminders | On | Display reminders from macOS Reminders |
-| Calendar Sources | All | Toggle which calendars to display |
-| Reminder Sources | All | Toggle which reminder lists to display |
-| Refresh Interval | 5 min | How often to refresh data from macOS |
-| Default View | Day List | Day list / Timeline / Week |
-| Reminder Display Range | Today only | Today / 7 days / All incomplete |
-| Show Past Events | On | Gray out ended events |
-| Show No-Date Reminders | On | Display undated reminders |
-| Event Notifications | On | Notify before events start |
-| Startup Today Overview | On | Show today's summary on launch |
-
----
-
-## Keyboard Shortcuts
-
-| Shortcut | Action |
-|----------|--------|
-| `T` | Jump to today |
-| `←` / `→` | Previous / next day |
-| `Shift+←` / `Shift+→` | Previous / next week |
-| `V` | Cycle through views |
-| `N` | New event |
-| `Shift+N` | New reminder |
-| `S` | Search events/reminders |
-
----
-
-## File Structure
-
+```text
+System Settings → Privacy & Security → Automation
 ```
-.obsidian/plugins/calendian/
-├── main.js                 ← Plugin entry point
-├── macos-integration.js    ← JXA data access & cache
-├── macos-renderer.js       ← UI rendering
-├── macos-settings.js       ← Settings page
-├── macos-sync.js           ← Two-way sync (Phase 2)
-├── macos-notifications.js  ← Notification system
-├── macos-note-link.js      ← Note associations (Phase 3)
-├── slash-commands.js       ← Slash commands (Phase 2)
-├── views/                  ← Additional views (Phase 4)
-├── styles.css              ← All styles
-├── manifest.json           ← Plugin metadata
-└── data.json               ← User settings (auto-generated)
-```
+
+Then re-enable Obsidian's access to Calendar and/or Reminders.
+
+---
+
+## Usage: current read-only flow
+
+| Action | Current result |
+|---|---|
+| Click a date | Selects that date and shows cached events/reminders for that date. |
+| Cmd/Ctrl + click a date | Opens or creates the daily note for that date. |
+| Click Today / month navigation | Moves the calendar view. |
+| Open settings → macOS Integration | Toggle Calendar/Reminders display and discover sources. |
+
+Write actions such as create/edit/delete are planned but should not be expected in v0.1.
+
+---
+
+## Specification-Driven Development documents
+
+Calendian uses SDD so that implementation stays aligned with requirements and release gates.
+
+| Document | Purpose |
+|---|---|
+| [`SPEC.md`](./SPEC.md) | Authoritative product specification and requirement IDs. |
+| [`ROADMAP.md`](./ROADMAP.md) | Versioned plan derived from the specification. |
+| [`docs/sdd/README.md`](./docs/sdd/README.md) | SDD process and document hierarchy. |
+| [`docs/sdd/CURRENT_STATUS.md`](./docs/sdd/CURRENT_STATUS.md) | Actual implemented / partial / planned status. |
+| [`docs/sdd/ACCEPTANCE.md`](./docs/sdd/ACCEPTANCE.md) | Release gates and acceptance rules. |
+| [`docs/sdd/TESTING.md`](./docs/sdd/TESTING.md) | Manual and future automated testing strategy. |
+| [`docs/sdd/TRACEABILITY.md`](./docs/sdd/TRACEABILITY.md) | Mapping from goals to requirements, tasks, tests, and releases. |
+| [`docs/sdd/TASKS.md`](./docs/sdd/TASKS.md) | Requirement-driven implementation backlog. |
+| [`docs/sdd/RISKS.md`](./docs/sdd/RISKS.md) | Risk register and mitigations. |
 
 ---
 
 ## Requirements
 
-- **macOS** 12.0+ (Monterey or later recommended)
-- **Obsidian** 0.12.0+
-- macOS Calendar app with at least one account configured
-- macOS Reminders app (optional)
+Current intended target:
+
+- macOS desktop.
+- Obsidian desktop.
+- Calendar.app configured if Calendar events are desired.
+- Reminders.app configured if reminders are desired.
+
+The exact minimum Obsidian version must be aligned between `manifest.json`, `SPEC.md`, and release notes before public release.
 
 ---
 
-## Roadmap
+## Privacy
 
-See [ROADMAP.md](./ROADMAP.md) for the full development plan.
+Calendian's early architecture reads from local macOS apps. Calendar and reminder data is not sent to third-party services by default.
 
-| Phase | Focus | Status |
-|-------|-------|--------|
-| **Phase 1** | Read-only display + caching + colors | 🟡 In Progress |
-| **Phase 2** | Two-way sync (create/edit/delete) | 🔲 Planned |
-| **Phase 3** | Note associations + Tasks integration | 🔲 Planned |
-| **Phase 4** | Timeline views + statistics | 🔲 Planned |
-| **Phase 5** | Smart features + Android support | 🔲 Planned |
+Future external API integrations, if any, must be opt-in and specified separately.
 
 ---
 
-## FAQ
+## Roadmap summary
 
-**Q: Does it work with Google Calendar / Exchange / iCloud?**  
-A: Yes! Any calendar account added to the macOS Calendar app is automatically accessible.
-
-**Q: Does it work on Windows / Linux?**  
-A: Not yet. Calendian relies on macOS automation (JXA). Cross-platform support is planned for Phase 5.
-
-**Q: Will it modify my calendar data?**  
-A: Phase 1 is read-only. Two-way sync (create/edit/delete) will be added in Phase 2, always with confirmation.
-
-**Q: Does it sync via the cloud?**  
-A: No cloud services involved. Data comes directly from your Mac's Calendar and Reminders apps.
-
-**Q: What about privacy?**  
-A: All data stays on your machine. No information is sent to any third-party service.
+| Version | Focus | Status |
+|---|---|---|
+| v0.1 | Read-only MVP | In progress |
+| v0.2 | Read-only polish | Planned |
+| v0.3 | Safe create | Planned |
+| v0.4 | Safe edit/delete | Planned |
+| v0.5 | Note association + limited Tasks integration | Planned |
+| v0.6 | Advanced views, search, statistics | Planned |
+| v1.x | Cross-platform architecture track | Deferred |
 
 ---
 
