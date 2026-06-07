@@ -24,7 +24,7 @@ This document records the actual repository state. It intentionally separates im
 | Permission handling | Implemented | Independent calendar/reminder permission states with recovery guidance and retry buttons. Partial permission support (show available data + banner for denied source). |
 | Error states | Implemented | Error classification (permission_denied, timeout, error). Per-source error banners with retry. Parse-failure isolation. Empty vs error distinction. |
 | Month cell event dots | Implemented | Calendar-colored dots on month cells showing event presence per calendar. Hollow reminder dot. Multi-day event span support. Uses in-memory cache only (no helper calls). Respects source filters. Dynamic CSS injection for per-calendar colors. |
-| Refresh / sync | Partial | Timer-driven refresh (configurable interval, default 5min). Manual refresh button. `_refreshRunning` concurrency guard. Window focus and EKEventStoreChangedNotification watch planned for v0.2. Post-write refresh planned for v0.3. See SPEC.md §7.6.1. |
+| Refresh / sync | Partial | Timer-driven refresh (configurable interval, default 5min). Manual refresh button. `_refreshRunning` concurrency guard. Window focus and EKEventStoreChangedNotification watch deferred beyond v0.2. Post-write refresh planned for v0.3. See SPEC.md §7.6.1. |
 | Right-click actions | Planned | Current day/week context menu is inherited from calendar note behavior; Calendian event/reminder actions are not complete. |
 | Write operations | Planned | Native EventKit helper supports writes (`EKEventStore.save`). `toggle-reminder` command already implemented in helper. Full CRUD planned for v0.3-v0.4. |
 | Note association | Planned | Existing daily/weekly note integration comes from the base calendar plugin behavior; Calendian event/reminder frontmatter association is not complete. |
@@ -38,7 +38,7 @@ This document records the actual repository state. It intentionally separates im
 
 ## Current release label
 
-Current repository state: **v0.2 read-only polish — in progress**. Core read path stable, event details and multi-day support implemented.
+Current repository state: **v0.2 read-only polish — complete**. All v0.2 tasks merged and verified.
 
 ## README policy
 
@@ -56,7 +56,12 @@ README may list the following as current behavior:
 - expandable event details (location, URL, notes, attendees, recurrence summary);
 - multi-day events shown on all overlapping days;
 - past event display (normal/dimmed/hidden) setting;
-- recurring event read-only indicator.
+- recurring event read-only indicator;
+- overdue reminder styling (red border + badge + due date);
+- no-date reminders in collapsible section;
+- reminder display range selector (today / 7 days / all incomplete);
+- month cell event dots (calendar-colored, hollow reminder dot, multi-day span);
+- diagnostic export with consent modal and field redaction.
 
 Everything else must be marked as planned, experimental, or future.
 
@@ -75,12 +80,11 @@ Everything else must be marked as planned, experimental, or future.
 
 > Updated by AI after every meaningful step. Next session reads this to continue without re-explaining context.
 
-- **Doing:** All v0.2 tasks merged into main. Awaiting final verification.
-- **Done this session:** All v0.2 tasks implemented in parallel across 4 worktrees:
-  - TASK-014: Diagnostic export with consent modal and redaction (REQ-DIAG-002).
-  - TASK-010+011: Event details panel, multi-day events, past event display, recurring indicator (REQ-CAL-007..011).
-  - TASK-012: Reminder polish — overdue styling, no-date section, display range selector, subtasks (REQ-REM-005..009).
-  - TASK-013: Month cell event dots with calendar colors (REQ-UX-006).
-- **Decisions:** 4 parallel worktrees, each touching distinct line ranges. All conflicts were "keep both sides". REQ-REM-009 subtasks marked Partial (helper does not yet populate parentId).
-- **Next:** Final verification — syntax check, compile helper, eye-check in Obsidian.
-- **Last action:** 2026-06-08 — all branches merged into main.
+- **Doing:** N/A (v0.2 complete).
+- **Done this session:** All v0.2 tasks merged and verified. Documentation finalized:
+  - TASK-010 through TASK-014 all marked Done in TASKS.md.
+  - CURRENT_STATUS.md updated to reflect v0.2 complete.
+  - SPEC.md section 7 verified — all v0.2 requirements correctly marked as Implemented or Partial.
+- **Decisions:** REQ-REM-009 subtasks remain Partial (helper does not yet populate parentId, data-dependent). REQ-REC-001 remains Planned (recurring identification used for display, but formal recurring safety model deferred to v0.3+). REQ-TIME-002/003 remain Planned (multi-day overlap implemented at JS filter level, formal timezone/DST spec deferred).
+- **Next:** Eye-check in Obsidian, then proceed to v0.3 planning.
+- **Last action:** 2026-06-08 — v0.2 documentation finalized.

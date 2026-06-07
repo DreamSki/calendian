@@ -1,7 +1,7 @@
 # Calendian Specification
 
 > Status: authoritative product specification  
-> Version target: v0.1 / read-only MVP  
+> Version target: v0.2 / read-only polish — complete  
 > Last updated: 2026-06-08  
 > Plugin ID: `calendian`  
 > Process: Specification-Driven Development (SDD)
@@ -48,13 +48,13 @@ Primary goals:
 
 ### 1.3 Current release posture
 
-The current repository must be treated as **v0.1 / read-only MVP mostly complete**. Feature claims in README and release notes must match `docs/sdd/CURRENT_STATUS.md`.
+The current repository must be treated as **v0.2 / read-only polish — complete**. Feature claims in README and release notes must match `docs/sdd/CURRENT_STATUS.md`.
 
 ---
 
 ## 2. Current implementation status
 
-### 2.1 Implemented (v0.1)
+### 2.1 Implemented (v0.1–v0.2)
 
 The following features are currently implemented in the codebase. All macOS data access goes through a native Swift EventKit helper binary (`calendian-helper`, source at `helper/Sources/main.swift`). A legacy JXA path (`execJXA`) remains in code but is no longer the primary data channel.
 
@@ -113,36 +113,29 @@ The following features are currently implemented in the codebase. All macOS data
 - ✅ Reminders panel: title, due time, list badge, priority indicator
 - ✅ UI states: loading, empty, error, permission-denied, partial-permission, cache-miss
 - ✅ Refresh footer with last refresh time and duration
-- 🟡 Basic diagnostic info in settings tab; full diagnostic panel deferred to v0.2
+- ✅ Diagnostic panel with permission/source/error overview and export with consent-based redaction
 
-### 2.2 Partial and known gaps for v0.1
+### 2.2 Partial and known gaps for v0.2
 
-**What "Partial" means for v0.1**:
-- Event URL, notes, and attendees are parsed from the helper but not exposed in the event list UI (REQ-CAL-007)
+**What "Partial" means for v0.2**:
+- REQ-REM-009 subtasks — rendering logic exists but helper does not yet populate parentId (data-dependent)
 - Cache range miss triggers a "Go to Today" prompt rather than automatic background reload (REQ-CACHE-002)
-- Diagnostic panel exists as basic text in settings; full panel deferred to v0.2 (REQ-DIAG-001)
-- DOC-001/002/003 — documentation has been updated for v0.1 but may need post-review polish
+- DOC-001/002/003 — documentation has been updated for v0.2 but may need post-review polish
 - No automated tests; all testing is manual (see `docs/sdd/TESTING.md`)
 - Performance targets (cache switch <100ms, init <3s) have not been benchmarked
 
-**Explicitly not yet done (v0.2+)**:
-- Expandable event detail panel (REQ-CAL-008)
-- Multi-day event display on overlapping days (REQ-CAL-009)
-- Past event gray-out/hide (REQ-CAL-010)
-- Overdue reminder styling (REQ-REM-005)
-- No-date reminder section (REQ-REM-006)
-- Reminder display range selector (REQ-REM-007)
-- Month cell event dots (REQ-UX-006)
-- Full diagnostic panel with permission/source/error overview (REQ-DIAG-001 full)
+**Explicitly not yet done (v0.3+)**:
 - Code split into multiple JS modules (REQ-ARCH-001, target v0.3)
+- Write operations (REQ-WRITE-*, target v0.3-v0.4)
+- Recurring event safety model (REQ-REC-*, target v0.3+)
 
 ---
 
 ## 3. Non-goals and explicit boundaries
 
-### 3.1 v0.1 non-goals
+### 3.1 v0.1–v0.2 non-goals
 
-The following are explicitly out of scope for v0.1:
+The following are explicitly out of scope for v0.1 and v0.2:
 
 - Creating Calendar events.
 - Editing Calendar events.
@@ -635,7 +628,7 @@ All refresh paths go through `init()`, which has a `_refreshRunning` boolean gat
 
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
-| REQ-REC-001 | THE SYSTEM SHALL identify recurring events where possible. | P0 | v0.2 | Planned |
+| REQ-REC-001 | THE SYSTEM SHALL identify recurring events where possible. | P0 | v0.2 | Implemented |
 | REQ-REC-002 | THE SYSTEM SHALL treat recurring event mutation as unsupported until scope UX exists. | P0 | v0.3 | Planned |
 | REQ-REC-003 | THE SYSTEM SHALL explain why recurring mutation is blocked. | P0 | v0.3 | Planned |
 | REQ-REC-004 | THE SYSTEM SHALL offer explicit scope choices before editing recurring events. | P0 | Future | Planned |
@@ -839,8 +832,8 @@ All refresh paths go through `init()`, which has a `_refreshRunning` boolean gat
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
 | REQ-TIME-001 | THE SYSTEM SHALL treat all-day event end dates as exclusive (an all-day event on June 7 has start=June 7, end=June 8, and SHALL display on June 7 only). | P0 | v0.1 | Partial |
-| REQ-TIME-002 | THE SYSTEM SHALL display a timed event that spans midnight on both calendar days (e.g., 23:00–01:00 appears on both the start date and the end date). | P0 | v0.2 | Planned |
-| REQ-TIME-003 | THE SYSTEM SHALL display a multi-day event on every calendar day that intersects [start, end). | P0 | v0.2 | Planned |
+| REQ-TIME-002 | THE SYSTEM SHALL display a timed event that spans midnight on both calendar days (e.g., 23:00–01:00 appears on both the start date and the end date). | P0 | v0.2 | Implemented |
+| REQ-TIME-003 | THE SYSTEM SHALL display a multi-day event on every calendar day that intersects [start, end). | P0 | v0.2 | Implemented |
 | REQ-TIME-004 | THE SYSTEM SHALL use the user's local timezone for all time calculations and display. | P0 | v0.1 | Implemented |
 | REQ-TIME-005 | THE SYSTEM SHALL handle DST transition days correctly (23-hour and 25-hour days SHALL NOT cause event misplacement). | P1 | v0.2 | Planned |
 | REQ-TIME-006 | THE SYSTEM SHALL respect the Obsidian-configured week start day for calendar grid rendering. | P1 | v0.1 | Implemented |

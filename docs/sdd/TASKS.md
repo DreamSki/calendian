@@ -109,19 +109,21 @@ Tasks are ordered by dependency and release target. Every task references requir
 ### TASK-012 — Reminder polish
 
 - Requirements: `REQ-REM-005` to `REQ-REM-009`
-- Status: In progress (branch: task-012)
+- Status: Done
 - Priority: P1
 - Deliverables:
   - Overdue styling.
   - No-date section.
   - Display range selector.
   - Priority and subtasks where supported.
+- Evidence: Overdue reminders visually distinguished (red border + badge + due date). No-date reminders in collapsible section. Display range selector (today / 7 days / all incomplete). Subtask rendering ready (data-dependent — helper parentId not yet populated). Code at main.js `renderRemindersSection()`.
 
 ### TASK-013 — Month cell event dots
 
 - Requirements: `REQ-UX-006`, `REQ-PERF-002`
-- Status: Review
+- Status: Done
 - Priority: P1
+- Evidence: Calendar-colored dots on month cells showing event presence per calendar. Hollow reminder dot. Multi-day event span support. Uses in-memory cache only (no helper calls). Respects source filters. Dynamic CSS injection for per-calendar colors. Code at main.js `renderMonthDots()`.
 
 ### TASK-014 — Manual refresh and diagnostics panel
 
