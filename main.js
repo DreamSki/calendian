@@ -7657,11 +7657,14 @@ class MacOSIntegration {
             self.render();
         });
 
-        // REQ-REM-005: Sort — overdue reminders first, then by due date
+        // REQ-REM-005: Sort — overdue first, then by due date, completed at bottom
         var todayStart = new Date();
         todayStart.setHours(0, 0, 0, 0);
 
         var sortedReminders = reminders.slice().sort(function(a, b) {
+            // Completed always at bottom
+            if (a.completed && !b.completed) return 1;
+            if (!a.completed && b.completed) return -1;
             var aOverdue = a.due && a.due < todayStart;
             var bOverdue = b.due && b.due < todayStart;
             if (aOverdue && !bOverdue) return -1;
@@ -7689,24 +7692,40 @@ class MacOSIntegration {
                 itemEl.addClass("calendian-reminder-overdue");
             }
 
+            // Completed styling
+            if (rem.completed) {
+                itemEl.addClass("calendian-reminder-completed");
+            }
+
             // Checkbox + title (v0.4: clickable checkbox for completion toggle, REQ-WRITE-016)
             if (!rem.isDisplayOnly && rem.id) {
                 var checkbox = itemEl.createDiv("calendian-reminder-checkbox");
-                checkbox.textContent = "○";
-                checkbox.setAttribute("title", "Mark complete");
+                checkbox.textContent = rem.completed ? "☑" : "○";
+                checkbox.setAttribute("title", rem.completed ? "Mark incomplete" : "Mark complete");
                 checkbox.addEventListener("click", function(e) {
                     e.stopPropagation();
+                    // Optimistic local update
+                    rem.completed = !rem.completed;
+                    self.render();
+                    // Sync to source of truth
                     self.toggleReminder(rem).then(function(result) {
                         if (result && result.ok) {
                             new obsidian.Notice(result.completed ? "Reminder completed" : "Reminder uncompleted");
-                            self.init(true);
                         }
                     }).catch(function(err) {
+                        // Revert on failure
+                        rem.completed = !rem.completed;
+                        self.render();
                         var errMsg = err.stderr || (err.error && err.error.message) || err.message || JSON.stringify(err);
                         console.error("[Calendian] Toggle reminder failed:", errMsg);
                         new obsidian.Notice("Failed to update reminder");
                     });
                 });
+            } else {
+                // Display-only: show status icon without click
+                var icon = itemEl.createDiv("calendian-reminder-checkbox");
+                icon.textContent = rem.completed ? "☑" : "○";
+                icon.style.cursor = "default";
             }
             const titleEl = itemEl.createDiv("macos-item-title");
             titleEl.textContent = (rem.title || rem.name || "");
@@ -7798,27 +7817,50 @@ class MacOSIntegration {
                 nodateHeader.textContent = (isHidden ? "▾" : "▸") + " Reminders without due date (" + noDateReminders.length + ")";
             });
 
+            // Sort no-date: incomplete first, completed at bottom
+            noDateReminders.sort(function(a, b) {
+                if (a.completed && !b.completed) return 1;
+                if (!a.completed && b.completed) return -1;
+                return 0;
+            });
+
             for (var k = 0; k < noDateReminders.length; k++) {
                 (function(nr) {
                 var nrItemEl = nodateList.createDiv("macos-item");
 
+                // Completed styling
+                if (nr.completed) {
+                    nrItemEl.addClass("calendian-reminder-completed");
+                }
+
                 // v0.4: Clickable checkbox for no-date reminders
                 if (!nr.isDisplayOnly && nr.id) {
                     var nrCheckbox = nrItemEl.createDiv("calendian-reminder-checkbox");
-                    nrCheckbox.textContent = "○";
-                    nrCheckbox.setAttribute("title", "Mark complete");
+                    nrCheckbox.textContent = nr.completed ? "☑" : "○";
+                    nrCheckbox.setAttribute("title", nr.completed ? "Mark incomplete" : "Mark complete");
                     nrCheckbox.addEventListener("click", function(e) {
                         e.stopPropagation();
+                        // Optimistic local update
+                        nr.completed = !nr.completed;
+                        self.render();
+                        // Sync to source of truth
                         self.toggleReminder(nr).then(function(result) {
                             if (result && result.ok) {
                                 new obsidian.Notice(result.completed ? "Reminder completed" : "Reminder uncompleted");
-                                self.init(true);
                             }
                         }).catch(function(err) {
+                            // Revert on failure
+                            nr.completed = !nr.completed;
+                            self.render();
                             console.error("[Calendian] Toggle reminder failed:", err);
                             new obsidian.Notice("Failed to update reminder");
                         });
                     });
+                } else {
+                    // Display-only icon
+                    var nrIcon = nrItemEl.createDiv("calendian-reminder-checkbox");
+                    nrIcon.textContent = nr.completed ? "☑" : "○";
+                    nrIcon.style.cursor = "default";
                 }
                 var nrTitleEl = nrItemEl.createDiv("macos-item-title");
                 nrTitleEl.textContent = (nr.title || nr.name || "");

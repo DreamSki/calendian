@@ -262,15 +262,20 @@ struct CalendianHelper {
             calendars = filtered.isEmpty ? nil : filtered
         }
 
-        let predicate = store.predicateForIncompleteReminders(
-            withDueDateStarting: startDate,
-            ending: endDate,
-            calendars: calendars
-        )
+        let predicate = store.predicateForReminders(in: calendars)
 
         let reminders: [CalendianReminder] = await withCheckedContinuation { continuation in
             store.fetchReminders(matching: predicate) { ekReminders in
-                let mapped = (ekReminders ?? []).map { mapReminder($0) }
+                let mapped = (ekReminders ?? [])
+                    .filter { ekReminder in
+                        // Filter by date range; no-date reminders handled by printNoDateReminders
+                        guard let dueComps = ekReminder.dueDateComponents,
+                              let dueDate = Calendar.current.date(from: dueComps) else {
+                            return false
+                        }
+                        return dueDate >= startDate && dueDate <= endDate
+                    }
+                    .map { mapReminder($0) }
                 continuation.resume(returning: mapped)
             }
         }
@@ -291,11 +296,7 @@ struct CalendianHelper {
             calendars = filtered.isEmpty ? nil : filtered
         }
 
-        let predicate = store.predicateForIncompleteReminders(
-            withDueDateStarting: nil as Date?,
-            ending: nil as Date?,
-            calendars: calendars
-        )
+        let predicate = store.predicateForReminders(in: calendars)
 
         let reminders: [CalendianReminder] = await withCheckedContinuation { continuation in
             store.fetchReminders(matching: predicate) { ekReminders in
