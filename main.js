@@ -5209,16 +5209,24 @@ class MacOSIntegration {
     }
 
     // --- Initial load: fire-and-forget background sync, render immediately ---
-    async init() {
-        // Hard debounce: only allow one init per 2 seconds
+    async init(forceRefresh) {
+        // Hard debounce: only allow one init per 2 seconds (skip for manual refresh)
         var now = Date.now();
-        if (this._lastInitTime && (now - this._lastInitTime) < 2000) {
+        if (!forceRefresh && this._lastInitTime && (now - this._lastInitTime) < 2000) {
             return;
         }
         this._lastInitTime = now;
         var initStart = now;
-        console.log("[Calendian] init() starting...");
+        console.log("[Calendian] init() starting..." + (forceRefresh ? " (forced)" : ""));
         const opts = this.plugin.options || {};
+
+        // Force refresh: skip cache, go directly to helper
+        if (forceRefresh) {
+            console.log("[Calendian] Force refresh — loading fresh data from helper...");
+            this.renderSyncing();
+            this.initBackground(initStart);
+            return;
+        }
 
         // Phase 1: Try disk cache first (near-instant)
         var calCached = false, remCached = false;
@@ -5559,7 +5567,7 @@ class MacOSIntegration {
         const refreshBtn = headerRow.createDiv("macos-refresh-btn");
         refreshBtn.textContent = "↻";
         refreshBtn.setAttribute("title", "Refresh calendar data");
-        refreshBtn.addEventListener("click", () => { this.init(); });
+        refreshBtn.addEventListener("click", () => { this.init(true); });
 
         // REQ-PERM-003: Partial permission banner
         if (showCal && calPerm === 'denied') {
