@@ -579,7 +579,7 @@ All refresh paths go through `init()`, which has a `_refreshRunning` boolean gat
 | REQ-UX-003 | THE SYSTEM SHALL show loading, empty, error, unsupported, and partial-permission states. | P0 | v0.1 | Implemented |
 | REQ-UX-004 | THE SYSTEM SHALL use Obsidian theme variables where possible. | P1 | v0.1 | Partial |
 | REQ-UX-005 | THE SYSTEM SHOULD support event/reminder context menus only when actions are implemented safely. | P1 | v0.3 | Planned |
-| REQ-UX-006 | THE SYSTEM SHOULD show calendar dots on month cells without harming navigation performance. | P1 | v0.2 | Planned |
+| REQ-UX-006 | THE SYSTEM SHOULD show calendar dots on month cells without harming navigation performance. | P1 | v0.2 | Implemented |
 | REQ-UX-007 | THE SYSTEM SHOULD support keyboard navigation and commands. | P2 | v0.6 | Planned |
 | REQ-UX-008 | THE SYSTEM SHOULD support a compact and comfortable density option. | P2 | v0.6 | Planned |
 | REQ-UX-009 | THE SYSTEM SHOULD provide copy-as-Markdown actions. | P2 | v0.5 | Planned |

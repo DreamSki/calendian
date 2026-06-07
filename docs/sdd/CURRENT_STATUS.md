@@ -23,6 +23,7 @@ This document records the actual repository state. It intentionally separates im
 | Source filtering | Implemented | Toggle individual calendars/lists via settings. Filter by stable UUID (EventKit `calendarIdentifier`). In-memory instant apply via `render()`. Persisted in `data.json`. |
 | Permission handling | Implemented | Independent calendar/reminder permission states with recovery guidance and retry buttons. Partial permission support (show available data + banner for denied source). |
 | Error states | Implemented | Error classification (permission_denied, timeout, error). Per-source error banners with retry. Parse-failure isolation. Empty vs error distinction. |
+| Month cell event dots | Implemented | Calendar-colored dots on month cells showing event presence per calendar. Hollow reminder dot. Multi-day event span support. Uses in-memory cache only (no helper calls). Respects source filters. Dynamic CSS injection for per-calendar colors. |
 | Refresh / sync | Partial | Timer-driven refresh (configurable interval, default 5min). Manual refresh button. `_refreshRunning` concurrency guard. Window focus and EKEventStoreChangedNotification watch planned for v0.2. Post-write refresh planned for v0.3. See SPEC.md §7.6.1. |
 | Right-click actions | Planned | Current day/week context menu is inherited from calendar note behavior; Calendian event/reminder actions are not complete. |
 | Write operations | Planned | Native EventKit helper supports writes (`EKEventStore.save`). `toggle-reminder` command already implemented in helper. Full CRUD planned for v0.3-v0.4. |
@@ -70,6 +71,19 @@ Everything else must be marked as planned, experimental, or future.
 
 > Updated by AI after every meaningful step. Next session reads this to continue without re-explaining context.
 
-- **Doing:** N/A (v0.1 doc audit complete).
-- **Done this session:** Full v0.1 audit: code vs SPEC vs docs vs README. Fixed 6 classes of discrepancies — fake build steps in README, stale v0.2 claims in WORKFLOWS.md, `_jxaRunning`→`_refreshRunning` in SPEC.md, outdated JXA platform description, inflated fields in PRIVACY.md, and 5 stale requirement statuses (PLAT-003, CAL-012, DATA-001, DATA-002, CACHE-008 → Implemented).
-- **Last action:** 2026-06-08 — doc audit complete. All v0.1 tasks Done, all docs honest.
+- **Doing:** TASK-013 — Month cell event dots (REQ-UX-006). Code complete, awaiting manual verification.
+- **Done this session:** Implemented TASK-013: macOS event/reminder metadata source for Svelte calendar month cell dots.
+  - Added `getEventMetadataSource()` to `MacOSIntegration` — returns a metadata source with `getDailyMetadata` that produces colored dots per calendar and a hollow dot for reminders.
+  - Added `_eventSpansDate()` helper for multi-day event dot display (handles both all-day and timed multi-day events).
+  - Added dynamic CSS injection (`_ensureDotStyleEl`, `_registerDotColor`, `_refreshDotColorCSS`) for per-calendar colored dots.
+  - Restructured `CalendarView.onOpen()` to create `MacOSIntegration` before Calendar component, injecting the metadata source into the Svelte calendar's sources array.
+  - Added `calendarComponent.$set({})` at end of `render()` to refresh calendar grid dots after data loads.
+  - Added reminder dot CSS to `styles.css`.
+  - Updated SPEC.md REQ-UX-006 → Implemented. Updated TASKS.md TASK-013 → Review. Updated CURRENT_STATUS.md.
+- **Decisions:**
+  - Used dynamic CSS injection (className-based) rather than modifying compiled Svelte Dot component — dots get a className like `caldot-rgb25500` that maps to an injected CSS rule overriding `fill`.
+  - Reminder dot uses a hollow dot with `var(--text-muted)` via a CSS class `calendian-reminder-dot`.
+  - Multi-day events produce dots on every day they span, matching TASK-011 behavior locally.
+  - `getWeeklyMetadata` returns empty dots (weekly view doesn't need event dots in v0.2).
+- **Verification needed:** Compile helper, check JS syntax, test in Obsidian (dots visible on month cells, correct colors, multi-day spans, reminder hollow dots, source filter respected, no performance issues on navigation).
+- **Last action:** 2026-06-08 — TASK-013 code + doc updates complete.

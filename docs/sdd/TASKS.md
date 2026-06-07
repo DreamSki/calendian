@@ -118,7 +118,7 @@ Tasks are ordered by dependency and release target. Every task references requir
 ### TASK-013 — Month cell event dots
 
 - Requirements: `REQ-UX-006`, `REQ-PERF-002`
-- Status: Todo
+- Status: Review
 - Priority: P1
 
 ### TASK-014 — Manual refresh and diagnostics panel
