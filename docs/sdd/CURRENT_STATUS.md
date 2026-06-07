@@ -80,11 +80,14 @@ Everything else must be marked as planned, experimental, or future.
 
 > Updated by AI after every meaningful step. Next session reads this to continue without re-explaining context.
 
-- **Doing:** N/A (v0.2 complete).
-- **Done this session:** All v0.2 tasks merged and verified. Documentation finalized:
-  - TASK-010 through TASK-014 all marked Done in TASKS.md.
-  - CURRENT_STATUS.md updated to reflect v0.2 complete.
-  - SPEC.md section 7 verified — all v0.2 requirements correctly marked as Implemented or Partial.
-- **Decisions:** REQ-REM-009 subtasks remain Partial (helper does not yet populate parentId, data-dependent). REQ-REC-001 remains Planned (recurring identification used for display, but formal recurring safety model deferred to v0.3+). REQ-TIME-002/003 remain Planned (multi-day overlap implemented at JS filter level, formal timezone/DST spec deferred).
-- **Next:** Eye-check in Obsidian, then proceed to v0.3 planning.
-- **Last action:** 2026-06-08 — v0.2 documentation finalized.
+- **Doing:** v0.2 bug fixes.
+- **Done this session:** Fixed three v0.2 bugs identified via eye-check:
+  - **Component range selector broken** — `renderRemindersSection()` called `self.plugin.writeOptions()` but `self.plugin` is `CalendarView`, not `CalendarPlugin`. Fixed to `self.plugin.calendarPlugin.writeOptions()`.
+  - **No-date reminders never fetched** — Swift helper `printReminders()` used `predicateForIncompleteReminders(withDueDateStarting:ending:)` which excludes reminders without due dates. Added new `reminders-nodate` helper command using `nil` start/end + dueDateComponents filter. JS `preloadReminders()` now calls it and merges results.
+  - **Due date display incomplete** — `formatTime()` only showed time, not date. Added `formatDueDate()` showing `M/D HH:MM` for non-today dates, time only for today.
+  - **Overdue reminders excluded** — `getRemindersForDate()` set `start` to selected date, excluding all overdue reminders. Changed `start` to `2000-01-01` so overdue always show; range controls future window only.
+  - Helper: compiled and tested `reminders-nodate` returns valid JSON.
+  - Eye-check confirmed: range selector works, due dates display correctly, no-date reminders appear, overdue reminders show.
+- **Decisions:** v0.2 was previously marked "complete" but had 4 live bugs. These were implementation bugs (requiremtents correctly marked Implemented, but code had defects). Now truly complete.
+- **Next:** Align SPEC/ROADMAP v0.2 scope, update ACCEPTANCE.md gates, then proceed to v0.3 planning.
+- **Last action:** 2026-06-08 — v0.2 bug fixes verified in Obsidian.

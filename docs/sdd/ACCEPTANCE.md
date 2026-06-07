@@ -1,7 +1,7 @@
 # Acceptance Model
 
 > Status: normative acceptance document  
-> Last updated: 2026-06-07
+> Last updated: 2026-06-08
 
 This document defines when a requirement, task, version, or release is accepted. A feature is not complete merely because code exists; it must pass its acceptance checks.
 
