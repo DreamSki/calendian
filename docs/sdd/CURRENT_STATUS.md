@@ -19,7 +19,7 @@ This document records the actual repository state. It intentionally separates im
 | Calendar source discovery | Implemented | EventKit `calendar.calendarIdentifier` (UUID), account name (`source.title`), color, type. Display name includes account suffix ("日历 — chengbo.sun123@outlook.com"). |
 | Reminder list discovery | Implemented | EventKit lists with UUID, account name, color. |
 | Event display | Implemented | Title, time range, all-day handling, calendar badge with color, location, recurrence indicator, ongoing/soon highlights. |
-| Reminder display | Implemented | Title, due time, list badge, priority indicator (high/medium/low). Completed reminders hidden by default. |
+| Reminder display | Implemented | Title, due time, list badge, priority indicator (high/medium/low). Completed reminders hidden by default. Overdue reminders visually distinguished (red border + badge + due date). No-date reminders in collapsible section. Display range selector (today / 7 days / all incomplete). Subtask rendering ready (data-dependent — helper parentId not yet populated). |
 | Source filtering | Implemented | Toggle individual calendars/lists via settings. Filter by stable UUID (EventKit `calendarIdentifier`). In-memory instant apply via `render()`. Persisted in `data.json`. |
 | Permission handling | Implemented | Independent calendar/reminder permission states with recovery guidance and retry buttons. Partial permission support (show available data + banner for denied source). |
 | Error states | Implemented | Error classification (permission_denied, timeout, error). Per-source error banners with retry. Parse-failure isolation. Empty vs error distinction. |
@@ -70,6 +70,7 @@ Everything else must be marked as planned, experimental, or future.
 
 > Updated by AI after every meaningful step. Next session reads this to continue without re-explaining context.
 
-- **Doing:** N/A (v0.1 doc audit complete).
-- **Done this session:** Full v0.1 audit: code vs SPEC vs docs vs README. Fixed 6 classes of discrepancies — fake build steps in README, stale v0.2 claims in WORKFLOWS.md, `_jxaRunning`→`_refreshRunning` in SPEC.md, outdated JXA platform description, inflated fields in PRIVACY.md, and 5 stale requirement statuses (PLAT-003, CAL-012, DATA-001, DATA-002, CACHE-008 → Implemented).
-- **Last action:** 2026-06-08 — doc audit complete. All v0.1 tasks Done, all docs honest.
+- **Doing:** TASK-012 (reminder polish) — code changes complete, awaiting verification.
+- **Done this session:** Implemented REQ-REM-005 (overdue styling with red border + badge), REQ-REM-006 (no-date reminders in collapsible section with setting toggle), REQ-REM-007 (display range selector: today/7days/all, both inline and in settings), REQ-REM-009 (subtask rendering via parentId — partial, helper does not yet populate parentId). Added two new settings: `showNoDateReminders` (boolean), `reminderDisplayRange` ('today'|'7days'|'all'). Updated `getRemindersForDate` to respect display range. Added `getNoDateReminders` helper. Updated SPEC.md status table and CURRENT_STATUS.md.
+- **Decisions:** REQ-REM-009 marked Partial because the Swift helper struct has `parentId` field but `mapReminder()` always sets it to `nil`. Subtask rendering code is ready but will only display data once the helper is updated to fetch child reminders via EventKit.
+- **Next:** Compile helper (`swiftc -parse-as-library helper/Sources/main.swift -o calendian-helper`), verify in Obsidian. Then update TASKS.md to Done and commit.

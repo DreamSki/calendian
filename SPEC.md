@@ -459,11 +459,11 @@ Goal, habit, intention, nudge, and review data SHALL reside exclusively in Obsid
 | REQ-REM-002 | THE SYSTEM SHALL display reminders due on the selected date. | P0 | v0.1 | Implemented |
 | REQ-REM-003 | THE SYSTEM SHALL display reminder title and reminder list. | P0 | v0.1 | Implemented |
 | REQ-REM-004 | THE SYSTEM SHALL hide completed reminders by default. | P0 | v0.1 | Implemented |
-| REQ-REM-005 | THE SYSTEM SHALL visually distinguish overdue reminders. | P1 | v0.2 | Planned |
-| REQ-REM-006 | THE SYSTEM SHALL display no-date reminders in a separate configurable section. | P1 | v0.2 | Planned |
-| REQ-REM-007 | THE SYSTEM SHALL support display ranges: selected day, next 7 days, all incomplete. | P1 | v0.2 | Planned |
+| REQ-REM-005 | THE SYSTEM SHALL visually distinguish overdue reminders. | P1 | v0.2 | Implemented |
+| REQ-REM-006 | THE SYSTEM SHALL display no-date reminders in a separate configurable section. | P1 | v0.2 | Implemented |
+| REQ-REM-007 | THE SYSTEM SHALL support display ranges: selected day, next 7 days, all incomplete. | P1 | v0.2 | Implemented |
 | REQ-REM-008 | THE SYSTEM SHOULD display reminder priority where available. | P2 | v0.1 | Implemented |
-| REQ-REM-009 | THE SYSTEM SHOULD display reminder subtasks where available. | P2 | v0.2 | Planned |
+| REQ-REM-009 | THE SYSTEM SHOULD display reminder subtasks where available. | P2 | v0.2 | Partial |
 
 ### 7.5 Source selection requirements
 

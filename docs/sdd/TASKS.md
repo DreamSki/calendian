@@ -107,7 +107,7 @@ Tasks are ordered by dependency and release target. Every task references requir
 ### TASK-012 — Reminder polish
 
 - Requirements: `REQ-REM-005` to `REQ-REM-009`
-- Status: Todo
+- Status: In progress (branch: task-012)
 - Priority: P1
 - Deliverables:
   - Overdue styling.
