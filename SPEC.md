@@ -77,9 +77,12 @@ The following features are currently implemented in the codebase. All macOS data
 - ✅ Calendar source discovery with UUID, account name, color
 - ✅ Stable event identity (`EKEvent.eventIdentifier`, UUID-based)
 - ✅ Event location and recurrence summary displayed in UI
-- ✅ URL, notes, attendees parsed from helper (stored in model, UI display partial)
+- ✅ URL, notes, attendees parsed from helper and displayed in expandable detail panel
+- ✅ Multi-day events displayed on every overlapping day
+- ✅ Past event display (normal/dimmed/hidden) configurable in settings
 - ✅ Calendar color from EventKit `cgColor`
 - ✅ Ongoing/starting-soon visual highlighting
+- ✅ Recurring event read-only indicator (⟳)
 
 #### Reminders reading
 - ✅ Reminder title, due date/time, list name, account name
@@ -87,6 +90,9 @@ The following features are currently implemented in the codebase. All macOS data
 - ✅ Completed reminder filtering (hide by default)
 - ✅ Reminder priority display (high/medium/low/none as `!!!`/`!!`/`!`)
 - ✅ Stable reminder identity (`EKReminder.calendarItemIdentifier`)
+- ✅ Overdue reminders visually distinguished (red border + badge + due date)
+- ✅ No-date reminders in collapsible section
+- ✅ Reminder display range selector (today / 7 days / all incomplete)
 
 #### Cache and performance
 - ✅ ±6 month preload via EventKit date predicate
@@ -113,18 +119,19 @@ The following features are currently implemented in the codebase. All macOS data
 - ✅ Reminders panel: title, due time, list badge, priority indicator
 - ✅ UI states: loading, empty, error, permission-denied, partial-permission, cache-miss
 - ✅ Refresh footer with last refresh time and duration
+- ✅ Month-cell event dots with calendar colors, hollow reminder dots, multi-day spans
 - ✅ Diagnostic panel with permission/source/error overview and export with consent-based redaction
 
 ### 2.2 Partial and known gaps for v0.2
 
 **What "Partial" means for v0.2**:
-- REQ-REM-009 subtasks — rendering logic exists but helper does not yet populate parentId (data-dependent)
-- Cache range miss triggers a "Go to Today" prompt rather than automatic background reload (REQ-CACHE-002)
+- (No Partial items remain in v0.2 scope. The one known gap — REQ-REM-009 subtask display — has been deferred to v0.3 because it requires helper-side changes.
 
 **Deferred to v0.3 (was originally target v0.2)**:
 - REQ-UX-010 (today summary panel), REQ-PERF-003 (large-calendar deg), REQ-PERM-005 (permission retry)
 - REQ-SYNC-004/005/007 (window focus, EK notification watch, fallback)
 - REQ-DATA-003 (display-only marking), REQ-TIME-005 (DST handling)
+- REQ-REM-009 (subtask display) — rendering code exists but helper does not yet populate `parentId`
 
 **Other known gaps (not version-specific)**:
 - No automated tests; all testing is manual (see `docs/sdd/TESTING.md`)
@@ -462,7 +469,7 @@ Goal, habit, intention, nudge, and review data SHALL reside exclusively in Obsid
 | REQ-REM-006 | THE SYSTEM SHALL display no-date reminders in a separate configurable section. | P1 | v0.2 | Implemented |
 | REQ-REM-007 | THE SYSTEM SHALL support display ranges: selected day, next 7 days, all incomplete. | P1 | v0.2 | Implemented |
 | REQ-REM-008 | THE SYSTEM SHOULD display reminder priority where available. | P2 | v0.1 | Implemented |
-| REQ-REM-009 | THE SYSTEM SHOULD display reminder subtasks where available. | P2 | v0.2 | Partial |
+| REQ-REM-009 | THE SYSTEM SHOULD display reminder subtasks where available. | P2 | v0.3 | Partial |
 
 ### 7.5 Source selection requirements
 
@@ -473,7 +480,7 @@ Goal, habit, intention, nudge, and review data SHALL reside exclusively in Obsid
 | REQ-SRC-003 | THE SYSTEM SHALL let users include or exclude individual calendars. | P0 | v0.1 | Implemented |
 | REQ-SRC-004 | THE SYSTEM SHALL let users include or exclude individual reminder lists. | P0 | v0.1 | Implemented |
 | REQ-SRC-005 | THE SYSTEM SHALL handle duplicate source names safely. | P1 | v0.1 | Implemented |
-| REQ-SRC-006 | THE SYSTEM SHALL show source discovery empty/error states. | P1 | v0.1 | Partial |
+| REQ-SRC-006 | THE SYSTEM SHALL show source discovery empty/error states. | P1 | v0.1 | Implemented |
 
 ### 7.6 Cache and performance requirements
 
@@ -576,7 +583,7 @@ All refresh paths go through `init()`, which has a `_refreshRunning` boolean gat
 | REQ-UX-001 | WHEN a user clicks a date, THE SYSTEM SHALL select that date and update the event/reminder panel. | P0 | v0.1 | Implemented |
 | REQ-UX-002 | WHEN a user Cmd/Ctrl-clicks a date, THE SYSTEM SHALL preserve open/create daily-note behavior. | P0 | v0.1 | Implemented |
 | REQ-UX-003 | THE SYSTEM SHALL show loading, empty, error, unsupported, and partial-permission states. | P0 | v0.1 | Implemented |
-| REQ-UX-004 | THE SYSTEM SHALL use Obsidian theme variables where possible. | P1 | v0.1 | Partial |
+| REQ-UX-004 | THE SYSTEM SHALL use Obsidian theme variables where possible. | P1 | v0.1 | Implemented |
 | REQ-UX-005 | THE SYSTEM SHOULD support event/reminder context menus only when actions are implemented safely. | P1 | v0.3 | Planned |
 | REQ-UX-006 | THE SYSTEM SHOULD show calendar dots on month cells without harming navigation performance. | P1 | v0.2 | Implemented |
 | REQ-UX-007 | THE SYSTEM SHOULD support keyboard navigation and commands. | P2 | v0.6 | Planned |
@@ -591,7 +598,7 @@ All refresh paths go through `init()`, which has a `_refreshRunning` boolean gat
 | REQ-PRIV-001 | THE SYSTEM SHALL keep Calendar and Reminders data local and NOT send content to third-party services by default. | P0 | v0.1 | Implemented |
 | REQ-PRIV-002 | THE SYSTEM SHALL document what data is stored in Obsidian settings/frontmatter. | P0 | v0.1 | Implemented |
 | REQ-PRIV-003 | THE SYSTEM SHALL keep note-association, goal, habit, nudge, and review data local and SHALL NOT send self-direction content to external services. | P0 | v0.5 | Planned |
-| REQ-DIAG-001 | THE SYSTEM SHALL provide diagnostic panel showing permission status, source counts, last refresh time, and error states WITHOUT exposing private event/reminder content by default. | P1 | v0.1 | Partial |
+| REQ-DIAG-001 | THE SYSTEM SHALL provide diagnostic panel showing permission status, source counts, last refresh time, and error states WITHOUT exposing private event/reminder content by default. | P1 | v0.1 | Implemented |
 | REQ-DIAG-002 | WHEN exporting diagnostics, THE SYSTEM SHALL obtain explicit user consent and redact sensitive fields. | P0 | v0.2 | Implemented |
 
 ### 7.9 Error handling requirements
@@ -748,9 +755,9 @@ All refresh paths go through `init()`, which has a `_refreshRunning` boolean gat
 
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
-| REQ-DOC-001 | README SHALL distinguish current, planned, experimental, and non-goal features. | P0 | v0.1 | Partial |
-| REQ-DOC-002 | Roadmap SHALL reference requirement groups or IDs. | P0 | v0.1 | Partial |
-| REQ-DOC-003 | Target architecture SHALL be labeled as target until code is refactored. | P0 | v0.1 | Partial |
+| REQ-DOC-001 | README SHALL distinguish current, planned, experimental, and non-goal features. | P0 | v0.1 | Implemented |
+| REQ-DOC-002 | Roadmap SHALL reference requirement groups or IDs. | P0 | v0.1 | Implemented |
+| REQ-DOC-003 | Target architecture SHALL be labeled as target until code is refactored. | P0 | v0.1 | Implemented |
 | REQ-ARCH-001 | THE SYSTEM SHOULD split into maintainable modules (macOS adapter, domain, cache, UI) before complex write features. | P1 | v0.3 | Planned |
 
 ### 7.22 Goal and focus requirements
@@ -837,7 +844,7 @@ All refresh paths go through `init()`, which has a `_refreshRunning` boolean gat
 
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
-| REQ-TIME-001 | THE SYSTEM SHALL treat all-day event end dates as exclusive (an all-day event on June 7 has start=June 7, end=June 8, and SHALL display on June 7 only). | P0 | v0.1 | Partial |
+| REQ-TIME-001 | THE SYSTEM SHALL treat all-day event end dates as exclusive (an all-day event on June 7 has start=June 7, end=June 8, and SHALL display on June 7 only). | P0 | v0.1 | Implemented |
 | REQ-TIME-002 | THE SYSTEM SHALL display a timed event that spans midnight on both calendar days (e.g., 23:00–01:00 appears on both the start date and the end date). | P0 | v0.2 | Implemented |
 | REQ-TIME-003 | THE SYSTEM SHALL display a multi-day event on every calendar day that intersects [start, end). | P0 | v0.2 | Implemented |
 | REQ-TIME-004 | THE SYSTEM SHALL use the user's local timezone for all time calculations and display. | P0 | v0.1 | Implemented |

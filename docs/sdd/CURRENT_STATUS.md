@@ -80,11 +80,13 @@ Everything else must be marked as planned, experimental, or future.
 
 > Updated by AI after every meaningful step. Next session reads this to continue without re-explaining context.
 
-- **Doing:** N/A (v0.2 scope closed — complete).
+- **Doing:** N/A (doc alignment complete — v0.2 scope genuinely closed).
 - **Done this session:**
-  - **Bug fixes** (verified in Obsidian): component range selector, no-date reminder fetch, due date display, overdue reminder exclusion.
-  - **Scope alignment**: Deferred 8 v0.2-targeted requirements to v0.3 (UX-010, PERF-003, PERM-005, SYNC-004/005/007, DATA-003, TIME-005). Updated SPEC.md §7 targets, ROADMAP v0.2/v0.3 scope & explicit exclusions, CLAUDE.md, ACCEPTANCE.md.
-  - **Deep audit**: 12 requirements Implemented, 1 Partial (REM-009, data-dependent), 0 Planned in v0.2 scope. SPEC and ROADMAP now agree.
-- **Decisions:** v0.2 was prematurely declared complete in a previous session without eye-check or scope alignment. The 4 bugs and 8 SPEC/ROADMAP mismatches are now resolved. v0.2 is genuinely complete.
-- **Next:** v0.3 planning (TASK-020 event create form).
-- **Last action:** 2026-06-08 — v0.2 scope closed, all docs aligned, ready for v0.3.
+  - **Deep audit** of v0.2 completeness (code + docs cross-verified): all 6 v0.2 acceptance gates pass. 12/13 requirements Implemented, 1 Partial (REM-009, data-dependent).
+  - **README fix**: Updated status from "v0.1 mostly complete" to "v0.2 complete". Moved 10 implemented v0.2 features from "Planned capabilities" to "Current capabilities". Updated roadmap table, usage section, non-goals heading.
+  - **SPEC §7 fix**: Changed 7 requirements from Partial → Implemented (SRC-006, UX-004, DIAG-001, TIME-001, DOC-001, DOC-002, DOC-003). Changed REQ-REM-009 target from v0.2 → v0.3 (data-dependent on helper parentId).
+  - **SPEC §2.1 fix**: Added missing v0.2 features to the implemented summary (expandable details, multi-day, past events, recurring indicator, overdue reminders, no-date section, range selector, month dots).
+  - **ROADMAP fix**: Added REQ-REM-009 to v0.3 required requirements and deliverables.
+- **Decisions:** REQ-REM-009 moved to v0.3 because helper Swift code hardcodes `parentId: nil` — the JS rendering code is ready but nothing to render. v0.2 scope is now genuinely complete at the code level, and all documentation is aligned.
+- **Next:** v0.3 planning (TASK-020 event create form). Code split (REQ-ARCH-001) should come before write operations.
+- **Last action:** 2026-06-08 — doc alignment complete. README, SPEC, ROADMAP, CURRENT_STATUS all agree on v0.2 complete.

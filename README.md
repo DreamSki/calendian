@@ -4,7 +4,7 @@
 
 Calendian is an Obsidian desktop plugin that integrates macOS Calendar events and macOS Reminders into the Obsidian sidebar. It is being developed with a Specification-Driven Development process: requirements, roadmap, tasks, tests, and release gates are tracked explicitly before features are claimed as complete.
 
-Current status: **v0.1 read-only MVP — mostly complete**.
+Current status: **v0.2 read-only polish — complete**.
 
 ---
 
@@ -16,7 +16,7 @@ Calendian is local-first by default. Early versions use macOS automation and do 
 
 ---
 
-## Current capabilities (v0.1)
+## Current capabilities (v0.1–v0.2)
 
 The repository contains a read-only integration with these capabilities:
 
@@ -26,12 +26,22 @@ The repository contains a read-only integration with these capabilities:
 - Date selection: click to show that day's events and reminders from cache.
 - Cmd/Ctrl-click preserved for daily note open/create.
 - Event display: title, time range, all-day handling, colored calendar badge, location, recurrence indicator.
+- Expandable event details: location, URL, notes, attendees, calendar source, recurrence summary.
+- Multi-day events shown on all overlapping days.
+- Past event display (normal/dimmed/hidden) configurable in settings.
+- Recurring event read-only indicator (⟳).
 - Reminder display: title, due time, list badge, priority indicator (high/medium/low).
+- Overdue reminders visually distinguished (red border + badge + due date).
+- No-date reminders in collapsible section.
+- Reminder display range selector (today / 7 days / all incomplete).
 - Calendar/reminder source discovery with account name disambiguation.
 - Source filtering by individual calendar/list with instant apply.
 - Configurable auto-refresh with disk cache and two-phase instant startup.
 - Permission denied, error, timeout, cache-miss, and empty UI states.
 - Manual refresh button and last refresh time display.
+- Month-cell event dots with calendar colors, hollow reminder dots, multi-day spans.
+- Diagnostic panel with permission status, source counts, cache stats, refresh timing.
+- Diagnostic export with consent modal and field redaction.
 
 For the precise truth table, see [`docs/sdd/CURRENT_STATUS.md`](./docs/sdd/CURRENT_STATUS.md) and [SPEC.md §2](./SPEC.md#2-current-implementation-status).
 
@@ -41,14 +51,6 @@ For the precise truth table, see [`docs/sdd/CURRENT_STATUS.md`](./docs/sdd/CURRE
 
 These are planned, but should not be treated as current behavior until their requirements and release gates pass:
 
-- Expandable event details panel with URL, notes, attendees.
-- Overdue reminder styling.
-- No-date reminders section.
-- Reminder display range selector.
-- Past event gray-out / hide setting.
-- Multi-day event display across all overlapping days.
-- Month-cell event dots based on source calendars.
-- Full diagnostic panel with permission/source/error overview.
 - Safe event/reminder creation.
 - Natural language event creation ("tomorrow 3pm meeting").
 - Safe event/reminder editing and deletion.
@@ -68,9 +70,9 @@ See [`ROADMAP.md`](./ROADMAP.md) for the requirement-driven plan.
 
 ---
 
-## Explicit non-goals for v0.1
+## Explicit non-goals for v0.1–v0.2
 
-v0.1 is read-only. It does **not** include:
+v0.1–v0.2 are read-only. They do **not** include:
 
 - creating Calendar events;
 - editing Calendar events;
@@ -147,11 +149,15 @@ Then re-enable Obsidian's access.
 | Action | Current result |
 |---|---|
 | Click a date | Selects that date and shows cached events/reminders for that date. |
+| Click an event | Expands event details (location, URL, notes, attendees, recurrence summary). |
 | Cmd/Ctrl + click a date | Opens or creates the daily note for that date. |
 | Click Today / month navigation | Moves the calendar view. |
-| Open settings → macOS Integration | Toggle Calendar/Reminders display and discover sources. |
+| Click ↻ button | Manually refreshes from macOS Calendar/Reminders. |
+| Reminder range selector | Filter reminders: selected day / next 7 days / all incomplete. |
+| Open settings → macOS Integration | Toggle Calendar/Reminders display, source filtering, past event display, refresh interval. |
+| Open settings → Diagnostics | View permission status, source counts, cache stats. Export via consent modal. |
 
-Write actions such as create/edit/delete are planned but should not be expected in v0.1.
+Write actions such as create/edit/delete are planned but should not be expected in v0.1–v0.2.
 
 ---
 
@@ -190,8 +196,8 @@ Future external API integrations, if any, must be opt-in and specified separatel
 
 | Version | Focus | Status |
 |---|---|---|
-| v0.1 | Read-only MVP | Mostly complete |
-| v0.2 | Read-only polish | Planned |
+| v0.1 | Read-only MVP | Complete |
+| v0.2 | Read-only polish | Complete |
 | v0.3 | Safe create + natural language | Planned |
 | v0.4 | Safe edit/delete | Planned |
 | v0.5 | Note association + notifications + Tasks | Planned |

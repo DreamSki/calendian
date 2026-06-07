@@ -149,6 +149,7 @@ Allow users to create simple non-recurring events and simple reminders from Obsi
 - Sync polish (deferred from v0.2): `REQ-SYNC-004`, `REQ-SYNC-005`, `REQ-SYNC-007`
 - Data safety (deferred from v0.2): `REQ-DATA-003`, `REQ-TIME-005`
 - Misc polish (deferred from v0.2): `REQ-UX-010`, `REQ-PERM-005`, `REQ-PERF-003`
+- Reminder polish (deferred from v0.2): `REQ-REM-009` (subtask display — helper parentId needed)
 
 ### Deliverables
 
@@ -162,6 +163,7 @@ Allow users to create simple non-recurring events and simple reminders from Obsi
 - Confirmation dialog for ambiguous NL parsing.
 - Recurring event creation blocked until separately specified.
 - Module refactor started before write complexity grows.
+- Subtask display (populate helper `parentId` for reminders, complete REQ-REM-009).
 
 ### Explicit exclusions
 
