@@ -1,101 +1,12 @@
 // src/macos/writer.js — write adapter for EventKit helper, safety-gated (v0.3+)
 // REQ-WRITE-001 to REQ-WRITE-010, REQ-WRITE-011 to REQ-WRITE-020 (v0.4)
+//
+// NOTE: The Node.js-only helper functions (callHelper, validateEvent, etc.) that were
+// previously in this file are kept in git history for reference but removed from the
+// Obsidian concatenation. The Obsidian-side code uses MacOSIntegration.prototype.execHelper()
+// directly. The create modals in main-head.js construct helper args and call execHelper().
 
-// ── Node.js-only helper functions (not used in Obsidian concatenation) ──
-// Only execute when loaded directly via Node.js require(), not in Obsidian/Electron.
-// Check: obsidian global exists in plugin context but not in plain Node.js.
-
-(function() {
-if (typeof obsidian === 'undefined' && typeof module !== 'undefined' && module.exports) {
-    var nodeChildProcess = require('child_process');
-
-    function callHelper(helperPath, args) {
-        if (!helperPath) return Promise.reject(new Error('Helper not available'));
-        return new Promise((resolve, reject) => {
-            var proc = nodeChildProcess.spawn(helperPath, args);
-            var stdout = '';
-            var stderr = '';
-            proc.stdout.on('data', function(d) { stdout += d.toString(); });
-            proc.stderr.on('data', function(d) { stderr += d.toString(); });
-            proc.on('close', function(code) {
-                if (code !== 0) {
-                    reject({ error: new Error('Helper exited with code ' + code), stderr: stderr, stdout: stdout });
-                    return;
-                }
-                try {
-                    resolve(JSON.parse(stdout.trim()));
-                } catch (e) {
-                    reject({ error: e, stderr: stderr, stdout: stdout });
-                }
-            });
-            proc.on('error', function(err) {
-                reject({ error: err, stderr: stderr, stdout: stdout });
-            });
-        });
-    }
-
-    function classifyError(err) {
-        const msg = ((err.stderr || '') + ' ' + (err.error?.message || '')).toLowerCase();
-        if (msg.includes('not allowed') || msg.includes('permission') ||
-            msg.includes('automation') || msg.includes('-1743') || msg.includes('-10004')) {
-            return 'permission_denied';
-        }
-        if (msg.includes('timed out') || msg.includes('timeout') || msg.includes('killed')) {
-            return 'timeout';
-        }
-        return 'error';
-    }
-
-    module.exports = {
-        callHelper,
-        classifyError,
-        validateEvent(title, calendarId, startDate, endDate) {
-            var errors = [];
-            if (!title || !title.trim()) errors.push("Event title is required.");
-            if (!calendarId) errors.push("A calendar must be selected.");
-            if (!startDate || isNaN(startDate.getTime())) errors.push("Valid start date is required.");
-            if (!endDate || isNaN(endDate.getTime())) errors.push("Valid end date is required.");
-            if (startDate && endDate && startDate.getTime() > endDate.getTime()) {
-                errors.push("Start date must be before end date.");
-            }
-            return { valid: errors.length === 0, errors: errors };
-        },
-        validateReminder(title, listId) {
-            var errors = [];
-            if (!title || !title.trim()) errors.push("Reminder title is required.");
-            if (!listId) errors.push("A reminder list must be selected.");
-            return { valid: errors.length === 0, errors: errors };
-        },
-        async createEvent(helperPath, title, startDate, endDate, calendarId, opts) {
-            opts = opts || {};
-            var validation = this.validateEvent(title, calendarId, startDate, endDate);
-            if (!validation.valid) throw new Error('Validation failed: ' + validation.errors.join(' '));
-            var isAllDay = opts.isAllDay === true;
-            var startISO = startDate.toISOString();
-            var endISO = endDate.toISOString();
-            var args = ['create-event', title, startISO, endISO, calendarId, isAllDay ? 'true' : 'false'];
-            if (opts.location) args.push(opts.location);
-            if (opts.notes) args.push(opts.notes);
-            if (opts.url) args.push(opts.url);
-            console.log("[Calendian] Creating event: " + title);
-            return callHelper(helperPath, args);
-        },
-        async createReminder(helperPath, title, listId, opts) {
-            opts = opts || {};
-            var validation = this.validateReminder(title, listId);
-            if (!validation.valid) throw new Error('Validation failed: ' + validation.errors.join(' '));
-            var dueDateISO = opts.dueDate ? opts.dueDate.toISOString() : '';
-            var args = ['create-reminder', title, listId];
-            if (dueDateISO) args.push(dueDateISO);
-            if (opts.dueTime) args.push(opts.dueTime);
-            if (opts.priority) args.push(opts.priority);
-            if (opts.notes) args.push(opts.notes);
-            console.log("[Calendian] Creating reminder: " + title);
-            return callHelper(helperPath, args);
-        }
-    };
-}
-})(); // end IIFE — Node.js-only code isolated from Obsidian concatenation scope
+// ── Mutation safety guards (v0.4, REQ-WRITE-015, REQ-WRITE-019, REQ-REC-002) ─
 
 /**
  * Check if an event can be safely mutated.
