@@ -8591,6 +8591,7 @@ MacOSIntegration.prototype.countReminderLists = function(reminders) {
 // Guarded: these are only available when loaded via require() in Node.js context.
 // The Obsidian-side code uses MacOSIntegration.prototype.execHelper() instead.
 
+(function() {
 if (typeof module !== 'undefined' && module.exports) {
     var nodeChildProcess = require('child_process');
 
@@ -8680,8 +8681,7 @@ if (typeof module !== 'undefined' && module.exports) {
         }
     };
 }
-
-// ── Mutation safety guards (v0.4, REQ-WRITE-015, REQ-WRITE-019, REQ-REC-002) ─
+})(); // end IIFE — Node.js-only code isolated from Obsidian concatenation scope
 
 /**
  * Check if an event can be safely mutated.
