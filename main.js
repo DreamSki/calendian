@@ -750,6 +750,9 @@ const defaultSettings = Object.freeze({
     selectedReminderListIds: [],
     refreshIntervalMinutes: 5,
     pastEventDisplay: 'dimmed',
+    // Reminder display settings (v0.2 schema)
+    showNoDateReminders: true,
+    reminderDisplayRange: 'today',
 });
 function appHasPeriodicNotesPluginLoaded() {
     var _a, _b;
@@ -812,6 +815,7 @@ class CalendarSettingsTab extends obsidian.PluginSettingTab {
         this.addMacOSRemindersToggle();
         this.addMacOSCalendarNamesSetting();
         this.addMacOSReminderListNamesSetting();
+        this.addReminderDisplaySettings();
         this.addMacOSRefreshIntervalSetting();
         this.addMacOSPastEventDisplaySetting();
 
@@ -1211,6 +1215,33 @@ class CalendarSettingsTab extends obsidian.PluginSettingTab {
                         }
                     });
                 });
+        });
+    }
+    // REQ-REM-006, REQ-REM-007: Reminder display settings
+    addReminderDisplaySettings() {
+        // No-date reminders toggle
+        new obsidian.Setting(this.containerEl)
+            .setName("Show reminders without due dates")
+            .setDesc("Display reminders that have no due date in a separate collapsible section")
+            .addToggle((toggle) => {
+            toggle.setValue(this.plugin.options.showNoDateReminders !== false);
+            toggle.onChange(async (value) => {
+                this.plugin.writeOptions(() => ({ showNoDateReminders: value }));
+            });
+        });
+
+        // Default display range
+        new obsidian.Setting(this.containerEl)
+            .setName("Default reminder display range")
+            .setDesc("Choose how many days of reminders to show. You can also change this inline in the reminder panel.")
+            .addDropdown((dropdown) => {
+            dropdown.addOption("today", "Selected day only");
+            dropdown.addOption("7days", "Next 7 days");
+            dropdown.addOption("all", "All incomplete");
+            dropdown.setValue(this.plugin.options.reminderDisplayRange || "today");
+            dropdown.onChange(async (value) => {
+                this.plugin.writeOptions(() => ({ reminderDisplayRange: value }));
+            });
         });
     }
     addMacOSRefreshIntervalSetting() {
@@ -5024,12 +5055,28 @@ class MacOSIntegration {
     }
 
     // --- Get reminders for a specific date from cache ---
+    // REQ-REM-007: displayRange controls the date window — 'today', '7days', or 'all'
     getRemindersForDate(date) {
+        var opts = this.plugin.options || {};
+        var displayRange = opts.reminderDisplayRange || 'today';
+        var filterIds = opts.selectedReminderListIds || [];
+
         var d = date.toDate();
         var y = d.getFullYear(), m = d.getMonth(), day = d.getDate();
         var start = new Date(y, m, day, 0, 0, 0);
-        var end = new Date(y, m, day, 23, 59, 59);
-        var filterIds = (this.plugin.options && this.plugin.options.selectedReminderListIds) || [];
+        var end;
+
+        if (displayRange === '7days') {
+            // From selected date through +7 days
+            end = new Date(y, m, day + 7, 23, 59, 59);
+        } else if (displayRange === 'all') {
+            // Show all incomplete reminders (full cache range)
+            end = new Date(y + 10, m, day, 23, 59, 59);
+        } else {
+            // 'today' — selected date only
+            end = new Date(y, m, day, 23, 59, 59);
+        }
+
         return this.allReminders.filter(function(r) {
             // Apply reminder list filter by ID (primary) or name (fallback)
             if (filterIds.length > 0) {
@@ -5038,12 +5085,24 @@ class MacOSIntegration {
                 var matched = filterIds.includes(rId) || filterIds.includes(rName);
                 if (!matched) return false;
             }
-            // Reminders with no due date: show on today only
-            if (!r.due) {
-                var today = new Date();
-                return y === today.getFullYear() && m === today.getMonth() && day === today.getDate();
-            }
+            // Reminders with no due date are handled separately (see renderRemindersSection)
+            if (!r.due) return false;
             return r.due >= start && r.due <= end;
+        });
+    }
+
+    // --- Get reminders without a due date (REQ-REM-006) ---
+    getNoDateReminders() {
+        var opts = this.plugin.options || {};
+        var filterIds = opts.selectedReminderListIds || [];
+        return this.allReminders.filter(function(r) {
+            if (filterIds.length > 0) {
+                var rId = r.listId || r.id || "";
+                var rName = r.listName || r.list || "";
+                var matched = filterIds.includes(rId) || filterIds.includes(rName);
+                if (!matched) return false;
+            }
+            return !r.due;
         });
     }
 
@@ -5376,11 +5435,13 @@ class MacOSIntegration {
         // Get data from cache
         var dayEvents = [];
         var dayReminders = [];
+        var noDateReminders = [];
         if (showCal && calPerm === 'granted') {
             dayEvents = this.getEventsForDate(this.selectedDate);
         }
         if (showRem && remPerm === 'granted') {
             dayReminders = this.getRemindersForDate(this.selectedDate);
+            noDateReminders = opts.showNoDateReminders !== false ? this.getNoDateReminders() : [];
         }
 
         // Events section
@@ -5389,10 +5450,10 @@ class MacOSIntegration {
         }
         // Reminders section
         if (showRem && remPerm === 'granted') {
-            this.renderRemindersSection(this.eventsPanelEl, dayReminders);
+            this.renderRemindersSection(this.eventsPanelEl, dayReminders, noDateReminders);
         }
         // REQ-ERR-004: Distinguish empty data from failure states
-        if (dayEvents.length === 0 && dayReminders.length === 0) {
+        if (dayEvents.length === 0 && dayReminders.length === 0 && noDateReminders.length === 0) {
             var allGranted = (!showCal || calPerm === 'granted') && (!showRem || remPerm === 'granted');
             if (allGranted) {
                 const emptyEl = this.eventsPanelEl.createDiv("macos-empty");
@@ -5604,26 +5665,72 @@ class MacOSIntegration {
     }
 
     // --- Render reminders section ---
-    renderRemindersSection(parent, reminders) {
+    // REQ-REM-005: Overdue styling. REQ-REM-006: No-date section. REQ-REM-007: Display range. REQ-REM-009: Subtasks.
+    renderRemindersSection(parent, reminders, noDateReminders) {
+        const self = this;
+        const opts = this.plugin.options || {};
         const sectionEl = parent.createDiv("macos-section");
-        const headerEl = sectionEl.createDiv("macos-section-header");
+
+        // REQ-REM-007: Header with inline range selector
+        const headerRow = sectionEl.createDiv("calendian-reminders-header");
+        const headerEl = headerRow.createDiv("macos-section-header");
         headerEl.textContent = "Reminders";
 
-        if (reminders.length === 0) {
+        // Inline range selector dropdown
+        const rangeSelector = headerRow.createEl("select", { cls: "calendian-reminder-range-selector" });
+        rangeSelector.innerHTML =
+            '<option value="today">Today</option>' +
+            '<option value="7days">Next 7 days</option>' +
+            '<option value="all">All incomplete</option>';
+        rangeSelector.value = opts.reminderDisplayRange || 'today';
+        rangeSelector.addEventListener("change", function() {
+            self.plugin.writeOptions(function() { return { reminderDisplayRange: rangeSelector.value }; });
+            self.render();
+        });
+
+        // REQ-REM-005: Sort — overdue reminders first, then by due date
+        var todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+
+        var sortedReminders = reminders.slice().sort(function(a, b) {
+            var aOverdue = a.due && a.due < todayStart;
+            var bOverdue = b.due && b.due < todayStart;
+            if (aOverdue && !bOverdue) return -1;
+            if (!aOverdue && bOverdue) return 1;
+            if (a.due && b.due) return a.due - b.due;
+            if (a.due) return -1;
+            if (b.due) return 1;
+            return 0;
+        });
+
+        if (sortedReminders.length === 0 && (!noDateReminders || noDateReminders.length === 0)) {
             const emptyEl = sectionEl.createDiv("macos-item-empty");
-            emptyEl.textContent = "No reminders for this day";
+            emptyEl.textContent = "No reminders";
             return;
         }
 
-        for (let i = 0; i < reminders.length; i++) {
-            const rem = reminders[i];
+        // Render each dated reminder
+        for (let i = 0; i < sortedReminders.length; i++) {
+            const rem = sortedReminders[i];
             const itemEl = sectionEl.createDiv("macos-item");
+
+            // REQ-REM-005: Overdue detection and styling
+            var isOverdue = rem.due && rem.due < todayStart;
+            if (isOverdue) {
+                itemEl.addClass("calendian-reminder-overdue");
+            }
 
             // Checkbox + title
             const titleEl = itemEl.createDiv("macos-item-title");
             titleEl.textContent = "○ " + (rem.title || rem.name || "");
 
-            // REQ-REM-008: Priority indicator
+            // REQ-REM-005: Overdue badge
+            if (isOverdue) {
+                const overdueBadge = itemEl.createDiv("calendian-reminder-overdue-badge");
+                overdueBadge.textContent = "overdue";
+            }
+
+            // Priority indicator
             if (rem.priority && rem.priority !== "none") {
                 const priorityEl = itemEl.createDiv("macos-priority");
                 if (rem.priority === "high") {
@@ -5638,10 +5745,13 @@ class MacOSIntegration {
                 }
             }
 
-            // Due time
+            // Due time — with overdue date styling
             if (rem.due) {
-                const timeEl = itemEl.createDiv("macos-item-time");
+                const timeEl = itemEl.createDiv("macos-item-time calendian-reminder-due");
                 timeEl.textContent = this.formatTime(rem.due);
+                if (isOverdue) {
+                    timeEl.addClass("calendian-reminder-overdue-due");
+                }
             }
 
             // List badge
@@ -5650,7 +5760,77 @@ class MacOSIntegration {
                 const badgeEl = itemEl.createDiv("macos-item-badge");
                 badgeEl.textContent = listName;
             }
+
+            // REQ-REM-009: Subtasks — render child reminders indented under parent
+            // TODO: Subtask display is data-dependent. The helper provides parentId field
+            // but does not yet populate it. Once the helper fetches subtasks, this code
+            // will find children by parentId and render them.
+            var children = this.getSubtasksForReminder(rem);
+            for (var j = 0; j < children.length; j++) {
+                var child = children[j];
+                var subtaskEl = sectionEl.createDiv("calendian-reminder-subtask");
+                if (child.completed) {
+                    subtaskEl.addClass("completed");
+                    subtaskEl.textContent = "☑ " + (child.title || "");
+                } else {
+                    subtaskEl.textContent = "○ " + (child.title || "");
+                }
+            }
         }
+
+        // REQ-REM-006: No-date reminders section
+        if (noDateReminders && noDateReminders.length > 0) {
+            var nodateSection = sectionEl.createDiv("calendian-reminder-nodate-section");
+
+            // Collapsible header
+            var nodateHeader = nodateSection.createDiv("calendian-reminder-nodate-header");
+            nodateHeader.textContent = "▸ Reminders without due date (" + noDateReminders.length + ")";
+            var nodateList = nodateSection.createDiv("calendian-reminder-nodate-list");
+            nodateList.style.display = "none"; // collapsed by default
+
+            nodateHeader.addEventListener("click", function() {
+                var isHidden = nodateList.style.display === "none";
+                nodateList.style.display = isHidden ? "block" : "none";
+                nodateHeader.textContent = (isHidden ? "▾" : "▸") + " Reminders without due date (" + noDateReminders.length + ")";
+            });
+
+            for (var k = 0; k < noDateReminders.length; k++) {
+                var nr = noDateReminders[k];
+                var nrItemEl = nodateList.createDiv("macos-item");
+
+                var nrTitleEl = nrItemEl.createDiv("macos-item-title");
+                nrTitleEl.textContent = "○ " + (nr.title || nr.name || "");
+
+                if (nr.priority && nr.priority !== "none") {
+                    const prEl = nrItemEl.createDiv("macos-priority");
+                    if (nr.priority === "high") {
+                        prEl.textContent = "!!!";
+                        prEl.addClass("macos-priority-high");
+                    } else if (nr.priority === "medium") {
+                        prEl.textContent = "!!";
+                        prEl.addClass("macos-priority-medium");
+                    } else {
+                        prEl.textContent = "!";
+                        prEl.addClass("macos-priority-low");
+                    }
+                }
+
+                var nrListName = nr.listName || nr.list || "";
+                if (nrListName) {
+                    const nrBadgeEl = nrItemEl.createDiv("macos-item-badge");
+                    nrBadgeEl.textContent = nrListName;
+                }
+            }
+        }
+    }
+
+    // REQ-REM-009: Get subtasks (children) for a reminder by parentId
+    getSubtasksForReminder(reminder) {
+        if (!this.allReminders) return [];
+        var parentId = reminder.id;
+        return this.allReminders.filter(function(r) {
+            return r.parentId && r.parentId === parentId;
+        });
     }
 
     // --- Format time range like "14:00 - 16:00 (2h)" ---

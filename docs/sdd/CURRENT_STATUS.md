@@ -19,7 +19,7 @@ This document records the actual repository state. It intentionally separates im
 | Calendar source discovery | Implemented | EventKit `calendar.calendarIdentifier` (UUID), account name (`source.title`), color, type. Display name includes account suffix ("日历 — chengbo.sun123@outlook.com"). |
 | Reminder list discovery | Implemented | EventKit lists with UUID, account name, color. |
 | Event display | Implemented | Title, time range, all-day handling, calendar badge with color, location, recurrence indicator, ongoing/soon highlights. Expandable detail panel (click to show location, URL, notes, attendees, calendar source, recurrence summary). Multi-day events shown on all overlapping days. Past events dimmed/hidden per setting. Recurring events marked with read-only indicator. |
-| Reminder display | Implemented | Title, due time, list badge, priority indicator (high/medium/low). Completed reminders hidden by default. |
+| Reminder display | Implemented | Title, due time, list badge, priority indicator (high/medium/low). Completed reminders hidden by default. Overdue reminders visually distinguished (red border + badge + due date). No-date reminders in collapsible section. Display range selector (today / 7 days / all incomplete). Subtask rendering ready (data-dependent — helper parentId not yet populated). |
 | Source filtering | Implemented | Toggle individual calendars/lists via settings. Filter by stable UUID (EventKit `calendarIdentifier`). In-memory instant apply via `render()`. Persisted in `data.json`. |
 | Permission handling | Implemented | Independent calendar/reminder permission states with recovery guidance and retry buttons. Partial permission support (show available data + banner for denied source). |
 | Error states | Implemented | Error classification (permission_denied, timeout, error). Per-source error banners with retry. Parse-failure isolation. Empty vs error distinction. |
@@ -80,6 +80,6 @@ Everything else must be marked as planned, experimental, or future.
   - TASK-010+011: Event details panel, multi-day events, past event display, recurring indicator (REQ-CAL-007..011).
   - TASK-012: Reminder polish — overdue styling, no-date section, display range selector, subtasks (REQ-REM-005..009).
   - TASK-013: Month cell event dots with calendar colors (REQ-UX-006).
-- **Decisions:** 4 parallel worktrees, each touching distinct line ranges. Merge conflicts only in doc files (SPEC, TASKS, CURRENT_STATUS).
+- **Decisions:** 4 parallel worktrees, each touching distinct line ranges. Merge conflicts only in doc files. REQ-REM-009 subtasks marked Partial (helper does not yet populate parentId).
 - **Next:** Final verification — compile helper, syntax check, eye-check in Obsidian.
 - **Last action:** 2026-06-08 — merging branches into main.
