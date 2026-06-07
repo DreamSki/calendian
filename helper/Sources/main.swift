@@ -49,6 +49,12 @@ struct PermissionStatus: Codable {
     var reminders: String
 }
 
+struct WriteResult: Codable {
+    var ok: Bool
+    var id: String
+    var completed: Bool?  // only for toggle-reminder
+}
+
 // MARK: - Main
 
 @main
@@ -98,6 +104,24 @@ struct CalendianHelper {
             case "toggle-reminder":
                 guard args.count >= 3 else { printUsage(); exit(1) }
                 try toggleReminder(args[2])
+            case "create-event":
+                guard args.count >= 7 else { printUsage(); exit(1) }
+                let isAllDay = args[6] == "true"
+                let location = args.count > 7 ? args[7] : ""
+                let notes = args.count > 8 ? args[8] : ""
+                let url = args.count > 9 ? args[9] : ""
+                try await createEvent(title: args[2], startISO: args[3], endISO: args[4],
+                                      calendarID: args[5], isAllDay: isAllDay,
+                                      location: location, notes: notes, url: url)
+            case "create-reminder":
+                guard args.count >= 4 else { printUsage(); exit(1) }
+                let dueDate = args.count > 4 ? args[4] : ""
+                let dueTime = args.count > 5 ? args[5] : ""
+                let priority = args.count > 6 ? args[6] : "none"
+                let notes = args.count > 7 ? args[7] : ""
+                try await createReminder(title: args[2], listID: args[3],
+                                         dueDate: dueDate, dueTime: dueTime,
+                                         priority: priority, notes: notes)
             default:
                 printUsage()
                 exit(1)
@@ -302,7 +326,88 @@ struct CalendianHelper {
         ekReminder.isCompleted.toggle()
         ekReminder.completionDate = ekReminder.isCompleted ? Date() : nil
         try store.save(ekReminder, commit: true)
-        printJSON(["ok": true, "completed": ekReminder.isCompleted])
+        printJSON(WriteResult(ok: true, id: reminderID, completed: ekReminder.isCompleted))
+    }
+
+    // MARK: - Create Event
+
+    static func createEvent(title: String, startISO: String, endISO: String,
+                            calendarID: String, isAllDay: Bool,
+                            location: String, notes: String, url: String) async throws {
+        _ = try await requestEventsAccessIfNeeded()
+
+        let fmt = ISO8601DateFormatter()
+        guard let startDate = fmt.date(from: startISO),
+              let endDate = fmt.date(from: endISO) else {
+            fputs("{\"error\":\"Invalid date format. Use ISO 8601.\"}\n", stderr)
+            exit(1)
+        }
+
+        guard let calendar = store.calendars(for: .event).first(where: { $0.calendarIdentifier == calendarID }) else {
+            fputs("{\"error\":\"Calendar not found: \(calendarID)\"}\n", stderr)
+            exit(1)
+        }
+
+        let ekEvent = EKEvent(eventStore: store)
+        ekEvent.title = title
+        ekEvent.startDate = startDate
+        ekEvent.endDate = endDate
+        ekEvent.isAllDay = isAllDay
+        ekEvent.calendar = calendar
+        if !location.isEmpty { ekEvent.location = location }
+        if !notes.isEmpty { ekEvent.notes = notes }
+        if !url.isEmpty, let eventURL = URL(string: url) { ekEvent.url = eventURL }
+
+        try store.save(ekEvent, span: .thisEvent, commit: true)
+        printJSON(WriteResult(ok: true, id: ekEvent.eventIdentifier ?? "", completed: nil))
+    }
+
+    // MARK: - Create Reminder
+
+    static func createReminder(title: String, listID: String, dueDate: String,
+                               dueTime: String, priority: String, notes: String) async throws {
+        _ = try await requestRemindersAccessIfNeeded()
+
+        guard let calendar = store.calendars(for: .reminder).first(where: { $0.calendarIdentifier == listID }) else {
+            fputs("{\"error\":\"Reminder list not found: \(listID)\"}\n", stderr)
+            exit(1)
+        }
+
+        let ekReminder = EKReminder(eventStore: store)
+        ekReminder.title = title
+        ekReminder.calendar = calendar
+
+        // Set due date components from ISO date + optional time
+        if !dueDate.isEmpty {
+            let fmt = ISO8601DateFormatter()
+            if let date = fmt.date(from: dueDate) {
+                let cal = Calendar.current
+                var comps = cal.dateComponents([.year, .month, .day], from: date)
+                if !dueTime.isEmpty {
+                    let parts = dueTime.split(separator: ":")
+                    if parts.count == 2,
+                       let h = Int(parts[0]), let m = Int(parts[1]),
+                       h >= 0 && h < 24 && m >= 0 && m < 60 {
+                        comps.hour = h
+                        comps.minute = m
+                    }
+                }
+                ekReminder.dueDateComponents = comps
+            }
+        }
+
+        // Set priority
+        switch priority.lowercased() {
+        case "high": ekReminder.priority = 1
+        case "medium": ekReminder.priority = 5
+        case "low": ekReminder.priority = 9
+        default: ekReminder.priority = 0
+        }
+
+        if !notes.isEmpty { ekReminder.notes = notes }
+
+        try store.save(ekReminder, commit: true)
+        printJSON(WriteResult(ok: true, id: ekReminder.calendarItemIdentifier, completed: nil))
     }
 
     // MARK: - Permissions
@@ -383,6 +488,8 @@ struct CalendianHelper {
               request-events                     Request Calendar access
               request-reminders                  Request Reminders access
               toggle-reminder <id>               Toggle reminder completion
+              create-event <title> <start> <end> <calId> <isAllDay> [location] [notes] [url]
+              create-reminder <title> <listId> [dueDate] [dueTime] [priority] [notes]
 
             """, stderr)
     }
