@@ -61,6 +61,48 @@ After any code change:
 5. **Update `docs/sdd/CURRENT_STATUS.md` → `## Active session`** with what you just did, what's next, and any decisions made. This is how the next session knows where to continue without re-explaining context.
 6. Commit with message: `<area>: <what changed> (REQ-XXX)` — e.g. `macos: add helper binary timeout handling (REQ-ERR-001)`. Commit doc-only changes separately from code changes.
 
+## Verify
+
+Before marking any task Done, verify it actually works. Code-reading is not verification.
+
+1. **Compile the helper** — `swiftc helper/Sources/main.swift -o calendian-helper`. If it fails, nothing downstream works.
+2. **Test the data channel** — `./calendian-helper calendars` and `./calendian-helper events <from> <to>`. Confirm valid JSON, no stderr.
+3. **Eye-check in Obsidian** — reload the plugin (disable/re-enable in Community Plugins), open calendar panel. Confirm: events and reminders visible, refresh button works, source toggles render, no blank or broken states.
+4. **Walk the version gates** — read `docs/sdd/ACCEPTANCE.md` for the current version's gates. For each gate: test the behavior in the Obsidian panel, not just in the code. A gate verified only by code-reading is not passed.
+
+When verification passes, update `docs/sdd/TASKS.md` and commit.
+
+---
+
+## Parallel sessions
+
+Multiple Claude Code sessions may work on this project simultaneously. Without coordination they will collide.
+
+**Startup (every session, before touching code):**
+1. Read `docs/sdd/TASKS.md`.
+2. If any task is marked `In progress (branch: <name>)`, it's claimed by another session. Leave it alone.
+3. Pick an unclaimed task and immediately mark it `In progress (branch: <your-branch>)` in TASKS.md before doing anything else.
+
+**Worktree for parallel branches:**
+```bash
+# Worktrees are siblings of the calendian/ plugin directory.
+# They share git history but have independent working trees.
+git worktree add ../calendian-<task-id> -b <task-id>
+cd ../calendian-<task-id>
+```
+
+Different sessions edit different worktrees → no file conflicts.
+
+**Testing your branch in Obsidian:** Obsidian loads from `.obsidian/plugins/calendian/`. Only one branch can be active there. To test your worktree branch, `git checkout <branch>` in the main `calendian/` directory.
+
+**Done:**
+1. Merge to main: `git checkout main && git merge <task-id>`
+2. Mark task `Done` in `docs/sdd/TASKS.md`, remove the branch annotation.
+3. `git worktree remove ../calendian-<task-id>`
+4. Push main.
+
+---
+
 ## Key conventions
 
 **Document map** — when you need to find something:
