@@ -352,11 +352,6 @@ module.exports = {
         });
     },
 
-    // --- Check if error is a permission error (delegates to classifyError) ---
-    isPermissionError: function(err) {
-        return this.classifyError(err) === 'permission_denied';
-    },
-
     // --- Parse event data ---
     // v0.1 fields per SPEC §5.1: id, source, calendarId, calendarName, calendarColor,
     //   title, start, end, isAllDay, isRecurring, recurrenceSummary,

@@ -6140,13 +6140,11 @@ class MacOSIntegration {
     }
 }
 
-// v0.3: Mix in methods from src/ modules (REQ-ARCH-001)
-// These override the inline class methods with identical implementations,
-// now organized into maintainable modules per SPEC §8 target architecture.
-var _mixinHelper = require('./src/macos/helper-executor.js');
-var _mixinCache = require('./src/cache/schedule-cache.js');
-Object.assign(MacOSIntegration.prototype, _mixinHelper);
-Object.assign(MacOSIntegration.prototype, _mixinCache);
+// NOTE: src/ module extraction in progress (REQ-ARCH-001, v0.3).
+// Modules exist on disk (src/macos/helper-executor.js, src/cache/schedule-cache.js,
+// src/macos/writer.js) but are not yet wired via require() — Obsidian plugin loading
+// does not support top-level require() to local files in all contexts.
+// Methods remain inline until a compatible module-loading strategy is verified.
 
 class CalendarView extends obsidian.ItemView {
     constructor(leaf, plugin, helperPath) {
