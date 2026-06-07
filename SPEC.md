@@ -1,573 +1,467 @@
-# Calendian — 产品规格文档 (Specification)
+# Calendian Specification
 
-> **插件名称**: Calendian  
-> **版本**: 1.0.0 (Phase 1)  
-> **平台**: macOS (必需), Android (后续)  
-> **Obsidian 最低版本**: 0.12.0+  
-> **最后更新**: 2026-06-07
+> Status: authoritative product specification  
+> Version target: pre-v0.1 / read-only MVP  
+> Last updated: 2026-06-07  
+> Process: Specification-Driven Development (SDD)
 
----
+Calendian is an Obsidian desktop plugin that brings macOS Calendar events and macOS Reminders into the Obsidian sidebar. The product is local-first: early versions read from Calendar.app and Reminders.app through macOS automation rather than sending data to a cloud service.
 
-## 1. 产品概述
+This specification is the single source of truth for scope, requirements, non-goals, data model, safety rules, and release acceptance. Roadmap, tasks, tests, and README must trace back to this file.
 
-Calendian 是一款 Obsidian 插件，将 macOS 系统日历和提醒事项深度集成到 Obsidian 工作流中。通过 JXA（JavaScript for Automation）访问 macOS Calendar 和 Reminders 应用（包括通过 Exchange、iCloud 等账户同步的数据），在 Obsidian 侧边栏提供丰富的日程和提醒展示，并支持双向同步、笔记关联、时间线视图等高级功能。
+See also:
 
-### 核心价值
-
-- **一站式日程管理**：无需离开 Obsidian 即可查看和管理所有日程与提醒
-- **笔记与日程融合**：通过双向链接将 Obsidian 笔记与日程事件深度关联
-- **多视图适配**：从月概览到时间轴，满足不同场景的日程查看需求
-- **系统原生集成**：直接读写 macOS Calendar/Reminders，无需第三方 API
-
----
-
-## 2. 数据源
-
-### 2.1 日历来源
-
-通过 macOS Calendar App 间接访问所有账户数据：
-
-| 来源类型 | 访问方式 | 支持情况 |
-|---------|---------|---------|
-| iCloud 日历 | macOS Calendar App (JXA) | ✅ Phase 1 |
-| Exchange/Outlook 日历 | macOS Calendar App (JXA) | ✅ Phase 1 |
-| Google Calendar | macOS Calendar App (JXA) | ✅ Phase 1 |
-| CalDAV 日历 | macOS Calendar App (JXA) | ✅ Phase 1 |
-| 本地日历 | macOS Calendar App (JXA) | ✅ Phase 1 |
-| Microsoft Graph API (Android) | 直接 API 调用 | 🔜 Phase 5+ |
-
-### 2.2 提醒事项来源
-
-| 来源类型 | 访问方式 | 支持情况 |
-|---------|---------|---------|
-| iCloud 提醒 | macOS Reminders App (JXA) | ✅ Phase 1 |
-| Exchange 提醒 | macOS Reminders App (JXA) | ✅ Phase 1 |
-| 本地提醒列表 | macOS Reminders App (JXA) | ✅ Phase 1 |
-
-### 2.3 可获取的事件字段
-
-通过 JXA 可从 Calendar App 获取的事件属性：
-
-| 字段 | JXA 属性 | 说明 |
-|------|---------|------|
-| 标题 | `summary()` | 事件标题 |
-| 开始时间 | `startDate()` | Date 对象 |
-| 结束时间 | `endDate()` | Date 对象 |
-| 是否全天 | `allday()` | Boolean |
-| 日历名称 | `calendar.name()` | 所属日历 |
-| 日历颜色 | `calendar.color()` | RGB 值 |
-| 地点 | `location()` | 地点/会议室/链接 |
-| 备注/描述 | `description()` | 事件描述文本 |
-| 参与者 | `attendees()` | 参与者列表 |
-| 重复规则 | `recurrence()` | 重复事件规则 |
-| 警报 | `alarms()` | 事件提醒设置 |
+- [`docs/sdd/README.md`](./docs/sdd/README.md) — SDD process and document hierarchy
+- [`docs/sdd/CURRENT_STATUS.md`](./docs/sdd/CURRENT_STATUS.md) — actual implementation status
+- [`docs/sdd/ACCEPTANCE.md`](./docs/sdd/ACCEPTANCE.md) — release gates
+- [`docs/sdd/TRACEABILITY.md`](./docs/sdd/TRACEABILITY.md) — requirement traceability
+- [`docs/sdd/TASKS.md`](./docs/sdd/TASKS.md) — implementation backlog
+- [`docs/sdd/TESTING.md`](./docs/sdd/TESTING.md) — test strategy
+- [`docs/sdd/RISKS.md`](./docs/sdd/RISKS.md) — risk register
 
 ---
 
-## 3. 视觉设计
+## 1. Product scope
 
-### 3.1 整体风格
+### 1.1 Product goal
 
-**Claude.ai 对话界面风格**：
-- 深色背景优先，适配 Obsidian 主题
-- 柔和的暖色（琥珀色/橙色）作为强调色
-- 圆角卡片式设计，温暖的视觉感受
-- 足够的留白和层次感
-- 非紧凑但也不过度分散，注重可读性
+Calendian helps Obsidian users review and eventually manage their schedule without leaving their note-taking environment.
 
-### 3.2 布局结构
+Primary goals:
 
+1. Show selected-day Calendar events in the Obsidian sidebar.
+2. Show selected-day Reminders in the Obsidian sidebar.
+3. Keep calendar/reminder data local by default.
+4. Preserve Obsidian daily-note workflows.
+5. Later, enable safe write operations and note associations.
+
+### 1.2 Target users
+
+- macOS users who already use Calendar.app and/or Reminders.app.
+- Obsidian users who use daily notes, meeting notes, task notes, or weekly planning workflows.
+- Users who want local-first schedule visibility without direct Google/Microsoft API setup.
+
+### 1.3 Current release posture
+
+The current repository must be treated as **pre-v0.1 / read-only MVP in progress**. Feature claims in README and release notes must match `docs/sdd/CURRENT_STATUS.md`.
+
+---
+
+## 2. Non-goals and explicit boundaries
+
+### 2.1 v0.1 non-goals
+
+The following are explicitly out of scope for v0.1:
+
+- Creating Calendar events.
+- Editing Calendar events.
+- Deleting Calendar events.
+- Creating, editing, deleting, or completing Reminders.
+- Editing recurring events.
+- Two-way sync between Obsidian Tasks and macOS Reminders.
+- Android, Windows, Linux, or web support.
+- Direct Google Calendar API, Microsoft Graph API, or CalDAV API integration.
+- Cloud sync managed by Calendian.
+- AI summarization or remote processing of private calendar data.
+
+### 2.2 Future non-goal unless re-specified
+
+Calendian will not send event titles, reminder text, attendees, notes, locations, or URLs to any external service unless a future spec adds an opt-in external integration with a separate privacy model.
+
+---
+
+## 3. Platforms and dependencies
+
+### 3.1 Platform matrix
+
+| Platform | Status | Notes |
+|---|---|---|
+| macOS desktop | Target | Uses `/usr/bin/osascript` and JXA. |
+| Obsidian desktop | Target | Plugin runs inside Obsidian desktop. |
+| iOS / iPadOS | Rejected for current architecture | JXA and macOS automation unavailable. |
+| Windows / Linux | Deferred | Requires non-JXA architecture. |
+| Android | Deferred to v1.x platform track | Requires external API/auth design. |
+
+### 3.2 External apps
+
+- Calendar.app is the source of calendar events.
+- Reminders.app is the source of reminders.
+- Account support is inherited from what the user has configured in macOS Calendar/Reminders.
+
+### 3.3 Packaging consistency requirement
+
+`manifest.json`, README, SPEC, and release notes must agree on:
+
+- plugin display name;
+- plugin id;
+- version;
+- minimum Obsidian version;
+- desktop/macOS-only scope.
+
+---
+
+## 4. Domain model
+
+### 4.1 Event model
+
+Internal event records should converge toward this shape:
+
+```ts
+interface CalendianEvent {
+  id: string;
+  source: "macos-calendar";
+  calendarId?: string;
+  calendarName: string;
+  calendarColor?: string;
+  title: string;
+  start: string; // ISO-like internal representation
+  end?: string;
+  isAllDay: boolean;
+  isRecurring?: boolean;
+  recurrenceSummary?: string;
+  location?: string;
+  url?: string;
+  notes?: string;
+  attendees?: string[];
+  alarms?: CalendianAlarm[];
+  rawSource?: "redacted" | unknown;
+}
 ```
-┌─────────────────────────┐
-│  ←  June 2026    →      │  ← 月份导航
-├─────────────────────────┤
-│ 日 一 二 三 四 五 六     │
-│        1  2  3  4  5     │  ← 月视图（日期格子可显示颜色点）
-│  6  7  8  9 10 11 12    │
-│ ...                      │
-├═════════════════════════┤  ← 可拖动分割线
-│ Today · 2026-06-07  ←T │  ← 日期标题 + Today 按钮
-├─────────────────────────┤
-│ CALENDAR EVENTS         │  ← 分区标题
-│ ┌─ All day ───────────┐ │
-│ │ 🎂 小明生日    [个人] │ │  ← 全天事件（置顶）
-│ └─────────────────────┘ │
-│ ┌ 14:00-16:00 (2h) ───┐ │
-│ │ │ 产品评审会议  [工作]│ │  ← 进行中事件（绿色左边条）
-│ └─────────────────────┘ │
-│ ┌ 17:00-17:30 (30m) ──┐ │
-│ │ │ 1:1 with John [工作]│ │  ← 即将开始（橙色左边条）
-│ └─────────────────────┘ │
-│ ┌ 19:00-20:00 (1h) ───┐ │
-│ │   健身房        [个人]│ │  ← 未来事件
-│ └─────────────────────┘ │
-├─────────────────────────┤
-│ REMINDERS               │
-│ ┌ ○ 买菜           [日常]│ │
-│ ┌ ○ 15:00 接孩子  [家庭]│ │
-│ ┌ ● ❌ 交报告      [工作]│ │  ← 过期（红色标注）
-├─────────────────────────┤
-│ NO DATE                 │  ← 无日期提醒单独区域
-│ ┌ ○ 读书 30 分钟        │ │
-│ ┌ ○ 整理桌面            │ │
-└─────────────────────────┘
+
+v0.1 may use a reduced display model, but write operations and note association must not ship until stable IDs exist.
+
+### 4.2 Reminder model
+
+```ts
+interface CalendianReminder {
+  id: string;
+  source: "macos-reminders";
+  listId?: string;
+  listName: string;
+  title: string;
+  dueDate?: string;
+  dueTime?: string;
+  priority?: "none" | "low" | "medium" | "high";
+  completed: boolean;
+  parentId?: string;
+  notes?: string;
+  rawSource?: "redacted" | unknown;
+}
 ```
 
-### 3.3 事件状态视觉
+### 4.3 Association model
 
-| 状态 | 视觉表现 |
-|------|---------|
-| 全天事件 | 置顶，时间列显示 `All day`，斜体 |
-| 进行中 | 左侧绿色竖条 + 淡绿色背景 |
-| 即将开始（30分钟内） | 左侧橙色竖条 + 淡橙色背景 |
-| 已结束 | 整行灰色/半透明 |
-| 未来 | 正常样式 |
-| 过期提醒 | 红色文字 + ❌ 图标 |
+Future note associations must use stable source IDs:
 
-### 3.4 日历颜色
-
-- 从 macOS Calendar 获取每个日历的原生颜色
-- 事件的 badge 标签使用对应日历颜色作为背景色
-- 月视图的日期格子上用对应颜色的小圆点标记有事件的日期
-- 颜色同时应用于时间轴视图的色块
-
----
-
-## 4. 功能规格
-
-### 4.1 数据加载与缓存
-
-| 项目 | 规格 |
-|------|------|
-| 预加载范围 | 前后 6 个月（共 13 个月） |
-| 缓存方式 | 内存缓存，插件运行期间持续有效 |
-| 切换日期 | 从缓存过滤，< 100ms |
-| 定时刷新 | 可配置间隔（默认 5 分钟） |
-| 首次加载 | 预加载约 3-5 秒，期间显示 Loading |
-| 缓存数据 | 事件标题、时间、日历、颜色、是否全天、地点、备注 |
-
-### 4.2 日历视图
-
-#### 4.2.1 月视图（Phase 1）
-
-- 标准月历网格，显示当前月份
-- 导航箭头切换月份
-- 点击日期：切换面板显示该日事件（不创建日记）
-- Cmd/Ctrl + 点击日期：打开/创建该日日记
-- 有事件的日期显示彩色圆点（颜色对应日历来源）
-- 选中日期高亮
-- Today 按钮快速回到今天
-
-#### 4.2.2 时间轴视图（Phase 4）
-
-- 垂直时间轴，左侧时间刻度（8:00, 9:00, ...）
-- 事件显示为彩色色块，占据对应时间段
-- 色块高度反映事件时长
-- 点击色块展开事件详情
-- 当前时间有红色指示线
-- 空闲时段留白，直观看出可用时间
-
-#### 4.2.3 无限缩放时间线（Phase 4+）
-
-- 缩小：显示年度/项目级的大时间节点
-- 放大：显示每月/每周/每天/每小时的具体事件
-- 鼠标滚轮控制缩放级别
-- 支持拖拽平移
-- 不同缩放级别自动调整显示粒度
-
-#### 4.2.4 周视图（Phase 4）
-
-- 显示 7 天的事件列表
-- 可配置显示范围（周一至周日 / 周日至周六）
-
-#### 4.2.5 年度概览（Phase 4+）
-
-- 12 个月的缩略月历
-- 标记有事件的日期分布
-- 热力图式展示（事件越多颜色越深）
-
-### 4.3 事件展示
-
-#### 4.3.1 事件列表（默认视图）
-
-| 属性 | 展示方式 |
-|------|---------|
-| 时间 | `14:00 - 16:00 (2h)` 格式，全天显示 `All day` |
-| 标题 | 事件标题，溢出省略号 |
-| 日历 | 彩色 badge 标签 |
-| 状态 | 左侧彩色竖条（进行中/即将开始） |
-
-排序规则：全天事件置顶 → 按开始时间升序 → 已结束事件灰化但仍显示
-
-#### 4.3.2 事件详情展开
-
-点击事件展开详情面板，显示：
-
-| 字段 | 说明 |
-|------|------|
-| 时间 | 完整开始/结束时间、时区、是否重复事件 |
-| 地点/链接 | 会议室、地址、Zoom/Teams 链接（可点击） |
-| 备注/描述 | 事件的备注内容全文 |
-| 日历 | 所属日历名称 + 颜色标记 |
-| 关联笔记 | 显示通过 `[[]]` 关联的 Obsidian 笔记链接 |
-
-#### 4.3.3 跨天事件
-
-- 多天事件在每一天的列表中都显示
-- 第一天显示 `[开始]` 标记
-- 最后一天显示 `[结束]` 标记
-- 中间天数以半透明样式显示
-
-### 4.4 提醒事项展示
-
-#### 4.4.1 当日提醒
-
-- 显示当天到期的未完成提醒
-- 按到期时间排序
-- 每条显示：○ + 标题 + 到期时间（如有） + 列表 badge
-
-#### 4.4.2 无日期提醒
-
-- 单独分区显示（NO DATE）
-- 无截止日期的提醒始终显示在"今天"
-- 支持子任务层级显示
-
-#### 4.4.3 过期提醒
-
-- 红色文字 + ⚠️ 图标
-- 显示过期天数
-
-#### 4.4.4 显示范围切换
-
-| 模式 | 说明 |
-|------|------|
-| 仅今天 | 只显示当天到期的提醒 |
-| 未来 7 天 | 显示未来 7 天的提醒 |
-| 所有未完成 | 显示所有未完成提醒 |
-
-### 4.5 右键菜单
-
-#### 4.5.1 事件右键菜单
-
-| 操作 | 说明 |
-|------|------|
-| 编辑事件 | 打开编辑面板 |
-| 删除事件 | 确认后删除并同步到 macOS |
-| 在日历 App 中打开 | 打开 macOS Calendar 到该事件 |
-| 关联笔记 | 选择/新建关联的 Obsidian 笔记 |
-| 打开关联笔记 | 跳转到已关联的笔记 |
-| 复制事件信息 | 复制标题+时间到剪贴板 |
-
-#### 4.5.2 提醒右键菜单
-
-| 操作 | 说明 |
-|------|------|
-| 标记完成 | 完成提醒并同步 |
-| 编辑提醒 | 打开编辑面板 |
-| 删除提醒 | 确认后删除 |
-| 关联笔记 | 选择/新建关联笔记 |
-| 打开关联笔记 | 跳转到关联笔记 |
-
-#### 4.5.3 日期右键菜单
-
-| 操作 | 说明 |
-|------|------|
-| 新建事件 | 在该日期创建事件 |
-| 新建提醒 | 在该日期创建提醒 |
-| 打开日记 | 打开/创建该日的 Obsidian 日记 |
-| 跳转到今天 | 日历回到今天 |
-
-#### 4.5.4 日历来源筛选
-
-| 操作 | 说明 |
-|------|------|
-| 显示/隐藏日历 | 快速切换某个日历的显示 |
-| 全部显示 | 显示所有日历 |
-| 全部隐藏 | 隐藏所有日历 |
-
-### 4.6 双向同步操作
-
-#### 4.6.1 创建事件（Phase 2）
-
-**交互方式 A — 侧边编辑面板（Slide-over）**：
-- 从右侧滑出编辑面板
-- 字段：标题、日历选择、日期、开始/结束时间、是否全天、地点、备注
-- 支持 Obsidian 笔记 `[[]]` 链接选择关联笔记
-- 保存后同步到 macOS Calendar
-
-**交互方式 B — 斜杠命令（Slash Command）**：
-- 输入 `/event` 触发创建流程
-- 智能提示：标题 → 日历选择 → 时间 → 地点
-- 支持自然语言解析：`/event 明天14点 开会` 自动识别时间和标题
-- 每一步都有充分的提示和默认值
-
-#### 4.6.2 编辑事件（Phase 2）
-
-- 点击事件的编辑按钮或右键 → 编辑
-- 侧边面板打开，预填充当前值
-- 修改后保存同步到 macOS
-
-#### 4.6.3 删除事件（Phase 2）
-
-- 右键 → 删除，弹出确认对话框
-- 确认后从 macOS Calendar 删除
-
-#### 4.6.4 提醒操作（Phase 2）
-
-| 操作 | 方式 |
-|------|------|
-| 标记完成 | 点击 ○ 图标或右键 |
-| 创建提醒 | 斜杠命令 `/reminder` 或右键 |
-| 编辑提醒 | 右键 → 编辑 |
-| 删除提醒 | 右键 → 删除（需确认） |
-
-### 4.7 笔记关联
-
-#### 4.7.1 关联机制
-
-- 事件/提醒通过 Obsidian 双向链接 `[[]]` 关联到笔记
-- 关联关系存储在笔记的 frontmatter 中：
-  ```yaml
-  ---
-  calendian:
-    - type: event
-      id: "unique-event-id"
-      title: "产品评审会议"
-      calendar: "工作"
-      date: 2026-06-07
-  ---
-  ```
-- 事件详情面板中显示关联笔记链接，点击跳转
-- 笔记中可搜索/反向链接到关联的事件
-
-#### 4.7.2 关联笔记模板
-
-关联笔记时可选择使用模板，自动生成笔记内容：
-
-```markdown
+```yaml
 ---
 calendian:
-  - type: event
-    id: "xxx"
-    title: "产品评审会议"
+  associations:
+    - type: event
+      source: macos-calendar
+      id: "stable-event-id"
+      title: "Product review"
+      date: 2026-06-07
+      calendar: "Work"
 ---
-
-# 产品评审会议
-📅 2026-06-07 14:00-16:00
-📍 会议室 A
-
-## 会议记录
-
-## 待办事项
 ```
 
-### 4.8 Obsidian Tasks 插件集成（Phase 3）
-
-- 复用 Tasks 插件的日期/时间格式
-- 解析笔记中的 `- [ ] 任务 📅 2026-06-07 ⏳ 14:00` 格式
-- 自动识别为日程或提醒事项
-- 支持手动触发同步到 macOS
-- 同步后保留 Tasks 插件的元数据格式
-
-### 4.9 通知系统
-
-| 通知类型 | 触发条件 | 展示方式 |
-|---------|---------|---------|
-| 事件即将开始 | 事件开始前 5 分钟 | Obsidian 右下角 Notice |
-| 待处理提醒 | 有未完成提醒时 | 面板顶部提示条 |
-| 今日概览 | Obsidian 启动时 | Notice 显示今日事件数量和下一个事件 |
-
-### 4.10 智能功能
-
-#### 4.10.1 智能事件分类（Phase 4+）
-
-根据事件标题和备注自动识别类型：
-
-| 类型 | 关键词/模式 | 图标 |
-|------|-----------|------|
-| 会议 | 会议、评审、sync、meeting | 👥 |
-| 用餐 | 午餐、晚餐、早餐 | 🍽️ |
-| 出行 | 出差、航班、train、flight | ✈️ |
-| 个人 | 健身、体检、理发 | 🏃 |
-| 工作 | deadline、deploy、release | 💼 |
-
-#### 4.10.2 标签集成（Phase 4+）
-
-- 事件的日历名称自动映射为 Obsidian 标签
-- 可配置标签映射规则
-- 事件分类结果也可作为标签
-
-#### 4.10.3 日程统计/报表（Phase 4+）
-
-- 本周/本月事件数量统计
-- 按日历分组统计
-- 按事件类型统计
-- 每日/每周可用时间占比
-- 在 Obsidian 笔记中生成统计报告
-
-### 4.11 高级功能
-
-#### 4.11.1 项目管理/分组（Phase 4+）
-
-- 按项目/类别对事件和提醒分组
-- 每个项目可关联多个事件和笔记
-- 项目面板显示时间线和进度
-
-#### 4.11.2 时间线笔记浏览（Phase 4+）
-
-- 类似 Agenda，按时间线浏览关联的笔记
-- 左侧时间轴，右侧笔记内容
-- 支持按日/周/月/年切换时间粒度
-
-#### 4.11.3 优先级排序（Phase 2+）
-
-- 提醒事项支持高/中/低优先级
-- 优先级来源于 macOS Reminders 的优先级字段
-- 列表按优先级排序显示
-
-#### 4.11.4 事件评论/备注（Phase 3+）
-
-- 在事件详情中添加 Obsidian 端的额外备注
-- 备注存储在关联的笔记或 data.json 中
-- 不影响 macOS Calendar 的事件数据
-
-#### 4.11.5 自定义视图（Phase 4+）
-
-- 保存自定义视图配置
-- 例如：只显示工作日历的周视图
-- 可创建多个自定义视图并快速切换
+Fallback IDs derived from title/time/calendar may be used only for display hints, not destructive operations.
 
 ---
 
-## 5. 设置项
+## 5. Requirement status vocabulary
 
-### 5.1 核心设置
-
-| 设置项 | 类型 | 默认值 | 说明 |
-|--------|------|--------|------|
-| 显示日历事件 | Toggle | 开 | 是否显示 macOS Calendar 事件 |
-| 显示提醒事项 | Toggle | 开 | 是否显示 macOS Reminders |
-| 刷新间隔 | Number | 5 分钟 | 自动刷新间隔 |
-
-### 5.2 日历来源管理
-
-- "发现日历" 按钮：通过 JXA 列出所有可用日历
-- 每个日历一个 Toggle 开关
-- 显示日历名称 + 颜色预览
-- 支持 Exchange/iCloud/Google 等账户的日历
-
-### 5.3 提醒列表管理
-
-- "发现列表" 按钮：列出所有提醒事项列表
-- 每个列表一个 Toggle 开关
-- 显示列表名称
-
-### 5.4 显示设置
-
-| 设置项 | 类型 | 默认值 | 说明 |
-|--------|------|--------|------|
-| 默认视图 | Select | 单日列表 | 单日列表/时间轴/周视图 |
-| 提醒显示范围 | Select | 仅今天 | 仅今天/7天/所有 |
-| 显示已结束事件 | Toggle | 开 | 是否灰化显示已结束事件 |
-| 显示无日期提醒 | Toggle | 开 | 是否显示无截止日期的提醒 |
-| 事件通知 | Toggle | 开 | 事件即将开始时通知 |
-| 今日概览 | Toggle | 开 | 启动时显示今日概览 |
-
-### 5.5 快捷键设置
-
-| 操作 | 默认快捷键 | 说明 |
-|------|-----------|------|
-| 跳转到今天 | `T` | 日历回到今天 |
-| 前一天/后一天 | `←` / `→` | 切换选中日期 |
-| 上周/下周 | `Shift+←` / `Shift+→` | 切换周 |
-| 切换视图 | `V` | 在不同视图间循环切换 |
-| 新建事件 | `N` | 打开新建事件面板 |
-| 新建提醒 | `Shift+N` | 打开新建提醒面板 |
-| 搜索事件 | `S` | 打开搜索框 |
-
-### 5.6 关联笔记设置
-
-| 设置项 | 类型 | 默认值 | 说明 |
-|--------|------|--------|------|
-| 关联笔记文件夹 | Text | "" | 新建关联笔记的存放目录 |
-| 默认笔记模板 | Text | "" | 关联笔记的默认模板路径 |
-| 自动关联日记 | Toggle | 关 | 是否自动将当日事件关联到日记 |
+| Status | Meaning |
+|---|---|
+| Implemented | Behavior exists and passes acceptance. |
+| Partial | Behavior exists but lacks edge cases, tests, or documentation. |
+| Planned | Approved scope, not implemented. |
+| Deferred | Valid idea postponed to later track. |
+| Rejected | Explicitly out of scope. |
 
 ---
 
-## 6. 文件结构
+## 6. Requirements
 
-### 6.1 插件文件结构
+### 6.1 Platform requirements
 
+| ID | Requirement | Priority | Target | Status |
+|---|---|---|---|---|
+| REQ-PLAT-001 | THE SYSTEM SHALL run as an Obsidian desktop plugin. | P0 | v0.1 | Partial |
+| REQ-PLAT-002 | THE SYSTEM SHALL clearly communicate macOS-only support for early releases. | P0 | v0.1 | Partial |
+| REQ-PLAT-003 | THE SYSTEM SHALL keep manifest metadata consistent with documentation. | P0 | v0.1 | Planned |
+| REQ-PLAT-004 | IF the platform is unsupported, THE SYSTEM SHALL show an unsupported-platform message instead of crashing. | P0 | v0.1 | Planned |
+
+### 6.2 Permission requirements
+
+| ID | Requirement | Priority | Target | Status |
+|---|---|---|---|---|
+| REQ-PERM-001 | WHEN Calendar permission is unavailable or denied, THE SYSTEM SHALL show actionable recovery guidance. | P0 | v0.1 | Partial |
+| REQ-PERM-002 | WHEN Reminders permission is unavailable or denied, THE SYSTEM SHALL show actionable recovery guidance. | P0 | v0.1 | Planned |
+| REQ-PERM-003 | WHILE only one source is permitted, THE SYSTEM SHALL continue showing available data from the permitted source. | P0 | v0.1 | Planned |
+| REQ-PERM-004 | THE SYSTEM SHALL distinguish permission failure from empty calendar/reminder data. | P0 | v0.1 | Planned |
+| REQ-PERM-005 | THE SYSTEM SHALL provide a retry or refresh path after permission changes. | P1 | v0.2 | Planned |
+
+### 6.3 Calendar read requirements
+
+| ID | Requirement | Priority | Target | Status |
+|---|---|---|---|---|
+| REQ-CAL-001 | THE SYSTEM SHALL read events from macOS Calendar.app through local automation. | P0 | v0.1 | Partial |
+| REQ-CAL-002 | THE SYSTEM SHALL display events for the selected date. | P0 | v0.1 | Partial |
+| REQ-CAL-003 | THE SYSTEM SHALL display event title, start time, end time where available, and calendar name. | P0 | v0.1 | Partial |
+| REQ-CAL-004 | THE SYSTEM SHALL display all-day events separately or before timed events. | P0 | v0.1 | Partial |
+| REQ-CAL-005 | THE SYSTEM SHALL sort events by all-day status and start time. | P0 | v0.1 | Partial |
+| REQ-CAL-006 | THE SYSTEM SHALL visually indicate ongoing and soon-starting events. | P1 | v0.1 | Partial |
+| REQ-CAL-007 | THE SYSTEM SHALL display event location, link, notes, calendar source, and recurrence summary where available. | P1 | v0.2 | Planned |
+| REQ-CAL-008 | THE SYSTEM SHALL support an expandable event detail state. | P1 | v0.2 | Planned |
+| REQ-CAL-009 | THE SYSTEM SHALL display multi-day events on every overlapping day. | P1 | v0.2 | Planned |
+| REQ-CAL-010 | THE SYSTEM SHALL visibly mark past events or hide them according to user settings. | P1 | v0.2 | Planned |
+| REQ-CAL-011 | THE SYSTEM SHALL treat recurring events as read-only until recurring mutation is specified. | P0 | v0.1 | Planned |
+| REQ-CAL-012 | THE SYSTEM SHOULD display source calendar colors where available. | P1 | v0.2 | Partial |
+
+### 6.4 Reminder read requirements
+
+| ID | Requirement | Priority | Target | Status |
+|---|---|---|---|---|
+| REQ-REM-001 | THE SYSTEM SHALL read incomplete reminders from macOS Reminders.app through local automation. | P0 | v0.1 | Partial |
+| REQ-REM-002 | THE SYSTEM SHALL display reminders due on the selected date. | P0 | v0.1 | Partial |
+| REQ-REM-003 | THE SYSTEM SHALL display reminder title and reminder list. | P0 | v0.1 | Partial |
+| REQ-REM-004 | THE SYSTEM SHALL hide completed reminders by default. | P0 | v0.1 | Partial |
+| REQ-REM-005 | THE SYSTEM SHALL visually distinguish overdue reminders. | P1 | v0.2 | Planned |
+| REQ-REM-006 | THE SYSTEM SHALL display no-date reminders in a separate configurable section. | P1 | v0.2 | Planned |
+| REQ-REM-007 | THE SYSTEM SHALL support display ranges: selected day, next 7 days, all incomplete. | P1 | v0.2 | Planned |
+| REQ-REM-008 | THE SYSTEM SHOULD display reminder priority where available. | P2 | v0.2 | Planned |
+| REQ-REM-009 | THE SYSTEM SHOULD display reminder subtasks where available. | P2 | v0.2 | Planned |
+
+### 6.5 Source selection requirements
+
+| ID | Requirement | Priority | Target | Status |
+|---|---|---|---|---|
+| REQ-SRC-001 | THE SYSTEM SHALL discover available macOS calendars. | P0 | v0.1 | Partial |
+| REQ-SRC-002 | THE SYSTEM SHALL discover available macOS reminder lists. | P0 | v0.1 | Partial |
+| REQ-SRC-003 | THE SYSTEM SHALL let users include or exclude individual calendars. | P0 | v0.1 | Partial |
+| REQ-SRC-004 | THE SYSTEM SHALL let users include or exclude individual reminder lists. | P0 | v0.1 | Partial |
+| REQ-SRC-005 | THE SYSTEM SHALL handle duplicate source names safely. | P1 | v0.2 | Planned |
+| REQ-SRC-006 | THE SYSTEM SHALL show source discovery empty/error states. | P1 | v0.2 | Planned |
+
+### 6.6 Cache and performance requirements
+
+| ID | Requirement | Priority | Target | Status |
+|---|---|---|---|---|
+| REQ-CACHE-001 | THE SYSTEM SHALL preload a bounded date range for fast date switching. | P0 | v0.1 | Partial |
+| REQ-CACHE-002 | THE SYSTEM SHALL define behavior when users select dates outside the cached range. | P0 | v0.1 | Planned |
+| REQ-CACHE-003 | THE SYSTEM SHALL refresh source data on a configurable interval. | P0 | v0.1 | Partial |
+| REQ-CACHE-004 | WHILE refreshing, THE SYSTEM SHALL avoid falsely showing an empty state before refresh completes. | P0 | v0.1 | Planned |
+| REQ-CACHE-005 | THE SYSTEM SHALL clear refresh timers when the plugin unloads. | P0 | v0.1 | Partial |
+| REQ-CACHE-006 | THE SYSTEM SHOULD provide manual refresh. | P1 | v0.2 | Planned |
+| REQ-CACHE-007 | THE SYSTEM SHOULD display last refresh time. | P1 | v0.2 | Planned |
+| REQ-CACHE-008 | THE SYSTEM SHOULD measure refresh duration for diagnostics. | P2 | v0.2 | Planned |
+| REQ-PERF-001 | Date switching from cache SHOULD complete in under 100ms for normal datasets. | P1 | v0.1 | Planned |
+| REQ-PERF-002 | Initial read SHOULD not block the Obsidian UI. | P0 | v0.1 | Planned |
+| REQ-PERF-003 | Large calendars SHOULD degrade gracefully. | P1 | v0.2 | Planned |
+| REQ-PERF-004 | Plugin unload SHALL not leave active intervals or detached DOM. | P0 | v0.1 | Partial |
+
+### 6.7 UX requirements
+
+| ID | Requirement | Priority | Target | Status |
+|---|---|---|---|---|
+| REQ-UX-001 | WHEN a user clicks a date, THE SYSTEM SHALL select that date and update the event/reminder panel. | P0 | v0.1 | Partial |
+| REQ-UX-002 | WHEN a user Cmd/Ctrl-clicks a date, THE SYSTEM SHALL preserve open/create daily-note behavior. | P0 | v0.1 | Partial |
+| REQ-UX-003 | THE SYSTEM SHALL show loading, empty, error, unsupported, and partial-permission states. | P0 | v0.1 | Partial |
+| REQ-UX-004 | THE SYSTEM SHALL use Obsidian theme variables where possible. | P1 | v0.1 | Partial |
+| REQ-UX-005 | THE SYSTEM SHOULD support event/reminder context menus only when actions are implemented safely. | P1 | v0.3 | Planned |
+| REQ-UX-006 | THE SYSTEM SHOULD show calendar dots on month cells without harming navigation performance. | P1 | v0.2 | Planned |
+| REQ-UX-007 | THE SYSTEM SHOULD support keyboard navigation and commands. | P2 | v0.6 | Planned |
+| REQ-UX-008 | THE SYSTEM SHOULD support a compact and comfortable density option. | P2 | v0.6 | Planned |
+| REQ-UX-009 | THE SYSTEM SHOULD provide copy-as-Markdown actions. | P2 | v0.5 | Planned |
+| REQ-UX-010 | THE SYSTEM SHOULD support a today summary panel. | P2 | v0.2 | Planned |
+
+### 6.8 Privacy and diagnostics requirements
+
+| ID | Requirement | Priority | Target | Status |
+|---|---|---|---|---|
+| REQ-PRIV-001 | THE SYSTEM SHALL keep Calendar and Reminders data local by default. | P0 | v0.1 | Planned |
+| REQ-PRIV-002 | THE SYSTEM SHALL NOT send event/reminder content to third-party services by default. | P0 | v0.1 | Planned |
+| REQ-PRIV-003 | THE SYSTEM SHALL document what data is stored in Obsidian settings/frontmatter. | P0 | v0.1 | Planned |
+| REQ-DIAG-001 | THE SYSTEM SHOULD expose diagnostic status without private event/reminder content by default. | P1 | v0.2 | Planned |
+| REQ-DIAG-002 | THE SYSTEM SHOULD show Calendar and Reminders permission status. | P1 | v0.2 | Planned |
+| REQ-DIAG-003 | THE SYSTEM SHOULD show source counts and last refresh status. | P1 | v0.2 | Planned |
+| REQ-DIAG-004 | THE SYSTEM SHOULD redact diagnostics unless the user explicitly exports raw data. | P0 | v0.2 | Planned |
+
+### 6.9 Error handling requirements
+
+| ID | Requirement | Priority | Target | Status |
+|---|---|---|---|---|
+| REQ-ERR-001 | IF JXA execution fails due to permission, THE SYSTEM SHALL classify it as permission failure. | P0 | v0.1 | Partial |
+| REQ-ERR-002 | IF JXA execution times out, THE SYSTEM SHALL show a timeout error and keep previous data if available. | P0 | v0.1 | Planned |
+| REQ-ERR-003 | IF one event/reminder fails to parse, THE SYSTEM SHALL skip that item and continue rendering valid items. | P1 | v0.2 | Planned |
+| REQ-ERR-004 | IF the source returns no data, THE SYSTEM SHALL show an empty state distinct from failure. | P0 | v0.1 | Planned |
+| REQ-ERR-005 | IF a future write fails, THE SYSTEM SHALL not display false success. | P0 | v0.3 | Planned |
+| REQ-ERR-006 | IF a future write partially succeeds, THE SYSTEM SHALL refresh from source of truth. | P0 | v0.3 | Planned |
+| REQ-ERR-007 | IF a future delete is requested, THE SYSTEM SHALL require confirmation. | P0 | v0.4 | Planned |
+| REQ-ERR-008 | IF a future edit targets unsupported recurrence, THE SYSTEM SHALL block or redirect safely. | P0 | v0.4 | Planned |
+
+### 6.10 Write requirements, future releases
+
+| ID | Requirement | Priority | Target | Status |
+|---|---|---|---|---|
+| REQ-WRITE-001 | THE SYSTEM SHALL create simple non-recurring events only after user confirmation or explicit save. | P0 | v0.3 | Planned |
+| REQ-WRITE-002 | THE SYSTEM SHALL validate event title, calendar, date, and time before creating an event. | P0 | v0.3 | Planned |
+| REQ-WRITE-003 | THE SYSTEM SHALL refresh from Calendar.app after event creation. | P0 | v0.3 | Planned |
+| REQ-WRITE-004 | THE SYSTEM SHOULD support event location and notes during creation. | P1 | v0.3 | Planned |
+| REQ-WRITE-005 | THE SYSTEM SHALL NOT create recurring events until recurrence creation is specified. | P0 | v0.3 | Planned |
+| REQ-WRITE-006 | THE SYSTEM SHALL create simple reminders only after user confirmation or explicit save. | P0 | v0.3 | Planned |
+| REQ-WRITE-007 | THE SYSTEM SHALL validate reminder title and list before creating a reminder. | P0 | v0.3 | Planned |
+| REQ-WRITE-008 | THE SYSTEM SHALL refresh from Reminders.app after reminder creation. | P0 | v0.3 | Planned |
+| REQ-WRITE-009 | THE SYSTEM SHOULD support due date and due time during reminder creation. | P1 | v0.3 | Planned |
+| REQ-WRITE-010 | THE SYSTEM SHOULD support priority during reminder creation where available. | P2 | v0.3 | Planned |
+| REQ-WRITE-011 | THE SYSTEM SHALL edit simple non-recurring events with validation and safe refresh. | P0 | v0.4 | Planned |
+| REQ-WRITE-012 | THE SYSTEM SHALL delete simple non-recurring events only after confirmation. | P0 | v0.4 | Planned |
+| REQ-WRITE-013 | THE SYSTEM SHALL open unsupported events in Calendar.app when safe editing is unavailable. | P1 | v0.4 | Planned |
+| REQ-WRITE-014 | THE SYSTEM SHALL record safe failure states for event edits/deletes. | P0 | v0.4 | Planned |
+| REQ-WRITE-015 | THE SYSTEM SHALL not mutate events without a stable source identity. | P0 | v0.4 | Planned |
+| REQ-WRITE-016 | THE SYSTEM SHALL mark reminders complete with safe refresh. | P0 | v0.4 | Planned |
+| REQ-WRITE-017 | THE SYSTEM SHALL edit reminders with validation and safe refresh. | P0 | v0.4 | Planned |
+| REQ-WRITE-018 | THE SYSTEM SHALL delete reminders only after confirmation. | P0 | v0.4 | Planned |
+| REQ-WRITE-019 | THE SYSTEM SHALL not mutate reminders without a stable source identity. | P0 | v0.4 | Planned |
+| REQ-WRITE-020 | THE SYSTEM SHOULD expose write operation result feedback. | P1 | v0.4 | Planned |
+
+### 6.11 Recurring event safety requirements
+
+| ID | Requirement | Priority | Target | Status |
+|---|---|---|---|---|
+| REQ-REC-001 | THE SYSTEM SHALL identify recurring events where possible. | P0 | v0.2 | Planned |
+| REQ-REC-002 | THE SYSTEM SHALL treat recurring event mutation as unsupported until scope UX exists. | P0 | v0.3 | Planned |
+| REQ-REC-003 | THE SYSTEM SHALL explain why recurring mutation is blocked. | P0 | v0.3 | Planned |
+| REQ-REC-004 | THE SYSTEM SHALL offer explicit scope choices before editing recurring events. | P0 | Future | Planned |
+| REQ-REC-005 | THE SYSTEM SHALL offer explicit scope choices before deleting recurring events. | P0 | Future | Planned |
+| REQ-REC-006 | THE SYSTEM SHALL distinguish series identity from occurrence identity. | P0 | Future | Planned |
+| REQ-REC-007 | THE SYSTEM SHALL document recurrence limitations. | P0 | v0.3 | Planned |
+| REQ-REC-008 | THE SYSTEM SHALL test recurring edit/delete before enabling it by default. | P0 | Future | Planned |
+
+### 6.12 Note association requirements
+
+| ID | Requirement | Priority | Target | Status |
+|---|---|---|---|---|
+| REQ-NOTE-001 | THE SYSTEM SHALL associate events with notes using stable frontmatter metadata. | P0 | v0.5 | Planned |
+| REQ-NOTE-002 | THE SYSTEM SHALL associate reminders with notes using stable frontmatter metadata. | P0 | v0.5 | Planned |
+| REQ-NOTE-003 | THE SYSTEM SHALL show associated note links in event/reminder details. | P0 | v0.5 | Planned |
+| REQ-NOTE-004 | THE SYSTEM SHALL handle missing or renamed notes safely. | P0 | v0.5 | Planned |
+| REQ-NOTE-005 | THE SYSTEM SHALL create a note from an event/reminder using a template. | P0 | v0.5 | Planned |
+| REQ-NOTE-006 | THE SYSTEM SHALL support template variables for title, date, time, calendar/list, and location where available. | P1 | v0.5 | Planned |
+| REQ-NOTE-007 | THE SYSTEM SHOULD insert associated event/reminder links into daily notes. | P1 | v0.5 | Planned |
+| REQ-NOTE-008 | THE SYSTEM SHOULD repair stale associations where possible. | P2 | v0.5 | Planned |
+| REQ-NOTE-009 | THE SYSTEM SHOULD support copy-as-Markdown for events/reminders. | P2 | v0.5 | Planned |
+| REQ-NOTE-010 | THE SYSTEM SHOULD support meeting-note templates. | P1 | v0.5 | Planned |
+
+### 6.13 Tasks integration requirements
+
+| ID | Requirement | Priority | Target | Status |
+|---|---|---|---|---|
+| REQ-TASK-001 | THE SYSTEM SHOULD parse Obsidian Tasks-compatible dates in notes. | P2 | v0.5 | Planned |
+| REQ-TASK-002 | THE SYSTEM SHOULD support manual export of selected tasks to Reminders. | P2 | v0.5 | Planned |
+| REQ-TASK-003 | THE SYSTEM SHALL NOT enable automatic two-way Tasks/Reminders sync until identity and conflict strategy are specified. | P0 | v0.5 | Planned |
+| REQ-TASK-004 | THE SYSTEM SHALL avoid duplicate reminder creation during task export. | P0 | v0.5 | Planned |
+
+### 6.14 Advanced view/search/statistics requirements
+
+| ID | Requirement | Priority | Target | Status |
+|---|---|---|---|---|
+| REQ-VIEW-001 | THE SYSTEM SHOULD provide a vertical timeline view. | P1 | v0.6 | Planned |
+| REQ-VIEW-002 | Timeline event height SHOULD reflect duration. | P1 | v0.6 | Planned |
+| REQ-VIEW-003 | Timeline SHOULD display current-time indicator. | P2 | v0.6 | Planned |
+| REQ-VIEW-004 | Timeline SHOULD use calendar source colors. | P1 | v0.6 | Planned |
+| REQ-VIEW-005 | THE SYSTEM SHOULD provide a week view. | P1 | v0.6 | Planned |
+| REQ-VIEW-006 | Week view SHOULD use the same filtering and cache model as day view. | P1 | v0.6 | Planned |
+| REQ-SEARCH-001 | THE SYSTEM SHOULD search events/reminders across the cache range. | P1 | v0.6 | Planned |
+| REQ-SEARCH-002 | Search SHOULD match title, calendar/list, location, notes, and associated note title where available. | P1 | v0.6 | Planned |
+| REQ-SEARCH-003 | Search SHOULD support date range filtering. | P2 | v0.6 | Planned |
+| REQ-SEARCH-004 | Search SHALL not query external services by default. | P0 | v0.6 | Planned |
+| REQ-SEARCH-005 | Search results SHOULD clearly distinguish events from reminders. | P1 | v0.6 | Planned |
+| REQ-STATS-001 | THE SYSTEM SHOULD provide basic event count statistics by day/week/month. | P2 | v0.6 | Planned |
+| REQ-STATS-002 | THE SYSTEM SHOULD group statistics by calendar source. | P2 | v0.6 | Planned |
+| REQ-STATS-003 | THE SYSTEM SHOULD generate Markdown summaries. | P3 | v0.6 | Planned |
+| REQ-STATS-004 | THE SYSTEM SHALL compute statistics locally. | P0 | v0.6 | Planned |
+
+### 6.15 Cross-platform requirements, deferred
+
+| ID | Requirement | Priority | Target | Status |
+|---|---|---|---|---|
+| REQ-XPLAT-001 | Cross-platform support SHALL have a separate architecture proposal before implementation. | P0 | v1.x | Deferred |
+| REQ-XPLAT-002 | Direct Microsoft Graph support SHALL define authentication, token storage, privacy, and revoke flows. | P0 | v1.x | Deferred |
+| REQ-XPLAT-003 | Android support SHALL not be coupled to macOS JXA code. | P0 | v1.x | Deferred |
+| REQ-XPLAT-004 | External API integrations SHALL be opt-in. | P0 | v1.x | Deferred |
+| REQ-XPLAT-005 | External API integrations SHALL have separate acceptance and test matrices. | P0 | v1.x | Deferred |
+
+### 6.16 Documentation and architecture requirements
+
+| ID | Requirement | Priority | Target | Status |
+|---|---|---|---|---|
+| REQ-DOC-001 | README SHALL distinguish current, planned, experimental, and non-goal features. | P0 | v0.1 | Planned |
+| REQ-DOC-002 | Roadmap SHALL reference requirement groups or IDs. | P0 | v0.1 | Planned |
+| REQ-DOC-003 | Target architecture SHALL be labeled as target until code is refactored. | P0 | v0.1 | Planned |
+| REQ-ARCH-001 | THE SYSTEM SHOULD split JXA integration, rendering, settings, sync, and note-link logic into maintainable modules before complex write features. | P1 | v0.3 | Planned |
+
+---
+
+## 7. Target architecture
+
+Current implementation may be bundled. This is the target architecture, not a claim that all files already exist.
+
+```text
+calendian/
+├── main.js                      # plugin entry, view registration, lifecycle
+├── src/
+│   ├── macos/
+│   │   ├── calendar-reader.ts   # Calendar.app JXA read adapter
+│   │   ├── reminder-reader.ts   # Reminders.app JXA read adapter
+│   │   ├── writer.ts            # future write adapter, safety-gated
+│   │   └── permissions.ts       # permission/error classification
+│   ├── domain/
+│   │   ├── event.ts             # internal event model
+│   │   ├── reminder.ts          # internal reminder model
+│   │   └── association.ts       # note association model
+│   ├── cache/
+│   │   └── schedule-cache.ts
+│   ├── ui/
+│   │   ├── calendar-panel.ts
+│   │   ├── event-list.ts
+│   │   ├── reminder-list.ts
+│   │   ├── details-panel.ts
+│   │   └── settings-tab.ts
+│   ├── notes/
+│   │   ├── frontmatter.ts
+│   │   └── templates.ts
+│   └── diagnostics/
+│       └── diagnostics.ts
+├── styles.css
+├── manifest.json
+└── docs/sdd/
 ```
-.obsidian/plugins/calendian/
-├── main.js                    ← 入口：注册视图、命令、设置
-├── macos-integration.js       ← MacOSIntegration 类：JXA 执行、数据获取、缓存
-├── macos-renderer.js          ← 面板渲染逻辑：事件列表、提醒列表、详情面板
-├── macos-settings.js          ← 设置页面：来源管理、显示配置、快捷键
-├── macos-sync.js              ← 双向同步逻辑：创建/编辑/删除（Phase 2）
-├── macos-notifications.js     ← 通知系统：事件提醒、今日概览
-├── macos-note-link.js         ← 笔记关联：双向链接、模板、搜索（Phase 3）
-├── slash-commands.js          ← 斜杠命令：/event、/reminder（Phase 2）
-├── views/
-│   ├── timeline.js            ← 时间轴视图（Phase 4）
-│   ├── week-view.js           ← 周视图（Phase 4）
-│   └── zoom-timeline.js       ← 无限缩放时间线（Phase 4+）
-├── styles.css                 ← 所有样式
-├── manifest.json              ← 插件元数据
-├── data.json                  ← 插件配置（自动生成）
-└── README.md                  ← 用户文档
-```
-
-### 6.2 数据存储策略
-
-| 数据类型 | 存储位置 | 同步方式 |
-|---------|---------|---------|
-| 插件配置 | `data.json` | 坚果云/GitHub |
-| 事件-笔记关联 | 笔记 frontmatter | 坚果云/GitHub |
-| 自定义视图配置 | `data.json` | 坚果云/GitHub |
-| 事件/提醒数据 | 内存缓存 | 不同步（从 macOS 实时获取） |
-| 关联笔记模板 | Obsidian 笔记文件 | 坚果云/GitHub |
 
 ---
 
-## 7. 性能规格
+## 8. Release policy
 
-| 指标 | 目标值 | 说明 |
-|------|--------|------|
-| 首次加载 | < 5 秒 | 预加载 13 个月数据 |
-| 切换日期 | < 100ms | 从内存缓存过滤 |
-| 刷新数据 | < 5 秒 | 后台静默刷新 |
-| 展开事件详情 | < 50ms | 从缓存读取 |
-| 创建/编辑事件 | < 3 秒 | JXA 同步到 macOS |
-| 内存占用 | < 10MB | 13 个月事件缓存 |
+A version may be released only when:
 
----
-
-## 8. 错误处理
-
-| 场景 | 处理方式 |
-|------|---------|
-| macOS 权限拒绝 | 面板显示引导文字，提示去系统设置授权 |
-| osascript 不存在（非 macOS） | 面板显示 "此功能仅支持 macOS" |
-| JXA 脚本超时 | 10 秒超时，显示错误提示 |
-| 网络断开（Exchange 日历） | 显示缓存数据 + 离线提示 |
-| 日历数据解析失败 | 跳过错误数据，继续显示正常数据 |
-| 同步冲突 | 提示用户选择保留哪一版本 |
+1. all P0 requirements for that version pass acceptance;
+2. README reflects the current status;
+3. risk register is reviewed;
+4. manual test suites for the version pass;
+5. known limitations are documented.
 
 ---
 
-## 9. 多语言支持
+## 9. Open specification questions
 
-- 界面语言跟随 Obsidian 设置
-- Phase 1：中文 + 英文
-- 使用 Obsidian 的 `i18n` 模式或自建语言包
+These must be resolved before the related release:
 
----
-
-## 10. 安全与隐私
-
-- 所有数据仅存储在本地（Obsidian Vault + macOS Calendar）
-- 不向任何第三方服务发送数据
-- JXA 访问需要 macOS 系统级自动化权限授权
-- 关联数据通过坚果云/GitHub 同步，走用户自有通道
+1. What stable identifiers are available from Calendar.app and Reminders.app through JXA across macOS versions?
+2. How should duplicate calendar/list names be represented in settings?
+3. What should happen when selected date is outside the preload cache range?
+4. Should source filtering persist by name, id, or compound identity?
+5. Should single-click date behavior be configurable for users migrating from the original Calendar plugin?
+6. What exact recurrence operations are safe through JXA?
+7. What diagnostic fields can be shown without exposing private data?
