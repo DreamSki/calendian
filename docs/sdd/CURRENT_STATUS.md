@@ -80,13 +80,16 @@ Everything else must be marked as planned, experimental, or future.
 
 > Updated by AI after every meaningful step. Next session reads this to continue without re-explaining context.
 
-- **Doing:** N/A (doc alignment complete — v0.2 scope genuinely closed).
+- **Doing:** v0.3 implementation — Swift helper write commands complete; code split in progress; JS writer module done.
 - **Done this session:**
-  - **Deep audit** of v0.2 completeness (code + docs cross-verified): all 6 v0.2 acceptance gates pass. 12/13 requirements Implemented, 1 Partial (REM-009, data-dependent).
-  - **README fix**: Updated status from "v0.1 mostly complete" to "v0.2 complete". Moved 10 implemented v0.2 features from "Planned capabilities" to "Current capabilities". Updated roadmap table, usage section, non-goals heading.
-  - **SPEC §7 fix**: Changed 7 requirements from Partial → Implemented (SRC-006, UX-004, DIAG-001, TIME-001, DOC-001, DOC-002, DOC-003). Changed REQ-REM-009 target from v0.2 → v0.3 (data-dependent on helper parentId).
-  - **SPEC §2.1 fix**: Added missing v0.2 features to the implemented summary (expandable details, multi-day, past events, recurring indicator, overdue reminders, no-date section, range selector, month dots).
-  - **ROADMAP fix**: Added REQ-REM-009 to v0.3 required requirements and deliverables.
-- **Decisions:** REQ-REM-009 moved to v0.3 because helper Swift code hardcodes `parentId: nil` — the JS rendering code is ready but nothing to render. v0.2 scope is now genuinely complete at the code level, and all documentation is aligned.
-- **Next:** v0.3 planning (TASK-020 event create form). Code split (REQ-ARCH-001) should come before write operations.
-- **Last action:** 2026-06-08 — doc alignment complete. README, SPEC, ROADMAP, CURRENT_STATUS all agree on v0.2 complete.
+  - **Swift helper**: Added `create-event` and `create-reminder` commands to `helper/Sources/main.swift`. Both tested with real EventKit data — events appear in Calendar.app, reminders in Reminders.app. Created `WriteResult` Codable struct for response format.
+  - **JS writer module**: Created `src/macos/writer.js` with `createEvent()`, `createReminder()`, validation functions, standalone `callHelper()` and `classifyError()`.
+  - **Code split (partial)**: Extracted `src/macos/helper-executor.js` (execHelper, classifyError, execJXA, refresh lifecycle) and `src/cache/schedule-cache.js` (cache load/save, date queries, preloadAll, preloadReminders). Wired into `MacOSIntegration.prototype` via `Object.assign` in main.js. Created `src/` directory structure.
+  - **SPEC §7 update**: REQ-WRITE-001 through REQ-WRITE-010 marked Partial (backend done, UI pending). REQ-ARCH-001 marked Partial (3 modules extracted, 4+ pending).
+  - **TASKS.md update**: Added TASK-019 (code split). TASK-020, TASK-021 marked In progress with evidence.
+- **Decisions:**
+  - Used `property: function()` syntax in module exports (not ES6 method shorthand) because Obsidian's Node.js runtime doesn't support method shorthand without commas in object literals.
+  - Left all original methods in MacOSIntegration class body — module methods override via `Object.assign` to prototype. Safer than removing code. Dead code will be cleaned up after full split verified.
+  - `init()` method stays in main.js for now (not extracted to schedule-cache.js) because extraction boundary was mid-method.
+- **Next:** Create event/reminder UI forms (TASK-020, TASK-021). Continue code split (settings-tab.js, calendar-panel.js). Add natural language parsing (TASK-023).
+- **Last action:** 2026-06-08 — v0.3 backend complete (Swift + JS writer). Code split 3/8 modules done.

@@ -134,18 +134,28 @@ Tasks are ordered by dependency and release target. Every task references requir
 
 ## v0.3 — Safe create
 
+### TASK-019 — Code split into src/ modules (REQ-ARCH-001)
+
+- Requirements: `REQ-ARCH-001`
+- Status: In progress (branch: main)
+- Priority: P1
+- Evidence: `src/macos/helper-executor.js` (execHelper, classifyError, execJXA, refresh lifecycle), `src/cache/schedule-cache.js` (cache load/save, date queries, preload), `src/macos/writer.js` (createEvent, createReminder with validation). Wired into MacOSIntegration.prototype via Object.assign after class definition in main.js.
+- Remaining: settings-tab.js, calendar-panel.js, diagnostics.js, dot-colors.js, domain models not yet extracted.
+
 ### TASK-020 — Event create form
 
 - Requirements: `REQ-WRITE-001` to `REQ-WRITE-005`
-- Status: Todo
+- Status: In progress (branch: main)
 - Priority: P0
-- Notes: only simple non-recurring events.
+- Notes: only simple non-recurring events. Backend (Swift create-event + JS writer.js) done. UI form pending.
+- Evidence: Swift helper `create-event` command with title, startISO, endISO, calendarId, isAllDay, location, notes, url. JS `writer.createEvent()` with validation. Tested and creates real EventKit events.
 
 ### TASK-021 — Reminder create form
 
 - Requirements: `REQ-WRITE-006` to `REQ-WRITE-010`
-- Status: Todo
+- Status: In progress (branch: main)
 - Priority: P0
+- Evidence: Swift helper `create-reminder` command with title, listId, dueDate, dueTime, priority, notes. JS `writer.createReminder()` with validation. Tested and creates real EventKit reminders.
 
 ### TASK-022 — Write confirmation and refresh verification
 
