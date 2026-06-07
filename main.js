@@ -1634,7 +1634,17 @@ class EventCreateModal extends obsidian.Modal {
                 for (var i = 0; i < cals.length; i++) {
                     cmp.addOption(cals[i].id, cals[i].name);
                 }
-                if (cals.length > 0) cmp.setValue(cals[0].id);
+                // Default to Outlook account calendar if available
+                if (cals.length > 0) {
+                    var defaultId = cals[0].id;
+                    for (var j = 0; j < cals.length; j++) {
+                        if (cals[j].accountHint && cals[j].accountHint.toLowerCase().indexOf('outlook') !== -1) {
+                            defaultId = cals[j].id;
+                            break;
+                        }
+                    }
+                    cmp.setValue(defaultId);
+                }
             });
             calendarSetting.setDesc(cals.length > 0 ? "Choose a calendar" : "No calendars found");
             calendarsReady = true;
@@ -1799,7 +1809,28 @@ class ReminderCreateModal extends obsidian.Modal {
                 for (var i = 0; i < lists.length; i++) {
                     cmp.addOption(lists[i].id, lists[i].name);
                 }
-                if (lists.length > 0) cmp.setValue(lists[0].id);
+                // Default to Outlook account's "任务" list if available
+                if (lists.length > 0) {
+                    var defaultId = lists[0].id;
+                    for (var j = 0; j < lists.length; j++) {
+                        var acc = (lists[j].accountHint || "").toLowerCase();
+                        var name = (lists[j].rawName || lists[j].name || "").toLowerCase();
+                        if (acc.indexOf('outlook') !== -1 && name.indexOf('任务') !== -1) {
+                            defaultId = lists[j].id;
+                            break;
+                        }
+                    }
+                    // Fallback: any Outlook list
+                    if (defaultId === lists[0].id) {
+                        for (var k = 0; k < lists.length; k++) {
+                            if ((lists[k].accountHint || "").toLowerCase().indexOf('outlook') !== -1) {
+                                defaultId = lists[k].id;
+                                break;
+                            }
+                        }
+                    }
+                    cmp.setValue(defaultId);
+                }
             });
             listSetting.setDesc(lists.length > 0 ? "Choose a reminder list" : "No lists found");
             listsReady = true;
@@ -6499,7 +6530,8 @@ class MacOSIntegration {
                     rawName: s.name,
                     id: s.id,
                     source: "macos-reminders",
-                    color: s.color || ""
+                    color: s.color || "",
+                    accountHint: s.accountName || ""
                 });
             }
             this.sourceCounts.reminderLists = lists.length;
