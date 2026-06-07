@@ -175,7 +175,7 @@ Tasks are ordered by dependency and release target. Every task references requir
 - Requirements: `REQ-NL-001` to `REQ-NL-005`
 - Status: Done
 - Priority: P1
-- Evidence: `parseNaturalLanguage()` function with English + Chinese locale support (date: today/tomorrow/weekdays/next-weekday/in-N-days/YYYY-MM-DD/Chinese 今天明天周一下周一; time: 3pm/15:00/at-noon/from-to/for-duration/Chinese 下午3点/3点半; duration: for-X-hours/Xh). `QuickEventModal` class with live preview showing extracted fields + confidence badge. "⚡" button in sidebar header. "Fill Form" opens EventCreateModal pre-filled; "Manual Form" keeps manual path. `EventCreateModal` accepts optional `prefill` parameter. Code at main.js:1610-1995 (parser + helpers), main.js:2302-2435 (QuickEventModal), main.js:6717-6728 (header button).
+- Evidence: `parseNaturalLanguage()` function with English + expanded Chinese locale support (CN dates: 今天/明天/后天/大后天/明早/明晚/今早/今晚/周末/下周周末/周一~周日/下周一~下周日/下下周一/X天后/X周后/X个月后/下个月/明年/X月Y日; CN times: 凌晨/早上/上午/中午/下午/晚上/傍晚/夜里/N点/N点半/N点一刻/N点三刻; CN duration: X小时/X分钟/X小时Y分钟/一个半小时; period hint cleanup via stripOrphanPeriodHints). `QuickEventModal` class with live preview + confidence badge. "⚡" button in sidebar header. "Fill Form" → pre-filled EventCreateModal; "Manual Form" keeps manual path. Code at main.js (parser + helpers + modal).
 
 ## v0.4 — Safe edit/delete
 
