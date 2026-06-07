@@ -10,38 +10,40 @@ Calendian is local-first by construction. This document defines exactly what dat
 
 ## 1. Data read from macOS
 
-Calendian reads from Calendar.app and Reminders.app through JXA (`/usr/bin/osascript`). No data is read until the user grants macOS Automation permission.
+Calendian reads from Calendar.app and Reminders.app through a native Swift EventKit helper (`calendian-helper`). No remote APIs are called. No data leaves the device. No data is read until the user grants macOS calendar/reminder permission.
 
 ### Calendar.app
 
 | Field | Read | Displayed | Stored in cache | Notes |
 |---|---|---|---|---|
-| Event title | Yes | Yes | Yes (in memory) | |
+| Event title | Yes | Yes | Yes (disk cache) | |
 | Start date/time | Yes | Yes | Yes | |
 | End date/time | Yes | Yes | Yes | |
 | All-day flag | Yes | Yes | Yes | |
 | Calendar name | Yes | Yes | Yes | |
 | Calendar color | Yes | Yes | Yes | |
-| Location | Yes (v0.2) | Yes (v0.2) | Yes | |
-| URL | Yes (v0.2) | Yes (v0.2) | Yes | |
-| Notes | Yes (v0.2) | Yes (v0.2) | Yes | |
-| Attendees | Yes (v0.2) | Yes (v0.2) | Yes | Redact in diagnostics |
-| Recurrence rule | Yes (v0.2) | Summary only | Yes | |
-| Event UID | Yes | Internal only | Yes | Stable identity |
+| Location | Yes | Yes | Yes | |
+| URL | Yes | Displayed if present | Yes | |
+| Notes | Yes | Displayed if present | Yes | Redact in diagnostics |
+| Attendees | Yes | Displayed if present | Yes | Redact in diagnostics |
+| Recurrence rule | Yes | Summary only | Yes | |
+| Account name | Yes | Yes | Yes | From EKSource.title |
+| Stable event ID | Yes | Internal only | Yes | EKEvent.eventIdentifier (UUID) |
 
 ### Reminders.app
 
 | Field | Read | Displayed | Stored in cache | Notes |
 |---|---|---|---|---|
-| Reminder title | Yes | Yes | Yes (in memory) | |
+| Reminder title | Yes | Yes | Yes (disk cache) | |
 | Due date | Yes | Yes | Yes | |
 | Due time | Yes | Yes | Yes | |
 | List name | Yes | Yes | Yes | |
-| Priority | Yes (v0.2) | Yes (v0.2) | Yes | |
+| Priority | Yes | Yes (high/medium/low/none) | Yes | |
 | Completed status | Yes | Internal (hide completed) | Yes | |
-| Notes | Yes (v0.2) | Yes (v0.2) | Yes | |
-| Subtasks | Yes (v0.2) | Yes (v0.2) | Yes | |
-| Persistent ID | Yes | Internal only | Yes | Stable identity |
+| Notes | Yes | Displayed if present | Yes | |
+| Account name | Yes | Yes | Yes | From EKSource.title |
+| Stable reminder ID | Yes | Internal only | Yes | EKReminder.calendarItemIdentifier |
+| Subtasks | No (v0.2) | No (v0.2) | No | |
 
 ---
 

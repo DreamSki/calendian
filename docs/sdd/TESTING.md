@@ -204,7 +204,7 @@ Requirements: `REQ-NUDGE-001` through `REQ-NUDGE-009`, `REQ-REVIEW-001` through 
 
 | Area | Suggested automation |
 |---|---|
-| Data parsing | Unit tests for event/reminder raw JXA parse output. |
+| Data parsing | Unit tests for event/reminder helper JSON output. |
 | Time overlap | Unit tests for day filtering, all-day, multi-day, DST boundaries. |
 | Formatting | Unit tests for time ranges and duration labels. |
 | Settings migration | Unit tests for data.json shape changes. |

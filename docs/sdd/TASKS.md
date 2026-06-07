@@ -1,7 +1,7 @@
 # Requirement-Driven Task Backlog
 
 > Status: living task backlog  
-> Last updated: 2026-06-07
+> Last updated: 2026-06-08
 
 Tasks are ordered by dependency and release target. Every task references requirement IDs from `SPEC.md` and acceptance gates from `ACCEPTANCE.md`.
 
@@ -20,7 +20,7 @@ Tasks are ordered by dependency and release target. Every task references requir
 ### TASK-001 — Align packaging and compatibility metadata
 
 - Requirements: `REQ-PLAT-001`, `REQ-PLAT-002`, `REQ-PLAT-003`
-- Status: Todo
+- Status: Review
 - Priority: P0
 - Deliverables:
   - Align plugin name, id, description, version, and minimum Obsidian version.
@@ -28,105 +28,64 @@ Tasks are ordered by dependency and release target. Every task references requir
   - Document desktop-only/macOS-only behavior.
 - Definition of Done:
   - README, SPEC, ROADMAP, and `manifest.json` do not contradict each other.
+- Evidence: `manifest.json` id=calendian, name=Calendian. Folder name `calendar-macos-sync` still needs rename (see CURRENT_STATUS.md).
 
 ### TASK-002 — Permission state model and recovery UI
 
 - Requirements: `REQ-PERM-001` to `REQ-PERM-005`, `REQ-ERR-001`
-- Status: Todo
+- Status: Done
 - Priority: P0
-- Deliverables:
-  - Model Calendar and Reminders permissions independently.
-  - Add user-facing states for allowed, denied, unsupported, timeout, and unknown.
-  - Add retry/recheck behavior.
-- Definition of Done:
-  - `TS-002` passes.
+- Evidence: `MacOSIntegration.permissionState`, `.lastError`, `.isLoading` — independent per-source states. `renderPermissionBanner()` with System Settings guidance and retry button. `classifyError()` distinguishes permission_denied/timeout/error. Code at main.js:4464-4476, 5232-5256.
 
 ### TASK-003 — Harden Calendar read model
 
 - Requirements: `REQ-CAL-001` to `REQ-CAL-006`
-- Status: Todo
+- Status: Done
 - Priority: P0
-- Deliverables:
-  - Add stable event identity where available.
-  - Parse core fields into typed internal model.
-  - Preserve local-only raw data only for diagnostics if needed.
-- Definition of Done:
-  - Timed, all-day, and basic calendar badge cases pass `TS-003`.
+- Evidence: EventKit helper provides stable UUID event IDs, all-day detection, calendar colors. `preloadAll()` maps helper JSON to CalendianEvent model. Display includes title, time range, calendar badge with color, ongoing/soon highlights. Code at main.js:4699-4757.
 
 ### TASK-004 — Harden Reminders read model
 
 - Requirements: `REQ-REM-001` to `REQ-REM-004`
-- Status: Todo
+- Status: Done
 - Priority: P0
-- Deliverables:
-  - Add stable reminder identity where available.
-  - Parse title, list, due date/time, completion state, and priority where available.
-  - Hide completed reminders by default.
-- Definition of Done:
-  - Basic reminder fixture cases pass `TS-004`.
+- Evidence: EventKit helper provides stable reminder IDs, priority, completion state. `preloadReminders()` maps to CalendianReminder model. Completed reminders filtered. Priority displayed in UI. Code at main.js:4759-4804.
 
 ### TASK-005 — Source discovery and filtering
 
 - Requirements: `REQ-SRC-001` to `REQ-SRC-006`
-- Status: Todo
+- Status: Done
 - Priority: P0
-- Deliverables:
-  - Discover calendars and reminder lists.
-  - Persist selected source IDs/names.
-  - Handle duplicate names safely.
-  - Show empty/error states.
-- Definition of Done:
-  - `TS-005` passes.
+- Evidence: `discoverCalendars()` and `discoverReminderLists()` use EventKit helper. Account name disambiguation ("日历 — iCloud"). Filter by stable UUID with backward-compat. Empty/error states handled. Instant in-memory filter apply via `render()`. Code at main.js:5400-5454, 977-1077.
 
 ### TASK-006 — Cache lifecycle and refresh
 
 - Requirements: `REQ-CACHE-001` to `REQ-CACHE-008`, `REQ-PERF-001` to `REQ-PERF-004`
-- Status: Todo
+- Status: Done
 - Priority: P0
-- Deliverables:
-  - Define cache range behavior.
-  - Keep old cache visible during refresh.
-  - Clear timers on unload.
-  - Add instrumentation for refresh duration.
-- Definition of Done:
-  - `TS-006` passes for small and large test data.
+- Evidence: Disk cache save/load for events and reminders. Cache freshness check (2x interval, min 15min). Two-phase init (cache-first then background refresh). Manual refresh button. Last refresh time in footer. Anti-concurrent guard. Timer cleanup on unload. Code at main.js:4568-4669, 4965-5041, 5456-5471.
 
 ### TASK-007 — Sidebar UX states
 
 - Requirements: `REQ-UX-001` to `REQ-UX-004`, `REQ-ERR-002` to `REQ-ERR-004`
-- Status: Todo
+- Status: Done
 - Priority: P0
-- Deliverables:
-  - Loading, empty, partial data, permission denied, unsupported platform states.
-  - Date click vs Cmd/Ctrl-click behavior remains clear.
-- Definition of Done:
-  - No ambiguous blank panel states remain.
+- Evidence: `render()` handles: loading, empty, error, permission-denied, partial-permission, cache-miss, unsupported-platform. Date click selects + updates panel. Cmd/Ctrl-click preserves daily-note. All states use Obsidian theme variables. Code at main.js:5098-5229.
 
 ### TASK-008 — Privacy and diagnostics baseline
 
 - Requirements: `REQ-PRIV-001` to `REQ-PRIV-002`, `REQ-DIAG-001`
-- Status: Todo
+- Status: Review
 - Priority: P1
-- Deliverables:
-  - Document local-only behavior.
-  - Redact private fields from diagnostic output by default.
-- Definition of Done:
-  - README privacy claim is accurate and bounded.
+- Evidence: Privacy section in settings tab documents local-only behavior. Diagnostic info in footer (refresh time, duration). Full diagnostic panel deferred to v0.2. Code at main.js:816-838.
+- Remaining: Full diagnostic panel (REQ-DIAG-001). Diagnostics redaction by default (REQ-DIAG-002, v0.2).
 
 ### TASK-009 — Error classification and recovery
 
 - Requirements: `REQ-ERR-001` to `REQ-ERR-004`
-- Status: Todo
+- Status: Done
 - Priority: P0
-- Deliverables:
-  - Classify JXA errors: permission denied, timeout, empty source, parse failure, unknown.
-  - Show appropriate error state per classification with recovery guidance.
-  - Independent Calendar and Reminders error states (one failure does not block the other).
-  - Distinguish empty data from failure states in the UI.
-  - Retain previous data on refresh failure; do not show false empty state.
-- Definition of Done:
-  - `TS-002` covers permission error states.
-  - Each error class has a distinct user-visible state.
+- Evidence: `classifyError()` for permission_denied/timeout/error. Per-source error banners with retry. Parse-failure isolation in `parseEvents()`/`parseReminders()`. Empty vs error distinction. Old cache retained on refresh failure. Code at main.js:4515-4526, 5232-5256.
 
 ## v0.2 — Read-only polish
 

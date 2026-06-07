@@ -1,10 +1,10 @@
 # Calendian Architecture
 
-> Status: target architecture document (code may not yet reflect this structure)
-> Last updated: 2026-06-07
+> Status: architecture document (partially implemented; helper is current; multi-file JS split is target)
+> Last updated: 2026-06-08
 > Plugin ID: `calendian`
 
-This document describes the target architecture for Calendian. The current implementation is bundled in `main.js`; this target structure is the direction for refactoring before complex write features ship (see `REQ-ARCH-001`).
+This document describes the architecture of Calendian. The Swift EventKit helper (`helper/Sources/main.swift` → compiled `calendian-helper`) is the current production data channel. The JS code is bundled in `main.js`; the target structure splits it into multiple `.js` modules before complex write features ship (see `REQ-ARCH-001`).
 
 ---
 
@@ -14,7 +14,7 @@ This document describes the target architecture for Calendian. The current imple
 ┌─────────────────────────────────────────────────────┐
 │                   Obsidian Plugin                    │
 │  ┌──────────┐  ┌──────────┐  ┌──────────────────┐  │
-│  │ main.ts  │  │ Settings │  │   View Registry   │  │
+│  │ main.js  │  │ Settings │  │   View Registry   │  │
 │  │ Lifecycle│  │   Tab    │  │ (Calendar Panel)  │  │
 │  └────┬─────┘  └──────────┘  └────────┬─────────┘  │
 │       │                               │             │
@@ -33,7 +33,7 @@ This document describes the target architecture for Calendian. The current imple
 │  ┌────┴───────────────────────────────┴──────────┐  │
 │  │              macOS Adapter Layer               │  │
 │  │  calendar-reader │ reminder-reader │ writer    │  │
-│  │  permissions     │ JXA executor               │  │
+│  │  permissions     │ helper-executor             │  │
 │  └────────────────────┬──────────────────────────┘  │
 │                       │                             │
 │  ┌────────────────────┴──────────────────────────┐  │
@@ -43,21 +43,23 @@ This document describes the target architecture for Calendian. The current imple
 └──────────────────────┬──────────────────────────────┘
                        │
               ┌────────┴────────┐
-              │  macOS Automation │
-              │  /usr/bin/osascript│
-              │  (JXA)            │
+              │  Swift Helper    │
+              │  (calendian-     │
+              │   helper)        │
+              │  EventKit API    │
               └────────┬────────┘
                        │
         ┌──────────────┼──────────────┐
         │              │              │
-   Calendar.app   Reminders.app   System Events
+   Calendar.app   Reminders.app   EKEventStore
+   (via EventKit — native, fast, full access)
 ```
 
 ---
 
 ## 2. Layer descriptions
 
-### 2.1 Plugin lifecycle (`main.ts`)
+### 2.1 Plugin lifecycle (`main.js`)
 
 - Register custom view (sidebar calendar panel).
 - Register settings tab.
@@ -69,14 +71,14 @@ This document describes the target architecture for Calendian. The current imple
 ### 2.2 UI layer (`src/ui/`)
 
 **Components:**
-- `calendar-panel.ts` — Top-level Obsidian `ItemView`. Owns the calendar grid, date selection, and hosts event/reminder lists.
-- `event-list.ts` — Renders events for the selected date. Handles loading, empty, error, partial-permission states.
-- `reminder-list.ts` — Renders reminders for the selected date. Independent state from event list.
-- `details-panel.ts` — Expandable detail view for a selected event or reminder (v0.2+).
-- `settings-tab.ts` — Obsidian `PluginSettingTab`. Source discovery, filtering, refresh interval, display preferences.
-- `diagnostics.ts` — Diagnostic panel showing permission status, counts, timing, errors (v0.2+).
+- `calendar-panel.js` — Top-level Obsidian `ItemView`. Owns the calendar grid, date selection, and hosts event/reminder lists.
+- `event-list.js` — Renders events for the selected date. Handles loading, empty, error, partial-permission states.
+- `reminder-list.js` — Renders reminders for the selected date. Independent state from event list.
+- `details-panel.js` — Expandable detail view for a selected event or reminder (v0.2+).
+- `settings-tab.js` — Obsidian `PluginSettingTab`. Source discovery, filtering, refresh interval, display preferences.
+- `diagnostics.js` — Diagnostic panel showing permission status, counts, timing, errors (v0.2+).
 
-**State contract:** Each UI component receives a state prop and renders accordingly. Components do not call JXA directly.
+**State contract:** Each UI component receives a state prop and renders accordingly. Components do not call the helper directly.
 
 ```ts
 type PanelState =
@@ -90,42 +92,51 @@ type PanelState =
 
 ### 2.3 Domain model (`src/domain/`)
 
-Pure TypeScript interfaces. No side effects. No JXA or Obsidian API dependencies.
+Pure JavaScript modules. No side effects. No EventKit or Obsidian API dependencies.
 
-- `event.ts` — `CalendianEvent`
-- `reminder.ts` — `CalendianReminder`
-- `association.ts` — `CalendianAssociation`
-- `goal.ts` — `CalendianGoal`, `CalendianStep` (v0.5.5)
-- `habit.ts` — `CalendianHabit`, `CalendianHabitCompletion` (v0.5.5)
-- `review.ts` — `CalendianReview` (v0.5.5)
+- `event.js` — `CalendianEvent`
+- `reminder.js` — `CalendianReminder`
+- `association.js` — `CalendianAssociation`
+- `goal.js` — `CalendianGoal`, `CalendianStep` (v0.5.5)
+- `habit.js` — `CalendianHabit`, `CalendianHabitCompletion` (v0.5.5)
+- `review.js` — `CalendianReview` (v0.5.5)
 
 ### 2.4 Cache layer (`src/cache/`)
 
-- `schedule-cache.ts` — In-memory cache of events and reminders for the configured date range.
+- `schedule-cache.js` — In-memory cache of events and reminders for the configured date range.
 - Cache is populated on plugin load via the macOS adapter layer.
 - Date switches within cache range are instant (<100ms target).
 - Auto-refresh re-populates cache on a timer. Old data is retained until new data is ready.
 - Cache miss behavior: if selected date is outside range, trigger background load.
 
-### 2.5 macOS adapter layer (`src/macos/`)
+### 2.5 macOS adapter layer (`src/macos/` + `helper/`)
 
-This is the only layer that calls `/usr/bin/osascript` or uses JXA.
+The adapter has two tiers:
 
-- `calendar-reader.ts` — Executes JXA to read Calendar.app events. Returns typed `CalendianEvent[]`. Handles timeout, permission denied, parse errors.
-- `reminder-reader.ts` — Executes JXA to read Reminders.app reminders. Returns typed `CalendianReminder[]`.
-- `writer.ts` — (v0.3+) Creates, edits, deletes Calendar events and Reminders. All write operations are gated: confirmation required, stable ID required, refresh-after-write required.
-- `permissions.ts` — Checks and classifies macOS Automation permission state for Calendar and Reminders independently.
+**Native Swift helper (current)** (`helper/Sources/main.swift` → `calendian-helper`):
+- Uses Apple EventKit framework for direct, native database access.
+- Significantly faster than JXA for all operations.
+- Commands output JSON to stdout: `calendars`, `lists`, `events`, `reminders`, `permissions`, `toggle-reminder`.
+- Provides stable UUID IDs (`calendarIdentifier`, `eventIdentifier`, `calendarItemIdentifier`), account names (`source.title`), and colors (`cgColor`).
+- Future commands: `create-event`, `edit-event`, `delete-event`, `create-reminder`, `edit-reminder`, `delete-reminder`.
+
+**JS executor layer** (`src/macos/`):
+- `helper-executor.js` — Spawn `calendian-helper`, capture JSON stdout, classify errors.
+- `calendar-reader.js` — Parses helper JSON into `CalendianEvent[]`.
+- `reminder-reader.js` — Parses helper JSON into `CalendianReminder[]`.
+- `writer.js` — (v0.3+) Create/edit/delete via helper commands. Gated: confirmation + stable ID + refresh verification.
+- `permissions.js` — Checks `EKEventStore.authorizationStatus` via helper `permissions` command.
 
 **Safety boundary:** The writer module is the only code path that mutates source data. It MUST NOT be called without:
-1. Stable source identity (`REQ-DATA-004`)
+1. Stable source identity (`REQ-DATA-004`) — EventKit provides this natively.
 2. User confirmation for destructive operations (`REQ-ERR-006`)
 3. Write verification via source refresh (`REQ-WRITE-003`, `REQ-WRITE-008`)
 
 ### 2.6 Notes layer (`src/notes/`) — v0.5+
 
-- `frontmatter.ts` — Read/write `calendian:` frontmatter blocks. Merge with existing frontmatter (do not clobber).
-- `templates.ts` — Template variable substitution for meeting notes, daily reflections, weekly reviews.
-- `note-link-resolver.ts` — Resolve and repair note links when notes are renamed or moved.
+- `frontmatter.js` — Read/write `calendian:` frontmatter blocks. Merge with existing frontmatter (do not clobber).
+- `templates.js` — Template variable substitution for meeting notes, daily reflections, weekly reviews.
+- `note-link-resolver.js` — Resolve and repair note links when notes are renamed or moved.
 
 ---
 
@@ -135,13 +146,14 @@ This is the only layer that calls `/usr/bin/osascript` or uses JXA.
 
 ```
 User clicks date
-  → UI layer requests date
+  → UI layer selects date
   → Cache layer checks if date is in range
   → Cache hit: return cached data (<100ms)
   → Cache miss: trigger macOS adapter read
-  → macOS adapter executes JXA
-  → JXA returns raw records
-  → Adapter parses into domain model
+  → macOS adapter spawns calendian-helper
+  → Helper queries EventKit (EKEventStore)
+  → Helper returns JSON to stdout
+  → Adapter parses JSON into domain model
   → Cache stores parsed records
   → UI renders from cache
 ```
@@ -152,11 +164,12 @@ User clicks date
 User submits create/edit/delete form
   → UI validates required fields
   → UI requests confirmation (for destructive ops)
-  → Writer checks stable identity
-  → Writer executes JXA write
-  → Writer refreshes from source
-  → Writer verifies write result
-  → Cache invalidates and reloads
+  → Writer checks stable identity (EventKit UUID)
+  → Writer spawns calendian-helper write command
+  → Helper saves via EKEventStore.save()
+  → macOS syncs to iCloud/Google/Exchange automatically
+  → Writer refreshes from source for verification
+  → Cache reloads
   → UI re-renders from cache
 ```
 
@@ -178,39 +191,42 @@ Timer fires (configurable interval)
 
 ```text
 calendian/
-├── main.ts                      # Plugin entry, view registration, lifecycle
+├── main.js                      # Plugin entry, view registration, lifecycle
+├── helper/
+│   ├── Sources/main.swift       # Native Swift EventKit helper
+│   └── calendian-helper         # Compiled binary
 ├── src/
 │   ├── macos/
-│   │   ├── calendar-reader.ts   # Calendar.app JXA read adapter
-│   │   ├── reminder-reader.ts   # Reminders.app JXA read adapter
-│   │   ├── writer.ts            # Write adapter, safety-gated (v0.3+)
-│   │   ├── jxa-executor.ts      # Shared JXA execution, timeout, error handling
-│   │   └── permissions.ts       # Permission/error classification
+│   │   ├── calendar-reader.js   # Parses helper JSON → CalendianEvent[]
+│   │   ├── reminder-reader.js   # Parses helper JSON → CalendianReminder[]
+│   │   ├── writer.js            # Write adapter, safety-gated (v0.3+)
+│   │   ├── helper-executor.js   # Spawn helper, capture JSON, classify errors
+│   │   └── permissions.js       # Permission/error classification
 │   ├── domain/
-│   │   ├── event.ts             # CalendianEvent interface
-│   │   ├── reminder.ts          # CalendianReminder interface
-│   │   ├── association.ts       # CalendianAssociation interface
-│   │   ├── goal.ts              # CalendianGoal, CalendianStep (v0.5.5)
-│   │   ├── habit.ts             # CalendianHabit (v0.5.5)
-│   │   └── review.ts            # CalendianReview (v0.5.5)
+│   │   ├── event.js             # CalendianEvent interface
+│   │   ├── reminder.js          # CalendianReminder interface
+│   │   ├── association.js       # CalendianAssociation interface
+│   │   ├── goal.js              # CalendianGoal, CalendianStep (v0.5.5)
+│   │   ├── habit.js             # CalendianHabit (v0.5.5)
+│   │   └── review.js            # CalendianReview (v0.5.5)
 │   ├── cache/
-│   │   └── schedule-cache.ts    # In-memory cache with range management
+│   │   └── schedule-cache.js    # In-memory cache with range management
 │   ├── ui/
-│   │   ├── calendar-panel.ts    # Main sidebar view
-│   │   ├── event-list.ts        # Event rendering
-│   │   ├── reminder-list.ts     # Reminder rendering
-│   │   ├── details-panel.ts     # Expandable details (v0.2+)
-│   │   ├── settings-tab.ts      # Plugin settings
-│   │   └── diagnostics.ts       # Diagnostic panel (v0.2+)
+│   │   ├── calendar-panel.js    # Main sidebar view
+│   │   ├── event-list.js        # Event rendering
+│   │   ├── reminder-list.js     # Reminder rendering
+│   │   ├── details-panel.js     # Expandable details (v0.2+)
+│   │   ├── settings-tab.js      # Plugin settings
+│   │   └── diagnostics.js       # Diagnostic panel (v0.2+)
 │   ├── notes/                   # v0.5+
-│   │   ├── frontmatter.ts
-│   │   ├── templates.ts
-│   │   └── note-link-resolver.ts
+│   │   ├── frontmatter.js
+│   │   ├── templates.js
+│   │   └── note-link-resolver.js
 │   └── self-direction/          # v0.5.5
-│       ├── goals.ts
-│       ├── habits.ts
-│       ├── nudges.ts
-│       └── reviews.ts
+│       ├── goals.js
+│       ├── habits.js
+│       ├── nudges.js
+│       └── reviews.js
 ├── styles.css
 ├── manifest.json
 └── docs/
@@ -232,9 +248,16 @@ calendian/
 
 ## 5. Key design decisions
 
-### 5.1 JXA as the only source adapter
+### 5.1 EventKit via native Swift helper
 
-All Calendar/Reminders data flows through JXA. There is no direct CalDAV, Google API, or Microsoft Graph client in the current architecture. This keeps the privacy model simple: if macOS doesn't have the data, Calendian doesn't either.
+All Calendar/Reminders data flows through Apple's EventKit framework via the native Swift helper (`calendian-helper`). EventKit provides:
+- Direct database access (no Apple Event overhead)
+- Date-range predicates for server-side filtering
+- Stable UUID-based identifiers
+- Account/source metadata
+- Automatic iCloud/Google/Exchange sync
+
+There is no direct CalDAV, Google API, or Microsoft Graph client in the current architecture. Calendian sees only what macOS has configured. If a calendar account is removed from System Settings, its data disappears from Calendian automatically.
 
 ### 5.2 In-memory cache, not persistent
 

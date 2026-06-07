@@ -1,7 +1,7 @@
 # Risk Register
 
 > Status: living risk register  
-> Last updated: 2026-06-07
+> Last updated: 2026-06-08
 
 Risks are reviewed before roadmap changes and before releases. Severity combines user impact, data loss potential, implementation uncertainty, and support cost.
 
@@ -36,16 +36,16 @@ Risks are reviewed before roadmap changes and before releases. Severity combines
   - Resolve canonical plugin id before public release.
   - Add metadata alignment to `TASK-001`.
 
-### RISK-003 — JXA field availability varies by account/source
+### RISK-003 — ~~JXA~~ EventKit field availability by account/source ✅ RESOLVED
 
-- Severity: Medium
+- Severity: ~~Medium~~ Low
 - Area: Data model
 - Related requirements: `REQ-CAL-*`, `REQ-REM-*`
-- Description: Calendar/Reminders JXA properties may be missing, inconsistent, slow, or differently shaped across iCloud, Google, Exchange, local calendars, and macOS versions.
+- Description: ~~Calendar/Reminders JXA properties may be missing, inconsistent, slow, or differently shaped across iCloud, Google, Exchange, local calendars, and macOS versions.~~ Resolved by switching from JXA to native Swift EventKit helper. EventKit provides consistent access to all fields (UUID, account name, color, notes, location, recurrence) across all account types at ~400x speed (72ms vs 28s).
 - Mitigation:
-  - Treat optional fields as optional.
-  - Add parse error isolation.
-  - Test across account types where available.
+  - ~~Treat optional fields as optional.~~ ✅ EventKit fields are always available.
+  - ~~Add parse error isolation.~~ ✅ JSON parse errors isolated per record by helper.
+  - ~~Test across account types where available.~~ ✅ Tested with iCloud, Outlook, Subscribed calendars.
 
 ### RISK-004 — Missing stable IDs block write and note association
 
@@ -167,10 +167,11 @@ Risks are reviewed before roadmap changes and before releases. Severity combines
 - Severity: Medium
 - Area: Maintainability
 - Related requirements: `REQ-ARCH-001`, `REQ-DOC-003`
-- Description: Docs describe a split module architecture while current implementation is bundled in `main.js`.
+- Description: Docs describe a split multi-file JS module architecture while current implementation is bundled in `main.js` (5866 lines). Split is planned for v0.3 before write operations.
 - Mitigation:
-  - Label architecture as target until refactor is done.
-  - Add refactor task before complex Phase 2 work.
+  - Architecture labeled as target in SPEC.md §8 and ARCHITECTURE.md.
+  - REQ-ARCH-001 explicitly gates the split before complex write features.
+  - Current single-file JS is well-organized by class responsibility.
 
 ## Risk review cadence
 

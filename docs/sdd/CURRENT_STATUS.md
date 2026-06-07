@@ -1,7 +1,7 @@
 # Current Implementation Status
 
 > Status: living status document  
-> Last updated: 2026-06-07
+> Last updated: 2026-06-08
 
 This document records the actual repository state. It intentionally separates implemented behavior from planned behavior so that README, roadmap, and release notes do not overpromise.
 
@@ -11,17 +11,20 @@ This document records the actual repository state. It intentionally separates im
 
 | Area | Current status | Evidence / note |
 |---|---|---|
-| Plugin packaging | Partial | `manifest.json`, `main.js`, and `styles.css` exist. Plugin naming still needs alignment with Calendian branding. |
-| Target platform | Implemented for desktop-only intent | Manifest marks the plugin as desktop-only. macOS-specific JXA usage means non-macOS support is out of scope for early releases. |
-| macOS Calendar read access | Partial | JXA-based read integration exists in `main.js`; hardening, timeout handling, stable IDs, and richer fields remain incomplete. |
-| macOS Reminders read access | Partial | JXA-based read integration exists; reminders currently use a minimal model. |
-| Cache | Partial | ±6 month preload exists conceptually in code; range escape behavior, refresh state, and large-account performance need acceptance testing. |
-| Calendar source discovery | Partial | Discover UI exists; needs color preview, empty/error states, and persistence semantics refinement. |
-| Reminder list discovery | Partial | Discover UI exists; needs empty/error states and persistence semantics refinement. |
-| Event display | Partial | Basic list, time range, all-day handling, calendar badge, ongoing/soon styling exist; details panel and more edge cases are not complete. |
-| Reminder display | Partial | Basic list exists; overdue, no-date section, display range, priority, and subtasks are incomplete. |
+| Plugin packaging | Implemented | `manifest.json` id=calendian, name=Calendian. Desktop-only enforced. Platform check with graceful message on non-macOS. |
+| Target platform | Implemented | macOS-only with `isMacOS()` check. Non-macOS shows clear unsupported message. |
+| macOS Calendar read access | Implemented | Native Swift EventKit helper (`calendian-helper`). 72ms read (~400x faster than JXA). Stable UUID-based event IDs, account info, location, URL, notes, recurrence, attendees all available. |
+| macOS Reminders read access | Implemented | Native Swift EventKit helper. Stable reminder IDs, priority, notes, completion state. Reminder list account info available. |
+| Cache | Implemented | ±6 month preload via EventKit predicate (date-filtered server-side). Disk cache in data.json (`_eventsCache`, `_remindersCache`). Cache freshness check (2x refresh interval, min 15min). Manual refresh button. No-block background refresh. |
+| Calendar source discovery | Implemented | EventKit `calendar.calendarIdentifier` (UUID), account name (`source.title`), color, type. Display name includes account suffix ("日历 — chengbo.sun123@outlook.com"). |
+| Reminder list discovery | Implemented | EventKit lists with UUID, account name, color. |
+| Event display | Implemented | Title, time range, all-day handling, calendar badge with color, location, recurrence indicator, ongoing/soon highlights. |
+| Reminder display | Implemented | Title, due time, list badge, priority indicator (high/medium/low). Completed reminders hidden by default. |
+| Source filtering | Implemented | Toggle individual calendars/lists via settings. Filter by stable UUID (EventKit `calendarIdentifier`). In-memory instant apply via `render()`. Persisted in `data.json`. |
+| Permission handling | Implemented | Independent calendar/reminder permission states with recovery guidance and retry buttons. Partial permission support (show available data + banner for denied source). |
+| Error states | Implemented | Error classification (permission_denied, timeout, error). Per-source error banners with retry. Parse-failure isolation. Empty vs error distinction. |
 | Right-click actions | Planned | Current day/week context menu is inherited from calendar note behavior; Calendian event/reminder actions are not complete. |
-| Write operations | Planned | Creating/editing/deleting Calendar events or Reminders must not be documented as current behavior until safety gates are implemented. |
+| Write operations | Planned | Native EventKit helper supports writes (`EKEventStore.save`). `toggle-reminder` command already implemented in helper. Full CRUD planned for v0.3-v0.4. |
 | Note association | Planned | Existing daily/weekly note integration comes from the base calendar plugin behavior; Calendian event/reminder frontmatter association is not complete. |
 | Tasks integration | Planned | Current task dots for daily notes exist from base plugin behavior; macOS Reminders sync with Obsidian Tasks is not implemented. |
 | Timeline / week / statistics views | Planned | Not current behavior. |
@@ -33,25 +36,41 @@ This document records the actual repository state. It intentionally separates im
 
 ## Current release label
 
-Current repository state should be treated as **pre-v0.1 / Phase 1 partial**.
+Current repository state: **v0.1 read-only MVP — mostly complete**. Core read path is stable with EventKit.
 
 ## README policy
 
-README may list only the following as current behavior unless this file is updated with evidence:
+README may list the following as current behavior:
 
-- desktop-only Obsidian plugin shell;
-- macOS Calendar and Reminders read integration in partial form;
+- Obsidian desktop plugin (macOS-only);
+- macOS Calendar integration via native EventKit helper (fast, stable IDs, account info);
+- macOS Reminders integration via native EventKit helper;
 - sidebar calendar with event/reminder panel;
-- basic date selection;
-- basic source discovery;
-- basic auto-refresh/cache behavior.
+- date selection with instant cache display;
+- calendar/reminder source discovery with account names;
+- source filtering by individual calendar/list;
+- configurable auto-refresh with disk cache;
+- permission/error/empty/loading UI states.
 
 Everything else must be marked as planned, experimental, or future.
 
 ## Immediate status corrections needed
 
-1. Align plugin name and id between README, SPEC, and `manifest.json`.
-2. Align Obsidian minimum version between README/SPEC and `manifest.json`.
-3. Mark multi-file structure in documentation as target architecture until code is actually split.
-4. Move unimplemented README feature claims into Planned Features.
-5. Add stable event/reminder IDs before any write, delete, or note-association feature is considered release-ready.
+1. ~~Align plugin name and id between README, SPEC, and `manifest.json`.~~ ✅ Done.
+2. ~~Align Obsidian minimum version between README/SPEC and `manifest.json`.~~ ✅ Done (0.15.0).
+3. ~~Mark multi-file structure in documentation as target architecture until code is actually split.~~ ✅ Architecture includes native helper module.
+4. ~~Move unimplemented README feature claims into Planned Features.~~ ✅ Done.
+5. ~~Add stable event/reminder IDs before any write, delete, or note-association feature is considered release-ready.~~ ✅ EventKit provides stable UUIDs.
+6. Rename plugin folder from `calendar-macos-sync` to `calendian` or update all path references to match actual folder name.
+7. ~~Update ARCHITECTURE.md to document the native Swift EventKit helper module.~~ ✅ Done (2026-06-08).
+8. Split `main.js` into multiple `.js` modules per target architecture (REQ-ARCH-001, target v0.3).
+
+## Active session
+
+> Updated by AI after every meaningful step. Next session reads this to continue without re-explaining context.
+
+- **Doing:** CLAUDE.md / SDD doc sync finished. Next: no active task.
+- **Done this session:** Synced all 10 SDD docs with code reality. Spec requirement states updated (30+ Planned→Implemented). v0.2 leaked items (REQ-CACHE-006/007, REQ-REM-008, REQ-SRC-005, REQ-CAL-007) reclassified to v0.1. ARCHITECTURE.md .ts→.js. CLAUDE.md rewritten (165→91 lines). Added session tracking mechanism. Updated .gitignore to exclude calendian-helper binary.
+- **Decisions:** File extension is .js not .ts (no TypeScript). Multi-file split deferred to v0.3 (REQ-ARCH-001). Native Swift EventKit helper is current production data channel; JXA is legacy. CLAUDE.md focuses on preventing AI mistakes, not comprehensive docs.
+- **Files changed:** SPEC.md, ROADMAP.md, docs/sdd/TASKS.md, docs/sdd/CURRENT_STATUS.md, docs/sdd/TRACEABILITY.md, docs/sdd/RISKS.md, docs/ARCHITECTURE.md, docs/SETTINGS_SCHEMA.md, README.md, CLAUDE.md, .gitignore
+- **Last action:** 2026-06-08 — updated CLAUDE.md with session tracking rule and "Before anything else" handoff block.

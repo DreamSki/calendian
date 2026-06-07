@@ -66,7 +66,7 @@ interface CalendianSettings {
 
 interface CalendianSourceMetadata {
   source: "macos-calendar" | "macos-reminders";
-  id: string;                    // Stable source ID from JXA where available
+  id: string;                    // Stable source ID from EventKit (UUID)
   name: string;                  // Display name (e.g. "Work")
   accountHint?: string;          // Account type hint (e.g. "iCloud", "Google", "Local")
   color?: string;                // Calendar color (hex)
@@ -128,7 +128,7 @@ Sources are identified by a compound key:
 ```ts
 interface SourceKey {
   source: "macos-calendar" | "macos-reminders";
-  id: string;          // JXA-provided stable ID
+  id: string;          // EventKit-provided stable UUID
   name: string;        // Display name
   accountHint: string; // Account type for disambiguation
 }
@@ -148,7 +148,7 @@ Personal — Local
 
 - `selectedCalendarIds` stores the `id` field, not the name.
 - `sourceMetadata` stores the full `CalendianSourceMetadata` including `accountHint` and `color`.
-- If JXA does not provide a stable source ID, the source is marked with a warning in the UI and persistence is marked as risky.
+- EventKit always provides a stable `calendarIdentifier` UUID, so this risk is resolved.
 
 ---
 
