@@ -80,16 +80,15 @@ Everything else must be marked as planned, experimental, or future.
 
 > Updated by AI after every meaningful step. Next session reads this to continue without re-explaining context.
 
-- **Doing:** v0.3 implementation — Swift helper write commands complete; code split in progress; JS writer module done.
+- **Doing:** v0.3 — event/reminder creation done; natural language parsing (TASK-023) next.
 - **Done this session:**
-  - **Swift helper**: Added `create-event` and `create-reminder` commands to `helper/Sources/main.swift`. Both tested with real EventKit data — events appear in Calendar.app, reminders in Reminders.app. Created `WriteResult` Codable struct for response format.
-  - **JS writer module**: Created `src/macos/writer.js` with `createEvent()`, `createReminder()`, validation functions, standalone `callHelper()` and `classifyError()`.
-  - **Code split (partial)**: Extracted `src/macos/helper-executor.js` (execHelper, classifyError, execJXA, refresh lifecycle) and `src/cache/schedule-cache.js` (cache load/save, date queries, preloadAll, preloadReminders). Wired into `MacOSIntegration.prototype` via `Object.assign` in main.js. Created `src/` directory structure.
-  - **SPEC §7 update**: REQ-WRITE-001 through REQ-WRITE-010 marked Partial (backend done, UI pending). REQ-ARCH-001 marked Partial (3 modules extracted, 4+ pending).
-  - **TASKS.md update**: Added TASK-019 (code split). TASK-020, TASK-021 marked In progress with evidence.
+  - **Swift helper**: Added `create-event` and `create-reminder` commands. Tested with real EventKit data.
+  - **EventCreateModal**: Title, date/time, calendar selector, all-day, location, URL, notes. Validation + error display. Post-create refresh.
+  - **ReminderCreateModal**: Title, list selector, due date/time, priority, notes. Validation + error display. Post-create refresh.
+  - **Sidebar buttons**: "+Event" and "+Remind" in header row (show only when source enabled + permission granted).
+  - **Code split attempt**: `require()` approach failed in Obsidian; reverted. Module files preserved on disk for reference.
 - **Decisions:**
-  - Used `property: function()` syntax in module exports (not ES6 method shorthand) because Obsidian's Node.js runtime doesn't support method shorthand without commas in object literals.
-  - Left all original methods in MacOSIntegration class body — module methods override via `Object.assign` to prototype. Safer than removing code. Dead code will be cleaned up after full split verified.
-  - `init()` method stays in main.js for now (not extracted to schedule-cache.js) because extraction boundary was mid-method.
-- **Next:** Create event/reminder UI forms (TASK-020, TASK-021). Continue code split (settings-tab.js, calendar-panel.js). Add natural language parsing (TASK-023).
-- **Last action:** 2026-06-08 — v0.3 backend complete (Swift + JS writer). Code split 3/8 modules done.
+  - `require()` to local files at module top level does NOT work in Obsidian plugin context. Alternative module-loading strategies (bundling, runtime vault adapter) needed for code split.
+  - UI forms use `integ.execHelper()` directly (inline in modal) rather than going through writer.js module — avoids the require() problem while keeping the same data flow.
+- **Next:** Natural language event parsing (TASK-023). Code split strategy revisit. Deferred v0.2 items (REQ-REM-009, etc.).
+- **Last action:** 2026-06-08 — v0.3 write UI complete. Event and reminder creation working end-to-end.

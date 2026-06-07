@@ -145,23 +145,23 @@ Tasks are ordered by dependency and release target. Every task references requir
 ### TASK-020 — Event create form
 
 - Requirements: `REQ-WRITE-001` to `REQ-WRITE-005`
-- Status: In progress (branch: main)
+- Status: Done
 - Priority: P0
-- Notes: only simple non-recurring events. Backend (Swift create-event + JS writer.js) done. UI form pending.
-- Evidence: Swift helper `create-event` command with title, startISO, endISO, calendarId, isAllDay, location, notes, url. JS `writer.createEvent()` with validation. Tested and creates real EventKit events.
+- Evidence: `EventCreateModal` class at main.js ~1549. Fields: title (required), calendar selector (dropdown from discoverCalendars), start/end date, start/end time, all-day toggle, location, URL, notes. Validates title + calendar before calling `integ.execHelper(["create-event", ...])`. Shows error banner on failure, calls `integ.init(true)` to refresh on success.
 
 ### TASK-021 — Reminder create form
 
 - Requirements: `REQ-WRITE-006` to `REQ-WRITE-010`
-- Status: In progress (branch: main)
+- Status: Done
 - Priority: P0
-- Evidence: Swift helper `create-reminder` command with title, listId, dueDate, dueTime, priority, notes. JS `writer.createReminder()` with validation. Tested and creates real EventKit reminders.
+- Evidence: `ReminderCreateModal` class at main.js ~1710. Fields: title (required), list selector (dropdown from discoverReminderLists), due date, due time, priority (none/low/medium/high), notes. Validates title + list before create. Post-create refresh.
 
 ### TASK-022 — Write confirmation and refresh verification
 
 - Requirements: `REQ-WRITE-003`, `REQ-WRITE-008`, `REQ-ERR-005` to `REQ-ERR-006`
-- Status: Todo
+- Status: Done
 - Priority: P0
+- Evidence: Both modals show `new obsidian.Notice("Event/Reminder created: ...")` on success. Error display via `.calendian-form-error` div with red styling. Post-create `init(true)` call refreshes cache from EventKit.
 
 ### TASK-023 — Natural language event creation
 

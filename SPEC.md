@@ -616,16 +616,16 @@ All refresh paths go through `init()`, which has a `_refreshRunning` boolean gat
 
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
-| REQ-WRITE-001 | THE SYSTEM SHALL create simple non-recurring events only after user confirmation or explicit save. | P0 | v0.3 | Partial — backend (Swift helper + JS writer) done; UI form pending |
-| REQ-WRITE-002 | THE SYSTEM SHALL validate event title, calendar, date, and time before creating an event. | P0 | v0.3 | Partial — JS validation in writer.js done; UI integration pending |
-| REQ-WRITE-003 | THE SYSTEM SHALL refresh from Calendar.app after event creation. | P0 | v0.3 | Partial — refresh via init() call after write pending UI integration |
-| REQ-WRITE-004 | THE SYSTEM SHOULD support event location and notes during creation. | P1 | v0.3 | Partial — Swift helper accepts optional location/notes; JS writer passes them |
-| REQ-WRITE-005 | THE SYSTEM SHALL NOT create recurring events until recurrence creation is specified. | P0 | v0.3 | Implemented — only simple EKEvent created with .thisEvent span |
-| REQ-WRITE-006 | THE SYSTEM SHALL create simple reminders only after user confirmation or explicit save. | P0 | v0.3 | Partial — backend done; UI form pending |
-| REQ-WRITE-007 | THE SYSTEM SHALL validate reminder title and list before creating a reminder. | P0 | v0.3 | Partial — JS validation in writer.js done; UI integration pending |
-| REQ-WRITE-008 | THE SYSTEM SHALL refresh from Reminders.app after reminder creation. | P0 | v0.3 | Partial — refresh via init() call after write pending UI integration |
-| REQ-WRITE-009 | THE SYSTEM SHOULD support due date and due time during reminder creation. | P1 | v0.3 | Partial — Swift helper accepts optional dueDate/dueTime; JS writer passes them |
-| REQ-WRITE-010 | THE SYSTEM SHOULD support priority during reminder creation where available. | P2 | v0.3 | Partial — Swift helper accepts optional priority; JS writer passes it |
+| REQ-WRITE-001 | THE SYSTEM SHALL create simple non-recurring events only after user confirmation or explicit save. | P0 | v0.3 | Implemented — EventCreateModal with field validation and explicit Save button |
+| REQ-WRITE-002 | THE SYSTEM SHALL validate event title, calendar, date, and time before creating an event. | P0 | v0.3 | Implemented — client-side validation before helper call |
+| REQ-WRITE-003 | THE SYSTEM SHALL refresh from Calendar.app after event creation. | P0 | v0.3 | Implemented — calls init(true) after successful write |
+| REQ-WRITE-004 | THE SYSTEM SHOULD support event location and notes during creation. | P1 | v0.3 | Implemented — location, notes, URL fields in modal |
+| REQ-WRITE-005 | THE SYSTEM SHALL NOT create recurring events until recurrence creation is specified. | P0 | v0.3 | Implemented — only simple EKEvent with .thisEvent span |
+| REQ-WRITE-006 | THE SYSTEM SHALL create simple reminders only after user confirmation or explicit save. | P0 | v0.3 | Implemented — ReminderCreateModal with validation |
+| REQ-WRITE-007 | THE SYSTEM SHALL validate reminder title and list before creating a reminder. | P0 | v0.3 | Implemented — client-side validation before helper call |
+| REQ-WRITE-008 | THE SYSTEM SHALL refresh from Reminders.app after reminder creation. | P0 | v0.3 | Implemented — calls init(true) after successful write |
+| REQ-WRITE-009 | THE SYSTEM SHOULD support due date and due time during reminder creation. | P1 | v0.3 | Implemented — optional due date and time fields |
+| REQ-WRITE-010 | THE SYSTEM SHOULD support priority during reminder creation where available. | P2 | v0.3 | Implemented — dropdown with none/low/medium/high |
 | REQ-WRITE-011 | THE SYSTEM SHALL edit simple non-recurring events with validation and safe refresh. | P0 | v0.4 | Planned |
 | REQ-WRITE-012 | THE SYSTEM SHALL delete simple non-recurring events only after confirmation. | P0 | v0.4 | Planned |
 | REQ-WRITE-013 | THE SYSTEM SHALL open unsupported events in Calendar.app when safe editing is unavailable. | P1 | v0.4 | Planned |
