@@ -134,9 +134,10 @@ The adapter has two tiers:
 
 ### 2.6 Notes layer (`src/notes/`) — v0.5+
 
-- `frontmatter.js` — Read/write `calendian:` frontmatter blocks. Merge with existing frontmatter (do not clobber).
-- `templates.js` — Template variable substitution for meeting notes, daily reflections, weekly reviews.
+- `frontmatter.js` — Read/write `calendian:` frontmatter blocks. Merge with existing frontmatter (do not clobber). Body scan for inline `cal:ev:ID`/`cal:rem:ID` refs. Create note with collision-safe filenames.
+- `templates.js` — Template variable substitution with `{{var}}` + `{{#key}}...{{/key}}` conditional blocks. Build event/reminder variable maps. Copy inline ref to clipboard.
 - `note-link-resolver.js` — Resolve and repair note links when notes are renamed or moved.
+- `codeblock.js` — Register `` ```calendian `` code block processor (renders events/reminders for target date). Markdown post-processor for inline `cal:ev:ID`/`cal:rem:ID` references (renders styled mini-table). Click-to-navigate from note to Calendian panel with highlight.
 
 ---
 
@@ -224,7 +225,7 @@ Timer fires (refreshIntervalMinutes, default 5)
 
 ---
 
-## 4. Source file layout (current v0.3 + target)
+## 4. Source file layout (current v0.5 + target)
 
 ```
 calendian/
@@ -257,10 +258,11 @@ calendian/
 │   │   ├── details-panel.js     # Expandable details
 │   │   ├── settings-tab.js      # Plugin settings
 │   │   └── diagnostics.js       # Diagnostic panel
-│   ├── notes/                   # v0.5+
-│   │   ├── frontmatter.js
-│   │   ├── templates.js
-│   │   └── note-link-resolver.js
+│   ├── notes/                   # v0.5+ [4 of 4 files IMPLEMENTED]
+│   │   ├── frontmatter.js        # Association index, body scan, create note
+│   │   ├── templates.js          # Template engine, copy inline ref
+│   │   ├── note-link-resolver.js # Resolve/repair renamed note paths
+│   │   └── codeblock.js          # ```calendian code block + inline ref renderer
 │   └── self-direction/          # v0.5.5
 │       ├── goals.js
 │       ├── habits.js

@@ -27,7 +27,7 @@ This document records the actual repository state. It intentionally separates im
 | Refresh / sync | Implemented | Timer-driven refresh (configurable interval, default 5min). Manual refresh button. Window focus refresh (REQ-SYNC-004). `_refreshRunning` concurrency guard. EKEventStoreChanged notification watch (REQ-SYNC-005). Post-write refresh (REQ-SYNC-006). Watch fallback to timer (REQ-SYNC-007). See SPEC.md §7.6.1. |
 | Right-click actions | Planned | Current day/week context menu is inherited from calendar note behavior; Calendian event/reminder actions are not complete. |
 | Write operations | **Implemented (v0.4)** | Event/reminder creation, edit, and delete. Edit/delete for simple non-recurring events and all reminders. Completion toggle for reminders. Recurring event mutations blocked with Calendar.app redirect. `ConfirmActionModal` for destructive operations. Mutation safety guards (`canMutateEvent`, `canMutateReminder`). Post-write refresh. Write error handling. Default calendar/list. NL quick-create with English + Chinese regex + optional AI backend. |
-| Note association | **Implemented (v0.5)** | Frontmatter schema per SPEC §5.3. `ensureAssociationIndex()` scans vault for `calendian.associations` frontmatter. Event detail panel shows "Linked Notes" + "+ Note" button. Reminder items show 📝 indicator + "+📝" create button. Renamed/missing notes handled gracefully. Templates deferred to TASK-041. |
+| Note association | **Implemented (v0.5)** | Frontmatter schema per SPEC §5.3. `ensureAssociationIndex()` scans vault for `calendian.associations` frontmatter + body scan for inline `cal:ev:ID`/`cal:rem:ID` refs. `createNoteForEvent()`/`createNoteForReminder()` with template engine (`expandTemplate()`). Event detail panel shows "Linked Notes" + "+ Note" button. Reminder items show expandable linked notes list + "+📝" create button. Copy inline ref via `copyItemText()`. `calendian-event` code block renders events/reminders in notes. Inline ref renderer (`cal:ev:ID`/`cal:rem:ID`) renders styled mini-table. Highlight navigation from note → panel. Renamed/missing notes handled gracefully. |
 | Tasks integration | Planned | Current task dots for daily notes exist from base plugin behavior; macOS Reminders sync with Obsidian Tasks is not implemented. |
 | Timeline / week / statistics views | Planned | Not current behavior. |
 | Goals and focus tracking | Planned | Requires note association and frontmatter infrastructure (v0.5 dependency). |
@@ -38,7 +38,7 @@ This document records the actual repository state. It intentionally separates im
 
 ## Current release label
 
-Current repository state: **v0.5 WIP — note association foundation complete**. TASK-040 (frontmatter schema) done. Next: TASK-041 (create/open notes with templates), TASK-042 (template variables), TASK-043 (notifications).
+Current repository state: **v0.5 WIP — note association + rendering complete, notifications pending**. TASK-040 (frontmatter schema) done. TASK-041 (create/open notes with templates) done. TASK-042 (template variables) done. Next: TASK-043 (notifications), TASK-050 (Tasks integration experiment).
 
 ## README policy
 
@@ -68,7 +68,15 @@ README may list the following as current behavior:
 - reminder completion toggle via clickable checkbox;
 - recurring event edit/delete blocked with redirect to Calendar.app;
 - natural language quick-create (English + Chinese regex parser);
-- optional AI-powered NL parsing via configurable API (Enter-triggered, privacy-controlled).
+- optional AI-powered NL parsing via configurable API (Enter-triggered, privacy-controlled);
+- note association via frontmatter (`calendian: { events: [...], reminders: [...] }`);
+- create note from event/reminder with template engine;
+- linked notes display in event detail panel and reminder items;
+- copy inline reference (`cal:ev:ID` / `cal:rem:ID`) to clipboard;
+- `calendian-event` code block renderer;
+- inline `cal:ev:ID` / `cal:rem:ID` reference renderer;
+- highlight navigation from note → panel item;
+- auto-link via body scan for inline refs.
 
 Everything else must be marked as planned, experimental, or future.
 
@@ -81,19 +89,25 @@ Everything else must be marked as planned, experimental, or future.
 5. ~~Add stable event/reminder IDs before any write, delete, or note-association feature is considered release-ready.~~ ✅ EventKit provides stable UUIDs.
 6. ~~Rename plugin folder from `calendar-macos-sync` to `calendian`~~ ✅ Done (2026-06-08). Folder renamed, VIEW_TYPE_CALENDAR and helper path updated in main.js.
 7. ~~Update ARCHITECTURE.md to document the native Swift EventKit helper module.~~ ✅ Done (2026-06-08).
-8. Split `main.js` into multiple `.js` modules per target architecture (REQ-ARCH-001, target v0.3).
+8. ~~Split `main.js` into multiple `.js` modules per target architecture (REQ-ARCH-001).~~ ✅ Done — `build-main.sh` concatenates `main-head.js` + 7 `src/` modules (4 macos/cache/writer + 3 notes) into `main.js`.
 
 ## Active session
 
 > Updated by AI after every meaningful step. Next session reads this to continue without re-explaining context.
 
-- **Doing:** v0.5 note association — cleaned back to user-driven model.
+- **Doing:** v0.5 note association — documentation update pass.
+- **Completed this session:**
+  - Squashed 71 local commits into 5 logical commits (removed 3 debug log commits, merged style/fix chains).
+  - Debug console.log lines removed from `src/notes/frontmatter.js`.
+  - Full documentation audit: README, CURRENT_STATUS, TASKS, SPEC, ARCHITECTURE, ROADMAP, CLAUDE.md updated.
 - **Decisions:**
   - Plugin NEVER auto-modifies note files. All association is user-initiated.
   - Compact frontmatter: `calendian: { events: [...], reminders: [...] }` (IDs only)
   - "+ Note": creates a dedicated note with calendian frontmatter
-  - "📋 Copy": wikilink if linked note exists, plain text otherwise
+  - "📋 Copy": copies `cal:ev:ID` or `cal:rem:ID` inline reference to clipboard
   - "Linked Notes" in event detail: shows associated notes, click to open
-  - Removed: auto-sync, daily-note insertion, all auto-modification code
-- **Next:** TASK-043 (notifications) or code block renderer for daily-note embedding.
-- **Last action:** 2026-06-08 — cleanup: removed syncDailyNoteAssociations, findOrCreateDailyNote, addToDailyNote, readExistingCalendian. 445 lines deleted. 40 prototype methods, 10032 lines.
+  - Body scan auto-links notes with inline `cal:ev:ID` / `cal:rem:ID` refs
+  - `calendian-event` code block renders events/reminders for a date
+  - Highlight navigation: clicking ref/codeblock item → panel highlight + scroll
+- **Next:** TASK-043 (notifications) or TASK-050 (Tasks integration experiment).
+- **Last action:** 2026-06-08 — documentation audit and update pass.

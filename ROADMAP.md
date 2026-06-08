@@ -210,7 +210,7 @@ Support simple event/reminder mutation while protecting users from accidental de
 
 ---
 
-## v0.5 — Note association and Tasks integration
+## v0.5 — Note association and Tasks integration 🔄 IN PROGRESS
 
 ### Goal
 
@@ -218,24 +218,27 @@ Connect calendar/reminder items to Obsidian notes using stable metadata and usef
 
 ### Required requirements
 
-- Note association: `REQ-NOTE-001` to `REQ-NOTE-010`
-- Tasks integration: `REQ-TASK-001` to `REQ-TASK-004`
-- In-app notifications: `REQ-NOTIF-001` to `REQ-NOTIF-005`
+- Note association: `REQ-NOTE-001` to `REQ-NOTE-010` (7 of 10 implemented, REQ-NOTE-008 deferred, REQ-NOTE-010 planned)
+- Tasks integration: `REQ-TASK-001` to `REQ-TASK-004` (not started)
+- In-app notifications: `REQ-NOTIF-001` to `REQ-NOTIF-005` (not started)
 - Privacy: `REQ-PRIV-003`
 
 ### Deliverables
 
-- Associate event/reminder with existing note.
-- Create note from event/reminder using template.
-- Show associated note links in details.
-- Store associations in frontmatter.
-- Handle missing/renamed notes safely.
-- Meeting-note template variables.
-- Copy-as-Markdown.
-- Manual, non-automatic Tasks integration experiment.
-- Event start notifications (configurable lead time).
-- Overdue reminder notifications.
-- Notification enable/disable settings.
+- ✅ Associate event/reminder with existing note — frontmatter schema + body scan for inline refs.
+- ✅ Create note from event/reminder using template — `createNoteForEvent()`/`createNoteForReminder()`.
+- ✅ Show associated note links in details — event detail "Linked Notes", reminder expandable list.
+- ✅ Store associations in frontmatter — compact `calendian: { events: [...], reminders: [...] }` YAML.
+- ✅ Handle missing/renamed notes safely — `getAssociatedNotes()` filters + `resolveNotePath()` search.
+- ✅ Template variables — 11 event vars, 7 reminder vars, conditional blocks via `{{#key}}...{{/key}}`.
+- ✅ Copy inline reference — `copyItemText()` copies `cal:ev:ID`/`cal:rem:ID` to clipboard.
+- ✅ `calendian-event` code block — render events/reminders for a date in notes.
+- ✅ Inline `cal:ev:ID`/`cal:rem:ID` renderer — styled mini-table when pasted in notes.
+- ✅ Highlight navigation — click inline ref/codeblock → panel highlight + scroll.
+- ❌ Manual, non-automatic Tasks integration experiment.
+- ❌ Event start notifications (configurable lead time).
+- ❌ Overdue reminder notifications.
+- ❌ Notification enable/disable settings.
 
 ### Explicit exclusions
 

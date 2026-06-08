@@ -4,7 +4,7 @@
 
 Calendian is an Obsidian desktop plugin that integrates macOS Calendar events and macOS Reminders into the Obsidian sidebar. It is being developed with a Specification-Driven Development process: requirements, roadmap, tasks, tests, and release gates are tracked explicitly before features are claimed as complete.
 
-Current status: **v0.4 safe edit/delete — complete** (all 5 acceptance gates passed; event/reminder creation, editing, deletion, and completion toggle all working).
+Current status: **v0.5 note association — in progress** (v0.4 safe edit/delete complete; note frontmatter, templates, codeblock/inline ref rendering, linked notes in panel working).
 
 ---
 
@@ -16,7 +16,7 @@ Calendian is local-first by default. Early versions use macOS automation and do 
 
 ---
 
-## Current capabilities (v0.1–v0.4)
+## Current capabilities (v0.1–v0.5)
 
 The repository contains the following implemented features:
 
@@ -55,6 +55,15 @@ The repository contains the following implemented features:
 - **Reminder editing** (`ReminderEditModal`): pre-filled form for all reminder fields.
 - **Reminder deletion**: confirmation dialog; post-delete refresh.
 - **No-date reminders** section expanded by default.
+- **Note association via frontmatter**: events and reminders linked to notes via `calendian: { events: [...], reminders: [...] }` YAML frontmatter.
+- **Create note from event/reminder**: generates a note with frontmatter + template body; configurable note folder and templates.
+- **Template engine**: `{{variable}}` substitution with conditional blocks (`{{#key}}...{{/key}}`). Event vars: title, date, startTime, endTime, time, calendar, location, url, notes, isAllDay, recurrence. Reminder vars: title, date, dueTime, time, list, priority, notes.
+- **Linked Notes in panel**: event detail panel shows associated notes with links; reminder items show expandable linked notes list.
+- **Copy inline reference**: `📋` button copies `cal:ev:ID` or `cal:rem:ID` inline reference to clipboard.
+- **`calendian-event` code block**: embed events/reminders in notes with ` ```calendian ` — renders a styled table for the target date.
+- **Inline reference renderer**: `cal:ev:ID` / `cal:rem:ID` in notes renders as a styled mini-table with event/reminder details.
+- **Highlight navigation**: clicking an inline ref or code block item highlights and scrolls to the item in the Calendian panel.
+- **Auto-link via body scan**: notes containing `cal:ev:ID` / `cal:rem:ID` are automatically associated without frontmatter.
 
 For the precise truth table, see [`docs/sdd/CURRENT_STATUS.md`](./docs/sdd/CURRENT_STATUS.md) and [SPEC.md §2](./SPEC.md#2-current-implementation-status).
 
@@ -65,10 +74,7 @@ For the precise truth table, see [`docs/sdd/CURRENT_STATUS.md`](./docs/sdd/CURRE
 These are planned, but should not be treated as current behavior until their requirements and release gates pass:
 
 - Recurring event scope selection (this-only / future / all) for edit/delete.
-- Event/reminder note association through frontmatter.
-- Meeting-note templates.
 - In-app notifications for upcoming events and overdue reminders.
-- Copy-as-Markdown.
 - Goals and focus tracking (define goals, break into steps, declare weekly focus).
 - Habit tracking with consistency rate (not streaks), minimum-viable versions, and rest periods.
 - Encouragement nudges (daily intention prompt, re-engagement prompts, configurable tone).
@@ -80,9 +86,9 @@ See [`ROADMAP.md`](./ROADMAP.md) for the requirement-driven plan.
 
 ---
 
-## Explicit non-goals for v0.1–v0.4
+## Explicit non-goals for v0.1–v0.5
 
-v0.1–v0.4 do **not** yet include:
+v0.1–v0.5 do **not** yet include:
 
 - recurring event scope selection (this-only / future / all) for edit/delete;
 - recurring event creation;
@@ -151,7 +157,7 @@ Then re-enable Obsidian's access.
 
 ---
 
-## Usage: current read-only flow
+## Usage: current flow
 
 | Action | Current result |
 |---|---|
@@ -161,12 +167,17 @@ Then re-enable Obsidian's access.
 | Click Today / month navigation | Moves the calendar view. |
 | Click ↻ button | Manually refreshes from macOS Calendar/Reminders. |
 | Reminder range selector | Filter reminders: selected day / next 7 days / all incomplete. |
-| Open settings → macOS Integration | Toggle Calendar/Reminders display, source filtering, past event display, refresh interval, default calendar/list for create form, AI NL parsing config. |
+| Open settings → macOS Integration | Toggle Calendar/Reminders display, source filtering, past event display, refresh interval, default calendar/list for create form, note templates, note folder, AI NL parsing config. |
 | Open settings → Diagnostics | View permission status, source counts, cache stats. Export via consent modal. |
 | Click ⚡ button | Open natural language quick-create for events/reminders. |
 | Click +Event / +Remind | Open manual create forms for events/reminders. |
+| Click 📋 on event/reminder | Copy `cal:ev:ID` or `cal:rem:ID` inline reference to clipboard. |
+| Click "+ Note" in event detail | Create a note with frontmatter association and template body. |
+| Click 📝 on reminder | Expand linked notes list; "+📝" creates an associated note. |
+| Write `cal:ev:ID` or `cal:rem:ID` in a note | Renders inline event/reminder details table; clicking navigates to panel. |
+| Write ` ```calendian ` in a note | Renders events/reminders for that date as a styled table. |
 
-Event/reminder creation, editing, and deletion (with recurring event safety) are available in v0.4.
+Event/reminder creation, editing, and deletion (with recurring event safety) are available in v0.4. Note association and rendering features are available in v0.5.
 
 ---
 
@@ -209,7 +220,8 @@ Future external API integrations, if any, must be opt-in and specified separatel
 | v0.2 | Read-only polish | Complete |
 | v0.3 | Safe create + natural language | Complete |
 | v0.4 | Safe edit/delete | Complete |
-| v0.5 | Note association + notifications + Tasks | Planned |
+| v0.5 | Note association | In progress |
+| v0.5.5 | Self-direction (goals, habits, nudges, reviews) | Planned |
 | v0.5.5 | Self-direction (goals, habits, nudges, reviews) | Planned |
 | v0.6 | Advanced views, search, export | Planned |
 | v1.x | Cross-platform architecture track | Deferred |

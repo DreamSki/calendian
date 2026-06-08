@@ -28,8 +28,12 @@ All code in `main.js` (concatenated from `main-head.js` + `src/*.js` modules). T
 | src/macos/helper-executor.js | `MacOSIntegration` (prototype) | Spawns native Swift helper (`execHelper`), caches events/reminders, renders sidebar panel. Contains legacy `execJXA`/`parseEvents` — not used by primary data paths. |
 | src/cache/schedule-cache.js | `MacOSIntegration` (prototype) | Cache save/load, preload, date queries |
 | src/macos/writer.js | `MacOSIntegration` (prototype) | Event/reminder create, edit, delete via helper. Mutation safety guards (`canMutateEvent`, `canMutateReminder`). Completion toggle. Node.js-only code guarded with `typeof module` check. |
-| main-head.js (end) | `CalendarView` | Obsidian `ItemView`. Bridges Svelte calendar to `MacOSIntegration`. Owns cache read/write helpers. |
-| main-head.js (end) | `CalendarPlugin` | Lifecycle, settings, discovers helper binary path, view registration. |
+| src/notes/frontmatter.js | `MacOSIntegration` (prototype) | Frontmatter read/write for `calendian:` YAML. Association index (frontmatter scan + body scan for inline refs). `createNoteForEvent()`/`createNoteForReminder()`. Filename sanitization. |
+| src/notes/templates.js | `MacOSIntegration` (prototype) | `expandTemplate()` with `{{var}}` + `{{#key}}...{{/key}}` conditional blocks. `buildEventTemplateVars()`/`buildReminderTemplateVars()`. `copyItemText()` for inline ref copy. |
+| src/notes/note-link-resolver.js | `MacOSIntegration` (prototype) | `resolveNotePath()` — resolve/repair note links when files are renamed or moved. |
+| src/notes/codeblock.js | (module-scoped) | `` ```calendian `` code block processor (`renderCalendianBlock`). Inline `cal:ev:ID`/`cal:rem:ID` post-processor (`renderCalendianInline`). Click-to-navigate + panel highlight. |
+| main-head.js (end) | `CalendarView` | Obsidian `ItemView`. Bridges Svelte calendar to `MacOSIntegration`. Owns cache read/write helpers. 60s association index rebuild. Window focus refresh. |
+| main-head.js (end) | `CalendarPlugin` | Lifecycle, settings, discovers helper binary path, view registration. Registers code block + markdown post-processor. Settings tab with note template fields. |
 
 Data flow: `calendian-helper` (EventKit) → JSON stdout → `execHelper()` → in-memory cache → `render()` → DOM. Disk cache written to `data.json` on each successful load.
 
@@ -41,9 +45,10 @@ Data flow: `calendian-helper` (EventKit) → JSON stdout → `execHelper()` → 
 - **Manual refresh** (`↻` button) — calls `init()`
 - **Permission retry** — calls `init()`
 - **Source filter toggle** — calls `render()` only (in-memory filter, no helper call)
-- **Deferred to v0.3**: Window focus refresh (`window.onfocus` → `init()`)
-- **Deferred to v0.3**: `calendian-helper watch` — subscribes `EKEventStoreChangedNotification`, writes signal file on change, JS polls signal → calls `init()`
+- **Implemented (v0.3+)**: Window focus refresh (`window.onfocus` → `init()`)
+- **Implemented (v0.3+)**: `calendian-helper watch` — subscribes `EKEventStoreChangedNotification`, writes signal file on change, JS polls signal → calls `init()`
 - **Implemented (v0.3+)**: Post-write refresh — after create/edit/delete → `init(true)` immediately
+- **Implemented (v0.5)**: Note association index rebuild (every 60s in CalendarView + on window focus)
 
 See SPEC.md §7.6.1 and ARCHITECTURE.md §3 for full refresh architecture.
 
@@ -51,6 +56,7 @@ See SPEC.md §7.6.1 and ARCHITECTURE.md §3 for full refresh architecture.
 
 - **Do not introduce npm or external package dependencies.** The project is plain JS with zero `node_modules`.
 - **Do not implement write operations** (create/edit/delete events or reminders) beyond what v0.4 already supports (safe create, edit, delete for simple non-recurring events and reminders). Recurring event mutation is blocked — scope selection is deferred.
+- **Do not implement auto-modification of note files.** The plugin never auto-modifies note content. All note association is user-initiated (frontmatter or inline refs placed by the user).
 - **Do not change code without updating docs.** See SDD workflow below — this is the #1 cause of project drift.
 - **Do not remove legacy JXA code** (`execJXA`, `parseEvents`, `parseReminders`). It's unused but kept as fallback reference.
 - **Do not log event titles, notes, locations, or reminder text.** Use `console.log("[Calendian] ...")` prefix for all logging.
@@ -72,6 +78,10 @@ cat \
   src/macos/helper-executor.js \
   src/cache/schedule-cache.js \
   src/macos/writer.js \
+  src/notes/frontmatter.js \
+  src/notes/note-link-resolver.js \
+  src/notes/templates.js \
+  src/notes/codeblock.js \
   > main.js
 ```
 

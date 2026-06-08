@@ -285,20 +285,21 @@ Tasks are ordered by dependency and release target. Every task references requir
 - Requirements: `REQ-NOTE-001` to `REQ-NOTE-004`
 - Status: Done
 - Priority: P0
-- Evidence: `src/notes/frontmatter.js` — `ensureAssociationIndex()` scans vault markdown files for `calendian.associations` frontmatter; `getAssociatedNotes()` returns `[{path, title}]` for events/reminders; `generateEventFrontmatter()`/`generateReminderFrontmatter()` produce SPEC §5.3 YAML; `createNoteForEvent()`/`createNoteForReminder()` create .md files with pre-filled frontmatter. `src/notes/note-link-resolver.js` — `resolveNotePath()` handles renamed notes via title search. UI: event detail panel shows "Linked Notes" + "+ Note" button; reminder items show 📝 indicator + "+📝" create button. Index rebuilds lazily via `metadataCache.on("changed"/"resolved")`. Missing notes filtered silently.
+- Evidence: `src/notes/frontmatter.js` — `ensureAssociationIndex()` scans vault markdown files for `calendian.associations` frontmatter + body scan for inline `cal:ev:ID`/`cal:rem:ID` refs; `getAssociatedNotes()` returns `[{path, title}]` for events/reminders; `generateEventFrontmatter()`/`generateReminderFrontmatter()` produce SPEC §5.3 YAML; `createNoteForEvent()`/`createNoteForReminder()` create .md files with pre-filled frontmatter. `src/notes/note-link-resolver.js` — `resolveNotePath()` handles renamed notes via title search. UI: event detail panel shows "Linked Notes" + "+ Note" button; reminder items show 📝 indicator + "+📝" create button. Index rebuilds every 60s via setInterval in CalendarView, plus on window focus. Body scan persists across rebuilds via `_bodyScanIndex`. Missing notes filtered silently.
 
 ### TASK-041 — Create/open associated notes
 
 - Requirements: `REQ-NOTE-005` to `REQ-NOTE-009`
 - Status: Done
 - Priority: P0
-- Evidence: `src/notes/templates.js` — `expandTemplate()` with `{{var}}` + `{{#key}}...{{/key}}` conditional blocks; `buildEventTemplateVars()`/`buildReminderTemplateVars()`; `findOrCreateDailyNote()`; `addToDailyNote()` appends `- [ ] [[path|title]]` to daily note; `copyWikilink()` copies wikilink to clipboard. Settings: `eventNoteTemplate`, `reminderNoteTemplate`, `noteFolder` in defaultSettings + settings tab UI. UI: "→ Daily Note" + "📋 Copy Link" buttons in event detail; "→📅" + "📋" hint buttons in reminder hover actions. REQ-NOTE-008 (stale repair) deferred.
+- Evidence: `src/notes/templates.js` — `expandTemplate()` with `{{var}}` + `{{#key}}...{{/key}}` conditional blocks; `buildEventTemplateVars()`/`buildReminderTemplateVars()` with 11 event vars and 7 reminder vars; `copyItemText()` copies `cal:ev:ID`/`cal:rem:ID` inline ref to clipboard. `src/notes/codeblock.js` — `renderCalendianBlock()` registers `` ```calendian `` code block processor rendering events/reminders for target date; `renderCalendianInline()` markdown post-processor renders `cal:ev:ID`/`cal:rem:ID` inline references as styled mini-table. `src/notes/frontmatter.js` — body scan (`scanBodiesForInlineRefs()`) auto-associates notes containing inline refs. UI: event detail "Linked Notes" + "+ Note" + "📋 Copy" buttons; reminder items show expandable linked notes + "+📝" + "📋" buttons; click inline ref/codeblock item navigates to panel and highlights item. Settings: `eventNoteTemplate`, `reminderNoteTemplate`, `noteFolder` in settings tab UI. REQ-NOTE-008 (stale repair) deferred.
 
 ### TASK-042 — Template variables and daily note summary
 
 - Requirements: `REQ-NOTE-009`, `REQ-NOTE-010`
-- Status: Todo
+- Status: Done
 - Priority: P1
+- Evidence: `src/notes/templates.js` — `expandTemplate()` supports `{{variable}}` substitution + `{{#key}}...{{/key}}` conditional blocks. Event vars: `{{title}}`, `{{date}}`, `{{startTime}}`, `{{endTime}}`, `{{time}}`, `{{calendar}}`, `{{location}}`, `{{url}}`, `{{notes}}`, `{{isAllDay}}`, `{{recurrence}}`. Reminder vars: `{{title}}`, `{{date}}`, `{{dueTime}}`, `{{time}}`, `{{list}}`, `{{priority}}`, `{{notes}}`. `copyItemText()` for inline ref copy. REQ-NOTE-010 (meeting-note templates) still planned.
 
 ### TASK-043 — In-app notifications
 
