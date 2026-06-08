@@ -7807,14 +7807,14 @@ class MacOSIntegration {
 
             // Collapsible header
             var nodateHeader = nodateSection.createDiv("calendian-reminder-nodate-header");
-            nodateHeader.textContent = "▸ Reminders without due date (" + noDateReminders.length + ")";
+            nodateHeader.textContent = "▾ Reminders without due date (" + noDateReminders.length + ")";
             var nodateList = nodateSection.createDiv("calendian-reminder-nodate-list");
-            nodateList.style.display = "none"; // collapsed by default
+            nodateList.style.display = "block"; // expanded by default
 
             nodateHeader.addEventListener("click", function() {
-                var isHidden = nodateList.style.display === "none";
-                nodateList.style.display = isHidden ? "block" : "none";
-                nodateHeader.textContent = (isHidden ? "▾" : "▸") + " Reminders without due date (" + noDateReminders.length + ")";
+                var isExpanded = nodateList.style.display !== "none";
+                nodateList.style.display = isExpanded ? "none" : "block";
+                nodateHeader.textContent = (isExpanded ? "▸" : "▾") + " Reminders without due date (" + noDateReminders.length + ")";
             });
 
             // Sort no-date: incomplete first, completed at bottom
