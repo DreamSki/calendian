@@ -315,7 +315,7 @@ Tasks are ordered by dependency and release target. Every task references requir
 ### TASK-044 — Reminder expandable detail panel
 
 - Requirements: `REQ-REM-010`
-- Status: Todo
+- Status: Done
 - Priority: P1
 - Deliverables:
   - Click-to-expand detail panel for reminders, matching event click behavior.
@@ -327,8 +327,7 @@ Tasks are ordered by dependency and release target. Every task references requir
   - Detail panel content matches event detail panel structure and styling.
   - Edit/Delete/Copy actions work from within the detail panel.
   - Linked notes display inside the detail panel, consistent with events.
-
-### TASK-045 — File-change → association index live sync
+- Evidence: `_expandedReminders` Set in CalendarView constructor at main-head.js:6915. Click handler on reminder items (main-head.js:7907) toggles expand state; checkbox clicks excluded via `e.target.closest()`. Expanded detail panel renders due date (`formatDueDateFull()`), priority, list+account, notes, linked notes with `createNoteForReminder()` +Note button, and Edit/Delete/Copy action row. Inline action buttons (old hover-visible Edit/Delete/📝/📋) removed. CSS: `.calendian-reminder-detail` and `.calendian-reminder-expanded` in styles.css mirror event detail panel pattern. Reuses `.calendian-event-detail-field`, `.calendian-detail-actions`, `.calendian-note-link` classes.
 
 - Requirements: `REQ-NOTE-011`
 - Status: Done

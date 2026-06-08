@@ -19,7 +19,7 @@ This document records the actual repository state. It intentionally separates im
 | Calendar source discovery | Implemented | EventKit `calendar.calendarIdentifier` (UUID), account name (`source.title`), color, type. Display name includes account suffix ("日历 — chengbo.sun123@outlook.com"). |
 | Reminder list discovery | Implemented | EventKit lists with UUID, account name, color. |
 | Event display | Implemented | Title, time range, all-day handling, calendar badge with color, location, recurrence indicator, ongoing/soon highlights. Expandable detail panel (click to show location, URL, notes, attendees, calendar source, recurrence summary). Multi-day events shown on all overlapping days. Past events dimmed/hidden per setting. Recurring events marked with read-only indicator. |
-| Reminder display | Implemented | Title, due time, list badge, priority indicator (high/medium/low). Completed reminders hidden by default. Overdue reminders visually distinguished (red border + badge + due date). No-date reminders in collapsible section. Display range selector (today / 7 days / all incomplete). Subtask rendering ready (data-dependent — helper parentId not yet populated). |
+| Reminder display | Implemented | Title, due time, list badge, priority indicator (high/medium/low). Completed reminders hidden by default. Overdue reminders visually distinguished (red border + badge + due date). No-date reminders in collapsible section. Display range selector (today / 7 days / all incomplete). Subtask rendering ready (data-dependent — helper parentId not yet populated). Expandable detail panel (click-to-expand, shows due date, priority, list, notes, linked notes, edit/delete/copy). |
 | Source filtering | Implemented | Toggle individual calendars/lists via settings. Filter by stable UUID (EventKit `calendarIdentifier`). In-memory instant apply via `render()`. Persisted in `data.json`. |
 | Permission handling | Implemented | Independent calendar/reminder permission states with recovery guidance and retry buttons. Partial permission support (show available data + banner for denied source). |
 | Error states | Implemented | Error classification (permission_denied, timeout, error). Per-source error banners with retry. Parse-failure isolation. Empty vs error distinction. |
@@ -38,7 +38,7 @@ This document records the actual repository state. It intentionally separates im
 
 ## Current release label
 
-Current repository state: **v0.5 complete — note association + rendering done. v0.5.1 planned: reminder detail panel, file-change live sync, note→calendar reverse write**. TASK-040 (frontmatter schema) done. TASK-041 (create/open notes with templates) done. TASK-042 (template variables) done. Next: TASK-044 (reminder detail panel), TASK-045 (file-change live sync), TASK-046 (note→calendar creation), or TASK-043 (notifications).
+Current repository state: **v0.5 complete — note association + rendering done. v0.5.1: TASK-044 (reminder detail panel) done, TASK-045 (file-change live sync) done. Next: TASK-046 (note→calendar creation) or TASK-043 (notifications).**
 
 ## README policy
 
@@ -95,11 +95,14 @@ Everything else must be marked as planned, experimental, or future.
 
 > Updated by AI after every meaningful step. Next session reads this to continue without re-explaining context.
 
-- **Doing:** TASK-044 (reminder detail panel) or TASK-046 (note→calendar creation) — whichever is next.
+- **Doing:** TASK-046 (note→calendar creation) or TASK-043 (notifications) — whichever is next.
 - **Completed this session:**
-  - TASK-045 (file-change live sync, REQ-NOTE-011) implemented. `_invalidateAssociationDebounced()` with 500ms debounce added to CalendarView. All three vault event handlers (`onFileCreated`/`onFileModified`/`onFileDeleted`) now invalidate association index on `.md` file changes. Fresh rebuild by nulling `_bodyScanIndex` ensures stale entries are cleaned.
+  - TASK-044 (reminder detail panel, REQ-REM-010) implemented. `_expandedReminders` Set tracks expand state. Click handler on reminder items toggles detail panel (checkbox clicks excluded). Detail panel shows: due date (`formatDueDateFull()`), priority, list+account, notes (200-char truncation), linked notes with `+ Note` create button, Edit/Delete/Copy action row. Old inline hover-visible actions removed. CSS mirrors event detail panel pattern. `main.js` rebuilt (10560 lines).
 - **Decisions:**
-  - Fresh rebuild (null `_bodyScanIndex` + `_associationIndex`) on every live-sync invalidation to ensure correct cleanup of stale frontmatter/inline refs. The body scan caps at 200 files so performance is acceptable.
-  - 60s periodic rebuild kept as safety net alongside live sync.
-- **Next:** TASK-044 (reminder detail panel) → TASK-046 (note→calendar creation).
-- **Last action:** 2026-06-08 — TASK-045 implemented (file-change live sync).
+  - Completion checkbox stays inline (outside detail panel) for fast toggle — per TASK-044 requirement.
+  - No inline action buttons when collapsed — clean appearance, consistent with events.
+  - Detail panel reuses event CSS classes (`calendian-event-detail-field`, `calendian-detail-actions`, `calendian-note-link`) to avoid duplication.
+  - Added `formatDueDateFull()` for detail panel — always shows weekday + date + time, unlike `formatDueDate()` which abbreviates for today.
+  - Added `+ Note` create button inside detail panel's linked notes section — wires to `createNoteForReminder()` which existed but had no UI trigger.
+- **Next:** TASK-046 (note→calendar creation) → TASK-043 (notifications).
+- **Last action:** 2026-06-08 — TASK-044 implemented (reminder detail panel).
