@@ -7714,7 +7714,8 @@ class MacOSIntegration {
                     var meRem = me._reminder;
                     var meItemEl = me._itemEl;
                     var rid = meRem.id;
-                    if (meSelf._togglingReminders[rid]) return;
+                    console.log("[Calendian] Toggle click — id=" + rid + ", completed=" + meRem.completed + ", inFlight=" + !!meSelf._togglingReminders[rid]);
+                    if (meSelf._togglingReminders[rid]) { console.log("[Calendian] Toggle blocked — already in flight"); return; }
                     meSelf._togglingReminders[rid] = true;
 
                     me.textContent = "◌";
@@ -7723,6 +7724,7 @@ class MacOSIntegration {
                     meSelf.toggleReminder(meRem).then(function(result) {
                         meSelf._togglingReminders[rid] = false;
                         var newCompleted = !!(result && result.completed);
+                        console.log("[Calendian] Toggle success — id=" + rid + ", newCompleted=" + newCompleted);
                         meRem.completed = newCompleted;
                         me.textContent = newCompleted ? "☑" : "○";
                         me.style.opacity = "1";
@@ -7736,7 +7738,7 @@ class MacOSIntegration {
                         meSelf._togglingReminders[rid] = false;
                         me.textContent = meRem.completed ? "☑" : "○";
                         me.style.opacity = "1";
-                        console.error("[Calendian] Toggle reminder failed:", err.error?.message || err.stderr || err);
+                        console.error("[Calendian] Toggle FAILED:", err.error?.message || err.stderr || err);
                         new obsidian.Notice("Failed to update reminder");
                     });
                 });
@@ -7867,7 +7869,8 @@ class MacOSIntegration {
                         var meRem = me._reminder;
                         var meItemEl = me._itemEl;
                         var rid = meRem.id;
-                        if (meSelf._togglingReminders[rid]) return;
+                        console.log("[Calendian] Toggle click (no-date) — id=" + rid + ", completed=" + meRem.completed + ", inFlight=" + !!meSelf._togglingReminders[rid]);
+                        if (meSelf._togglingReminders[rid]) { console.log("[Calendian] Toggle blocked — already in flight"); return; }
                         meSelf._togglingReminders[rid] = true;
 
                         me.textContent = "◌";
@@ -7876,6 +7879,7 @@ class MacOSIntegration {
                         meSelf.toggleReminder(meRem).then(function(result) {
                             meSelf._togglingReminders[rid] = false;
                             var newCompleted = !!(result && result.completed);
+                            console.log("[Calendian] Toggle success (no-date) — id=" + rid + ", newCompleted=" + newCompleted);
                             meRem.completed = newCompleted;
                             me.textContent = newCompleted ? "☑" : "○";
                             me.style.opacity = "1";
@@ -7889,7 +7893,7 @@ class MacOSIntegration {
                             meSelf._togglingReminders[rid] = false;
                             me.textContent = meRem.completed ? "☑" : "○";
                             me.style.opacity = "1";
-                            console.error("[Calendian] Toggle reminder failed:", err.error?.message || err.stderr || err);
+                            console.error("[Calendian] Toggle FAILED (no-date):", err.error?.message || err.stderr || err);
                             new obsidian.Notice("Failed to update reminder");
                         });
                     });
