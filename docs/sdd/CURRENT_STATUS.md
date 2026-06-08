@@ -1,7 +1,7 @@
 # Current Implementation Status
 
 > Status: living status document  
-> Last updated: 2026-06-08
+> Last updated: 2026-06-09
 
 This document records the actual repository state. It intentionally separates implemented behavior from planned behavior so that README, roadmap, and release notes do not overpromise.
 
@@ -98,16 +98,28 @@ Everything else must be marked as planned, experimental, or future.
 
 > Updated by AI after every meaningful step. Next session reads this to continue without re-explaining context.
 
-- **Doing:** None.
+- **Doing:** Review for remaining items.
+- **Just completed:** BUGFIX-007 — widen inline ref body scan regex for opaque EventKit IDs.
 - **Completed this session:**
-  - Fixed inline ref live re-rendering bug — two related issues:
-    1. `cc` code block: after creation, inline ref showed as raw text until navigation away/back. Root cause: `replaceBlockWithInlineRef` ran before `init(true)`, so the item wasn't in cache when the post-processor re-ran. Fix: await `init(true)` first, then modify file, then call `triggerNoteRerender`.
-    2. Sidebar data changes (edit/delete) didn't update inline refs in open notes. Fix: `triggerNoteRerender()` called at end of `render()` in MacOSIntegration, re-runs post-processors on all open MarkdownViews after every data refresh.
-  - Added `triggerNoteRerender(plugin)` helper in `codeblock.js` — iterates all markdown leaves, calls `previewMode.rerender()`.
+  - **BUGFIX-001 — source filter fallback (helper/Sources/main.swift):** When configured calendar/reminder IDs don't match any available source, helper was falling back to `calendars = nil` (all calendars) — a privacy leak. Fixed 3 locations to return empty `[]` when `filtered.isEmpty`.
+  - **BUGFIX-002 — execHelper timeout (src/macos/helper-executor.js):** Added 30s timeout with settled guard, SIGTERM kill, and clearTimeout in all paths.
+  - **BUGFIX-003 — manifest version (manifest.json, README, TASKS.md):** Bumped manifest version from 0.1.0 to 0.5.0. Updated README status from "in progress" to "complete" with added notification/note→calendar mentions. Removed duplicate v0.5.5 roadmap row.
+  - **BUGFIX-004 — macOS version compatibility (helper/Sources/main.swift):** Added `isFullAccess(for:)` and `requestFullAccess(for:)` version-safe wrappers with `#available(macOS 14.0, *)` guards. On macOS 14+ uses `.fullAccess` / `requestFullAccessTo*`; on macOS 12-13 falls back to `.authorized` / `requestAccess(to:)` completion-handler API.
+  - **BUGFIX-005 — error JSON via JSONEncoder (helper/Sources/main.swift):** Replaced all 13 string-interpolated `fputs("{\"error\":\"...\"}\n", stderr)` calls with `printError()` function using `ErrorResponse` Codable struct + `JSONEncoder`. Added manual-escaping fallback for encode failures. Special-character-safe error output verified.
+  - **BUGFIX-006 — stale body scan index (src/notes/frontmatter.js):** `ensureAssociationIndex()` was preserving `_bodyScanIndex` on rebuild, carrying stale inline-ref entries forward because `scanBodiesForInlineRefs()` only adds. Now always starts fresh (frontmatter populates sync, body scan populates async). Removed `if (isRebuild && this._bodyScanIndex) { index = this._bodyScanIndex }` carry-over.
+  - **UI/UX refresh — CSS overhaul (`styles.css`):** Added design tokens, event color rail via `box-shadow: inset`, priority color dots replacing `!!!` text, skeleton loading animation, inline chip styling, toolbar icon buttons, `<details>` folding for no-date reminders, codeblock `max-width` cap. All through Obsidian theme variables.
+  - **`render()` method:** Today summary without emoji + overdue in red. Date header simplified. **Toolbar refactored** into separate icon-button row using `obsidian.setIcon`. **Scroll position preserved** across re-renders (no more jump-to-top).
+  - **`renderEventsSection()` rewrite:** Calendar color → left 3px rail via `--cal-event-color`. Badge removed, calendar name as muted subtitle. All-day class + "soon" chip. All detail panel / linked notes / mutation guards preserved.
+  - **`renderRemindersSection()` rewrite:** `obsidian.setIcon` checkboxes with loader spinner feedback. Priority color dots replace text. List badge removed. No-date section → `<details>` CSS-only folding. Simplified detail priority labels.
+  - **`renderLoading()` upgraded** with skeleton pulse rows.
+  - **Inline ref chip mode (`src/notes/codeblock.js`):** Single ref → inline chip with icon. Multiple → table (unchanged). `CalendianInlineChipChild` for live-update.
+  - **Build:** `main.js` (11818 lines). Helper compiles OK. Helper data channel → valid JSON.
 - **Decisions:**
-  - Fix the init→modify order (data before file change) rather than debouncing — simpler, more reliable.
-  - `triggerNoteRerender` uses `previewMode.rerender()` for Reading mode; Live Preview relies on Obsidian's built-in file-change detection.
-  - Note re-render runs at end of every `render()` call — lightweight since it only re-runs post-processors, no DOM rebuild.
-- **Verification:** `node --check main.js` ✓, `./build-main.sh` (11625 lines) ✓.
-- **Next:** TASK-050 (Tasks plugin integration) or TASK-090+ (self-direction features).
-- **Last action:** 2026-06-08 — inline ref live re-rendering fix.
+  - External proposal ~90% correct — adjusted for method signatures, `obsidian.setIcon` fallback, and preserving existing detail panel / linked notes / mutation guard functionality.
+  - `<details>` only for no-date section; dated reminder expand/collapse kept JS-based for detail panel rendering.
+  - `renderSelf` renamed to avoid collision with inner `self` references.
+  - BUGFIX-006: Fresh index on every rebuild. The brief async body scan gap (~seconds, capped 200 files) is acceptable — preserving stale entries indefinitely is the greater evil.
+- **Next:** Review for any remaining issues.
+- **BUGFIX-007 — inline ref body scan regex (`src/notes/frontmatter.js:161`):** Widened char class from `[A-Fa-f0-9:-]{20,}` (hex+colon+hyphen only) to `[^\s`]{20,}` (any non-whitespace, non-backtick). This ensures opaque EventKit IDs with non-hex characters are matched by the body scan for inline `cal:ev:ID`/`cal:rem:ID` refs. The inline renderer regex in `src/notes/codeblock.js:165` already used `(.+)` and needed no change. Rebuilt `main.js` (11726 lines). Helper compiles OK, `node --check` clean.
+- **Last action:** 2026-06-09 — BUGFIX-007: widened inline ref body scan regex char class to `[^\s`]`.
+

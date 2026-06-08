@@ -1,8 +1,8 @@
 # Calendian Specification
 
 > Status: authoritative product specification  
-> Version target: v0.4 / safe edit/delete — complete (all 5 acceptance gates passed; event/reminder creation, editing, deletion, and completion toggle all working; only recurring scope selection deferred to future)
-> Last updated: 2026-06-08  
+> Version target: v0.5 / note association + codeblock/inline rendering — in progress; v0.4 safe edit/delete complete
+> Last updated: 2026-06-09  
 > Plugin ID: `calendian`  
 > Process: Specification-Driven Development (SDD)
 
@@ -679,11 +679,11 @@ External changes            Obsidian writes (v0.3+)     Timer (configurable)
 
 | Trigger | Status | Mechanism |
 |---|---|---|
-| Configurable timer | Implemented | `setInterval` on `refreshIntervalMinutes` (default 5) |
+| Configurable timer | Implemented | `setInterval` on `refreshIntervalMinutes` (default 5). **2026-06-09:** `execHelper()` 30s timeout with SIGTERM kill to prevent indefinite refresh hang. |
 | Manual refresh | Implemented | `↻` button in date header |
 | Cache stale check | Implemented | `isCacheFresh()` — 2× interval, min 15min |
 | Permission retry | Implemented | Retry button calls `init()` |
-| Source filter toggle | Implemented | `render()` with in-memory filter |
+| Source filter toggle | Implemented | `render()` with in-memory filter; **2026-06-09 fix:** helper filter fallback — stale IDs now return `[]` instead of all data (nil) |
 | Window focus | **Implemented v0.3** | `window.addEventListener('focus')` → `init()` if cache stale |
 | macOS system notification | **Implemented v0.3** | `calendian-helper watch` subscribes `EKEventStoreChanged` → writes timestamp to signal file → JS polls every 2s → `refreshInBackground()` |
 | Post-write refresh | **Implemented v0.3** | After create via helper, immediately call `init(true)` |

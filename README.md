@@ -4,7 +4,7 @@
 
 Calendian is an Obsidian desktop plugin that integrates macOS Calendar events and macOS Reminders into the Obsidian sidebar. It is being developed with a Specification-Driven Development process: requirements, roadmap, tasks, tests, and release gates are tracked explicitly before features are claimed as complete.
 
-Current status: **v0.5 note association — in progress** (v0.4 safe edit/delete complete; note frontmatter, templates, codeblock/inline ref rendering, linked notes in panel working).
+Current status: **v0.5 note association — complete** (v0.4 safe edit/delete complete; note frontmatter, templates, codeblock/inline ref rendering, linked notes in panel, in-app notifications, note→calendar creation working).
 
 ---
 
@@ -221,7 +221,6 @@ Future external API integrations, if any, must be opt-in and specified separatel
 | v0.3 | Safe create + natural language | Complete |
 | v0.4 | Safe edit/delete | Complete |
 | v0.5 | Note association | In progress |
-| v0.5.5 | Self-direction (goals, habits, nudges, reviews) | Planned |
 | v0.5.5 | Self-direction (goals, habits, nudges, reviews) | Planned |
 | v0.6 | Advanced views, search, export | Planned |
 | v1.x | Cross-platform architecture track | Deferred |

@@ -1,7 +1,7 @@
 # Requirement-Driven Task Backlog
 
 > Status: living task backlog  
-> Last updated: 2026-06-08
+> Last updated: 2026-06-09
 
 Tasks are ordered by dependency and release target. Every task references requirement IDs from `SPEC.md` and acceptance gates from `ACCEPTANCE.md`.
 
@@ -56,7 +56,7 @@ Tasks are ordered by dependency and release target. Every task references requir
 - Requirements: `REQ-SRC-001` to `REQ-SRC-006`
 - Status: Done
 - Priority: P0
-- Evidence: `discoverCalendars()` and `discoverReminderLists()` use EventKit helper. Account name disambiguation ("日历 — iCloud"). Filter by stable UUID with backward-compat. Empty/error states handled. Instant in-memory filter apply via `render()`. Code at main.js:5400-5454, 977-1077.
+- Evidence: `discoverCalendars()` and `discoverReminderLists()` use EventKit helper. Account name disambiguation ("日历 — iCloud"). Filter by stable UUID with backward-compat. Empty/error states handled. Instant in-memory filter apply via `render()`. Code at main.js:5400-5454, 977-1077. **2026-06-09 P0 fix:** Source filter fallback bug — helper was returning ALL data when filter IDs were stale (`calendars = filtered.isEmpty ? nil : filtered` → nil means all calendars in EventKit). Fixed in `helper/Sources/main.swift` (`printEvents`, `printReminders`, `printNoDateReminders`) to return empty `[]` when no filter matches.
 
 ### TASK-006 — Cache lifecycle and refresh
 
@@ -524,3 +524,17 @@ Tasks are ordered by dependency and release target. Every task references requir
 - Status: Deferred
 - Priority: P3
 - Notes: Microsoft Graph / Android support requires separate auth, storage, privacy, and sync specifications.
+
+---
+
+## Bugfix tracking (2026-06-09 code review)
+
+| ID | Description | Severity | File | Status |
+|---|---|---|---|---|
+| BUGFIX-001 | Source filter fallback: stale calendar/reminder list IDs cause helper to return ALL data (nil = all in EventKit) | P0 — privacy leak | `helper/Sources/main.swift` (printEvents, printReminders, printNoDateReminders) | **Fixed** — stale filter IDs now return `[]` |
+| BUGFIX-002 | `execHelper()` has no timeout — can hang refresh indefinitely | P0 | `src/macos/helper-executor.js` | **Fixed** — 30s timeout with SIGTERM kill, settled guard, and clearTimeout (mirrors execJXA pattern) |
+| BUGFIX-003 | Manifest version (0.1.0) inconsistent with actual code state (v0.5) | P0 | `manifest.json`, README, CURRENT_STATUS.md | **Fixed** — manifest 0.5.0, README status aligned, duplicate roadmap row removed |
+| BUGFIX-004 | macOS version compatibility: helper uses `.fullAccess` APIs without `#available` fallback | P0 | `helper/Sources/main.swift` | **Fixed** — added `isFullAccess(for:)` / `requestFullAccess(for:)` version-safe wrappers with `#available(macOS 14.0, *)` guards and legacy `requestAccess(to:)` fallback for macOS 12-13 |
+| BUGFIX-005 | Swift helper error JSON constructed via string interpolation rather than JSONEncoder | P1 | `helper/Sources/main.swift` | **Fixed** — added `ErrorResponse` Codable struct + `printError()` using `JSONEncoder` with manual-escaping fallback; all 13 `fputs("{\"error\":\"...\"}\n", stderr)` replaced |
+| BUGFIX-006 | Note body scan index retains stale inline refs (only adds, never clears old entries) | P1 | `src/notes/frontmatter.js` | **Fixed** — `ensureAssociationIndex()` now always starts with a fresh index on rebuild; frontmatter scan populates synchronously, body scan re-populates inline refs asynchronously |
+| BUGFIX-007 | Inline ref body scan regex too narrow — may miss valid opaque EventKit IDs | P1 | `src/notes/frontmatter.js` | **Fixed** — widened char class from `[A-Fa-f0-9:-]` to `[^\s`]` (any non-whitespace, non-backtick) |
