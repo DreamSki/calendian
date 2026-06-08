@@ -2,7 +2,7 @@
   "id": "calendian",
   "name": "Calendian",
   "description": "macOS Calendar and Reminders integration for Obsidian",
-  "version": "0.1.0",
+  "version": "0.5.0",
   "author": "DreamSki",
   "isDesktopOnly": true,
   "minAppVersion": "0.15.0"

@@ -7,9 +7,23 @@ MacOSIntegration.prototype.execHelper = function(args) {
             var proc = nodeChildProcess.spawn(this.helperPath, args);
             var stdout = '';
             var stderr = '';
+            var settled = false;
+
+            // 30-second timeout (helper normally completes in <100ms; this handles hangs)
+            var timer = setTimeout(function() {
+                if (!settled) {
+                    settled = true;
+                    proc.kill('SIGTERM');
+                    reject({ error: new Error('Helper execution timed out after 30s'), stderr: stderr, stdout: stdout });
+                }
+            }, 30000);
+
             proc.stdout.on('data', function(d) { stdout += d.toString(); });
             proc.stderr.on('data', function(d) { stderr += d.toString(); });
             proc.on('close', function(code) {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
                 if (code !== 0) {
                     reject({ error: new Error('Helper exited with code ' + code), stderr: stderr, stdout: stdout });
                     return;
@@ -21,6 +35,9 @@ MacOSIntegration.prototype.execHelper = function(args) {
                 }
             });
             proc.on('error', function(err) {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
                 reject({ error: err, stderr: stderr, stdout: stdout });
             });
         });

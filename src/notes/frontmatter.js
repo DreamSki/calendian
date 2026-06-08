@@ -158,7 +158,7 @@ async function scanBodiesForInlineRefs(app, files, index) {
         if (count >= 200) break;
         try {
             var content = await app.vault.cachedRead(files[i]);
-            var re = /`?cal:(ev|rem):([A-Fa-f0-9:-]{20,})`?/g;
+            var re = /`?cal:(ev|rem):([^\s`]{20,})`?/g;
             var m;
             while ((m = re.exec(content)) !== null) {
                 addToIndex(index, m[1] === "rem" ? "reminder" : "event", m[2], files[i].path, files[i].basename);
@@ -205,14 +205,11 @@ MacOSIntegration.prototype.ensureAssociationIndex = function() {
     var isRebuild = !!this._associationIndex;
     console.log("[Calendian] Building note association index..." + (isRebuild ? " (rebuild)" : ""));
 
-    // Keep old body scan results across rebuilds so inline refs aren't lost
-    var index;
-    if (isRebuild && this._bodyScanIndex) {
-        // Preserve body scan entries from last scan
-        index = this._bodyScanIndex;
-    } else {
-        index = { events: new Map(), reminders: new Map() };
-    }
+    // Always start fresh on rebuild: frontmatter scan populates synchronously,
+    // body scan re-populates inline refs asynchronously (capped 200 files, fast).
+    // Never carry over stale _bodyScanIndex entries — scanBodiesForInlineRefs
+    // only adds, so stale inline-ref deletions would persist forever.
+    var index = { events: new Map(), reminders: new Map() };
 
     try {
         var app = this.plugin.app;

@@ -155,7 +155,7 @@ struct CalendianHelper {
                 exit(1)
             }
         } catch {
-            fputs("{\"error\":\"\(error.localizedDescription)\"}\n", stderr)
+            printError(error.localizedDescription)
             exit(1)
         }
     }
@@ -202,7 +202,7 @@ struct CalendianHelper {
         let fmt = ISO8601DateFormatter()
         guard let startDate = fmt.date(from: from),
               let endDate = fmt.date(from: to) else {
-            fputs("{\"error\":\"Invalid date format. Use ISO 8601.\"}\n", stderr)
+            printError("Invalid date format. Use ISO 8601.")
             exit(1)
         }
 
@@ -211,7 +211,12 @@ struct CalendianHelper {
             calendars = nil  // all calendars
         } else {
             let filtered = store.calendars(for: .event).filter { calendarIDs.contains($0.calendarIdentifier) }
-            calendars = filtered.isEmpty ? nil : filtered
+            if filtered.isEmpty {
+                // No matching calendars found - return empty instead of falling back to all
+                printJSON([CalendianEvent]())
+                return
+            }
+            calendars = filtered
         }
 
         let predicate = store.predicateForEvents(withStart: startDate, end: endDate, calendars: calendars)
@@ -250,7 +255,7 @@ struct CalendianHelper {
         let fmt = ISO8601DateFormatter()
         guard let startDate = fmt.date(from: from),
               let endDate = fmt.date(from: to) else {
-            fputs("{\"error\":\"Invalid date format.\"}\n", stderr)
+            printError("Invalid date format.")
             exit(1)
         }
 
@@ -259,7 +264,12 @@ struct CalendianHelper {
             calendars = nil
         } else {
             let filtered = store.calendars(for: .reminder).filter { listIDs.contains($0.calendarIdentifier) }
-            calendars = filtered.isEmpty ? nil : filtered
+            if filtered.isEmpty {
+                // No matching lists found - return empty instead of falling back to all
+                printJSON([CalendianReminder]())
+                return
+            }
+            calendars = filtered
         }
 
         let predicate = store.predicateForReminders(in: calendars)
@@ -293,7 +303,12 @@ struct CalendianHelper {
             calendars = nil
         } else {
             let filtered = store.calendars(for: .reminder).filter { listIDs.contains($0.calendarIdentifier) }
-            calendars = filtered.isEmpty ? nil : filtered
+            if filtered.isEmpty {
+                // No matching lists found - return empty instead of falling back to all
+                printJSON([CalendianReminder]())
+                return
+            }
+            calendars = filtered
         }
 
         let predicate = store.predicateForReminders(in: calendars)
@@ -349,7 +364,7 @@ struct CalendianHelper {
 
     static func toggleReminder(_ reminderID: String) throws {
         guard let ekReminder = store.calendarItem(withIdentifier: reminderID) as? EKReminder else {
-            fputs("{\"error\":\"Reminder not found\"}\n", stderr)
+            printError("Reminder not found")
             exit(1)
         }
         ekReminder.isCompleted.toggle()
@@ -368,12 +383,12 @@ struct CalendianHelper {
         let fmt = ISO8601DateFormatter()
         guard let startDate = fmt.date(from: startISO),
               let endDate = fmt.date(from: endISO) else {
-            fputs("{\"error\":\"Invalid date format. Use ISO 8601.\"}\n", stderr)
+            printError("Invalid date format. Use ISO 8601.")
             exit(1)
         }
 
         guard let calendar = store.calendars(for: .event).first(where: { $0.calendarIdentifier == calendarID }) else {
-            fputs("{\"error\":\"Calendar not found: \(calendarID)\"}\n", stderr)
+            printError("Calendar not found: \(calendarID)")
             exit(1)
         }
 
@@ -398,7 +413,7 @@ struct CalendianHelper {
         _ = try await requestRemindersAccessIfNeeded()
 
         guard let calendar = store.calendars(for: .reminder).first(where: { $0.calendarIdentifier == listID }) else {
-            fputs("{\"error\":\"Reminder list not found: \(listID)\"}\n", stderr)
+            printError("Reminder list not found: \(listID)")
             exit(1)
         }
 
@@ -447,13 +462,13 @@ struct CalendianHelper {
         _ = try await requestEventsAccessIfNeeded()
 
         guard let ekEvent = store.event(withIdentifier: eventID) else {
-            fputs("{\"error\":\"Event not found: \(eventID)\"}\n", stderr)
+            printError("Event not found: \(eventID)")
             exit(1)
         }
 
         // Double-safety: reject recurring events at data layer
         if ekEvent.hasRecurrenceRules {
-            fputs("{\"error\":\"Cannot edit recurring events from Calendian\"}\n", stderr)
+            printError("Cannot edit recurring events from Calendian")
             exit(1)
         }
 
@@ -484,12 +499,12 @@ struct CalendianHelper {
         _ = try await requestEventsAccessIfNeeded()
 
         guard let ekEvent = store.event(withIdentifier: eventID) else {
-            fputs("{\"error\":\"Event not found: \(eventID)\"}\n", stderr)
+            printError("Event not found: \(eventID)")
             exit(1)
         }
 
         if ekEvent.hasRecurrenceRules {
-            fputs("{\"error\":\"Cannot delete recurring events from Calendian\"}\n", stderr)
+            printError("Cannot delete recurring events from Calendian")
             exit(1)
         }
 
@@ -505,7 +520,7 @@ struct CalendianHelper {
         _ = try await requestRemindersAccessIfNeeded()
 
         guard let ekReminder = store.calendarItem(withIdentifier: reminderID) as? EKReminder else {
-            fputs("{\"error\":\"Reminder not found: \(reminderID)\"}\n", stderr)
+            printError("Reminder not found: \(reminderID)")
             exit(1)
         }
 
@@ -558,7 +573,7 @@ struct CalendianHelper {
         _ = try await requestRemindersAccessIfNeeded()
 
         guard let ekReminder = store.calendarItem(withIdentifier: reminderID) as? EKReminder else {
-            fputs("{\"error\":\"Reminder not found: \(reminderID)\"}\n", stderr)
+            printError("Reminder not found: \(reminderID)")
             exit(1)
         }
 
@@ -568,44 +583,76 @@ struct CalendianHelper {
 
     // MARK: - Permissions
 
+    // MARK: Version-safe permission helpers (BUGFIX-004)
+    // .fullAccess and requestFullAccessTo* are macOS 14+ APIs.
+    // On macOS 12-13 we must use .authorized and requestAccess(to:).
+
+    static func isFullAccess(for entityType: EKEntityType) -> Bool {
+        let status = EKEventStore.authorizationStatus(for: entityType)
+        if #available(macOS 14.0, *) {
+            return status == .fullAccess
+        } else {
+            // macOS 12-13: .authorized is the highest level
+            return status == .authorized
+        }
+    }
+
+    static func requestFullAccess(for entityType: EKEntityType) async throws -> Bool {
+        if #available(macOS 14.0, *) {
+            switch entityType {
+            case .event: return try await store.requestFullAccessToEvents()
+            case .reminder: return try await store.requestFullAccessToReminders()
+            @unknown default: return false
+            }
+        } else {
+            return try await withCheckedThrowingContinuation { continuation in
+                store.requestAccess(to: entityType) { granted, error in
+                    if let error = error {
+                        continuation.resume(throwing: error)
+                    } else {
+                        continuation.resume(returning: granted)
+                    }
+                }
+            }
+        }
+    }
+
     static func printPermissions() {
-        let eventStatus: String = {
-            switch EKEventStore.authorizationStatus(for: .event) {
-            case .authorized, .fullAccess: return "granted"
-            case .denied, .restricted: return "denied"
-            default: return "notDetermined"
-            }
-        }()
-        let reminderStatus: String = {
-            switch EKEventStore.authorizationStatus(for: .reminder) {
-            case .authorized, .fullAccess: return "granted"
-            case .denied, .restricted: return "denied"
-            default: return "notDetermined"
-            }
-        }()
+        let eventStatus: String = isFullAccess(for: .event) ? "granted"
+            : ({
+                switch EKEventStore.authorizationStatus(for: .event) {
+                case .denied, .restricted: return "denied"
+                default: return "notDetermined"
+                }
+            }())
+        let reminderStatus: String = isFullAccess(for: .reminder) ? "granted"
+            : ({
+                switch EKEventStore.authorizationStatus(for: .reminder) {
+                case .denied, .restricted: return "denied"
+                default: return "notDetermined"
+                }
+            }())
         printJSON(PermissionStatus(events: eventStatus, reminders: reminderStatus))
     }
 
     static func requestEventsAccess() async throws {
-        let ok = try await store.requestFullAccessToEvents()
+        let ok = try await requestFullAccess(for: .event)
         printJSON(["granted": ok])
     }
 
     static func requestRemindersAccess() async throws {
-        let ok = try await store.requestFullAccessToReminders()
+        let ok = try await requestFullAccess(for: .reminder)
         printJSON(["granted": ok])
     }
 
     static func requestEventsAccessIfNeeded() async throws -> Bool {
-        let status = EKEventStore.authorizationStatus(for: .event)
-        if status == .fullAccess { return true }
-        return try await store.requestFullAccessToEvents()
+        if isFullAccess(for: .event) { return true }
+        return try await requestFullAccess(for: .event)
     }
 
     static func requestRemindersAccessIfNeeded() async throws -> Bool {
-        let status = EKEventStore.authorizationStatus(for: .reminder)
-        if status == .fullAccess { return true }
-        return try await store.requestFullAccessToReminders()
+        if isFullAccess(for: .reminder) { return true }
+        return try await requestFullAccess(for: .reminder)
     }
 
     // MARK: - Watch (long-lived process for REQ-SYNC-005)
@@ -639,6 +686,27 @@ struct CalendianHelper {
         try? ts.write(toFile: path, atomically: true, encoding: .utf8)
     }
 
+    // MARK: - Error output (BUGFIX-005: use JSONEncoder, not string interpolation)
+
+    struct ErrorResponse: Codable {
+        let error: String
+    }
+
+    static func printError(_ message: String) {
+        do {
+            let data = try encoder.encode(ErrorResponse(error: message))
+            if let str = String(data: data, encoding: .utf8) {
+                fputs(str + "\n", stderr)
+            }
+        } catch {
+            // Last-resort fallback: manual JSON with basic escaping
+            let escaped = message.replacingOccurrences(of: "\\", with: "\\\\")
+                                 .replacingOccurrences(of: "\"", with: "\\\"")
+                                 .replacingOccurrences(of: "\n", with: "\\n")
+            fputs("{\"error\":\"\(escaped)\"}\n", stderr)
+        }
+    }
+
     // MARK: - Helpers
 
     static func colorString(from cgColor: CGColor?) -> String {
@@ -657,7 +725,7 @@ struct CalendianHelper {
                 print(str)
             }
         } catch {
-            fputs("{\"error\":\"JSON encode failed\"}\n", stderr)
+            printError("JSON encode failed")
         }
     }
 

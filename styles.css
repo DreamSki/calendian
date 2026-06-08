@@ -984,21 +984,20 @@
     cursor: not-allowed;
 }
 
-/* v0.5: Inline cal:ev:ID / cal:rem:ID reference table */
-/* v0.5: Inline cal:ev:ID / cal:rem:ID reference table
-   Use high-specificity selectors to beat Obsidian's global table styles */
+/* ── Inline cal:ev:ID / cal:rem:ID reference table ── */
+/* High-specificity selectors beat Obsidian's global table styles */
 .markdown-rendered table.calendian-inline-table,
 .markdown-preview-view table.calendian-inline-table,
 .markdown-reading-view table.calendian-inline-table,
 .markdown-source-view table.calendian-inline-table,
 .cm-content table.calendian-inline-table {
     border-collapse: collapse !important;
-    table-layout: fixed !important;
-    margin: 4px 0 !important;
-    font-size: 0.8em !important;
+    table-layout: auto !important;
+    margin: 4px 0 8px !important;
+    font-size: 0.84em !important;
     border: none !important;
     background: transparent !important;
-    width: auto !important;
+    width: 100% !important;
 }
 .markdown-rendered .calendian-inline-table td,
 .markdown-preview-view .calendian-inline-table td,
@@ -1007,78 +1006,86 @@
 .cm-content .calendian-inline-table td {
     border: none !important;
     vertical-align: baseline !important;
-    padding: 2px 8px !important;
+    padding: 5px 7px !important;
     background: transparent !important;
     font-size: inherit !important;
 }
+
+/* Row styling */
 .calendian-inline-row td {
-    background: var(--background-secondary) !important;
-    padding-top: 5px !important;
-    padding-bottom: 5px !important;
-    border-bottom: 1px solid var(--color-base-50) !important;
+    border-bottom: 1px solid var(--background-modifier-border) !important;
 }
 .calendian-inline-row:last-child td {
     border-bottom: none !important;
 }
-.calendian-inline-row td:nth-child(2) {
-    border-left: 4px solid var(--interactive-accent) !important;
-    padding-left: 6px !important;
-}
-.calendian-inline-row.calendian-inline-reminder td:nth-child(2) {
-    border-left: 4px solid var(--color-orange) !important;
-}
 .calendian-inline-row:hover td {
-    filter: brightness(0.97) !important;
+    background: var(--background-modifier-hover) !important;
 }
 
-/* Type icon */
+/* ── Left color rail — accent for events, muted for reminders ── */
+.calendian-inline-row td:first-child {
+    padding-left: 5px !important;
+}
+.calendian-inline-row:not(.calendian-inline-reminder) td:first-child {
+    box-shadow: inset 3px 0 0 var(--interactive-accent) !important;
+}
+.calendian-inline-row.calendian-inline-reminder td:first-child {
+    box-shadow: inset 3px 0 0 var(--text-faint) !important;
+}
+
+/* Not-found: dim + italic */
+.calendian-inline-row.calendian-inline-notfound td {
+    opacity: 0.55;
+    font-style: italic;
+    color: var(--text-muted) !important;
+}
+
+/* ── Column styles ── */
 .calendian-inline-type {
     text-align: center !important;
     white-space: nowrap !important;
-    font-size: 1em !important;
+    width: 1.2em !important;
+    color: var(--text-faint) !important;
 }
-
 .calendian-inline-date {
-    text-align: right !important;
-    font-family: var(--font-monospace) !important;
     white-space: nowrap !important;
+    font-family: var(--font-monospace) !important;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-faint) !important;
+}
+.calendian-inline-title {
+    width: 99% !important;   /* flex — takes remaining space */
     overflow: hidden !important;
-    color: var(--text-muted) !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
     font-weight: 500 !important;
+    color: var(--text-normal) !important;
 }
 .calendian-inline-time {
+    white-space: nowrap !important;
     text-align: right !important;
     font-family: var(--font-monospace) !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    letter-spacing: -0.03em !important;
+    font-variant-numeric: tabular-nums;
     color: var(--text-muted) !important;
 }
 .calendian-inline-time-allday {
     font-family: var(--font-interface) !important;
-    font-style: normal !important;
-    letter-spacing: 0 !important;
+    font-style: italic;
+    color: var(--text-faint) !important;
 }
-.calendian-inline-title {
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    font-weight: 600 !important;
-    color: var(--text-accent) !important;
-}
-.calendian-inline-badge {
+.calendian-inline-indicators {
     text-align: center !important;
     white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    font-size: 0.8em !important;
-    font-weight: 500 !important;
     color: var(--text-muted) !important;
-    border: 1px solid var(--text-faint) !important;
-    border-radius: 10px !important;
-    padding: 1px 8px !important;
+    font-size: 0.9em !important;
 }
-/* v0.5: Highlight for items navigated-to from notes */
+
+/* Retired: badge column */
+.calendian-inline-badge {
+    display: none !important;
+}
+
+/* Panel highlight for items navigated-to from notes */
 .macos-item.calendian-item-highlight {
     border-left: 4px solid var(--interactive-accent) !important;
     padding-left: 8px;
@@ -1086,10 +1093,716 @@
     background: transparent !important;
 }
 
-.calendian-inline-indicators {
-    text-align: center !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
+/* =====================================================================
+   Calendian UI refresh — design tokens + optimized layout
+   All colors, radii, fonts go through Obsidian theme variables.
+   ===================================================================== */
+
+/* ------------------------------------------------------------------- */
+/* 1. Design tokens — one source of truth                              */
+/* ------------------------------------------------------------------- */
+.macos-events-panel,
+.calendian-block,
+.calendian-create-block {
+    --cal-gap:        var(--size-4-2);   /* 8px  — between sections       */
+    --cal-gap-sm:     var(--size-2-3);   /* 6px  — within a row           */
+    --cal-pad-y:      var(--size-2-2);   /* 4px                           */
+    --cal-pad-x:      var(--size-2-3);   /* 6px                           */
+    --cal-radius:     var(--radius-s);
+    --cal-rail:       3px;
+    --cal-time-col:   52px;              /* fixed time column in panel    */
+    --cal-fs-label:   var(--font-ui-smaller);
+    --cal-fs-meta:    var(--font-ui-smaller);
+    --cal-fs-title:   var(--font-ui-small);
+    --cal-dot:        6px;
+}
+
+/* ------------------------------------------------------------------- */
+/* 2. Panel container — flex layout, gap                               */
+/* ------------------------------------------------------------------- */
+.macos-events-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--cal-gap) var(--size-2-2);
+}
+
+/* ------------------------------------------------------------------- */
+/* 3. Today summary bar — quiet, no background, no emoji               */
+/* ------------------------------------------------------------------- */
+.macos-today-summary {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px 6px;
+    padding: var(--cal-pad-y) var(--cal-pad-x);
+    font-size: var(--cal-fs-meta);
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    margin-bottom: 0;
+    border-radius: 0;
+}
+.macos-today-summary .macos-today-summary-text {
+    font-size: inherit;
+    font-weight: normal;
+    letter-spacing: 0;
+    color: inherit;
+}
+.macos-today-summary .cal-summary-dot {
+    color: var(--text-faint);
+    margin: 0 2px;
+    font-weight: normal;
+}
+.macos-today-summary .cal-summary-overdue {
+    color: var(--text-error);
+    font-weight: var(--font-semibold);
+    margin-left: auto;
+}
+.macos-today-summary.macos-clickable {
+    cursor: pointer;
+    border-radius: var(--cal-radius);
+    transition: background-color 0.12s;
+}
+.macos-today-summary.macos-clickable:hover {
+    background-color: var(--background-modifier-hover);
+}
+
+/* ------------------------------------------------------------------- */
+/* 4. Date header row — date left, toolbar right, single line           */
+/* ------------------------------------------------------------------- */
+.macos-date-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--cal-gap-sm);
+    padding: var(--cal-pad-y) var(--cal-pad-x);
+    background: none;
+    border-radius: 0;
+    margin-bottom: 0;
+}
+.macos-date-header-row .macos-date-label {
+    font-size: var(--font-ui-medium);
+    font-weight: var(--font-medium);
+    letter-spacing: 0;
+    color: var(--text-normal);
+    flex-shrink: 0;
+}
+.macos-date-header-row .macos-today-btn {
+    font-size: var(--cal-fs-meta);
+    color: var(--text-accent);
+    cursor: pointer;
+    padding: 1px 6px;
+    border-radius: 3px;
+    white-space: nowrap;
+}
+.macos-date-header-row .macos-today-btn:hover {
+    background-color: var(--background-modifier-hover);
+}
+
+/* Back-to-today dot — tiny circle next to date */
+.calendian-today-dot {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    cursor: pointer;
+    color: var(--text-faint);
+    flex-shrink: 0;
+    transition: color 0.12s, background-color 0.12s;
+}
+.calendian-today-dot:hover {
+    color: var(--interactive-accent);
+    background-color: var(--background-modifier-hover);
+}
+.calendian-today-dot svg {
+    width: 8px;
+    height: 8px;
+}
+
+/* Toolbar inside date header row — icon buttons pushed to the right */
+.macos-date-header-row .calendian-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+.calendian-toolbar .calendian-toolbar-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--cal-radius);
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: color 0.12s, background-color 0.12s;
+}
+.calendian-toolbar .calendian-toolbar-btn:hover {
+    color: var(--text-normal);
+    background-color: var(--background-modifier-hover);
+}
+.calendian-toolbar .calendian-toolbar-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* ------------------------------------------------------------------- */
+/* 6. Section headers — editorial: caps + trailing line                 */
+/* ------------------------------------------------------------------- */
+.macos-section {
+    margin-bottom: 0;
+    margin-top: 6px;
+    padding-top: 0;
+}
+.macos-section:first-child {
+    margin-top: 0;
+}
+.macos-section:last-child {
+    margin-bottom: 0;
+}
+
+.macos-section-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px var(--cal-pad-x) 6px;
+    color: var(--text-faint);
+    font-size: 0.64em;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+/* ------------------------------------------------------------------- */
+/* 7. Shared item base                                                 */
+/* ------------------------------------------------------------------- */
+.macos-item {
+    display: flex;
+    align-items: center;
+    gap: var(--cal-gap-sm);
+    padding: 5px var(--cal-pad-x);
+    border-radius: var(--cal-radius);
+    border-left: 3px solid transparent;
+    transition: background-color 0.12s ease;
+}
+.macos-item:hover {
+    background-color: var(--background-modifier-hover);
+}
+
+.macos-item-time {
+    color: var(--text-muted);
+    font-size: var(--cal-fs-meta);
+    font-variant-numeric: tabular-nums;
+    min-width: 0;   /* let grid control width */
+}
+.macos-item-title {
+    color: var(--text-normal);
+    font-size: var(--cal-fs-title);
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------- */
+/* 8. Event rows — agenda grid + left color rail                       */
+/* ------------------------------------------------------------------- */
+.calendian-event-item {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 5px var(--cal-pad-x) 5px calc(var(--cal-pad-x) + 2px);
+    box-shadow: inset var(--cal-rail) 0 0 var(--cal-event-color, transparent);
+    cursor: pointer;
+    border-radius: 0 var(--radius-s) var(--radius-s) 0;
+    margin-right: 3px;
+}
+.calendian-event-item .macos-item-time {
+    flex-shrink: 0;
+    text-align: right;
+    padding-top: 0;
+}
+.calendian-event-item .macos-item-details {
+    flex: 1;
+    min-width: 0;
+}
+.calendian-event-item .macos-item-title {
+    flex: none;
+    width: 100%;
+    font-weight: 500;
+}
+
+/* Calendar name as muted subtitle — replaces the filled badge */
+.calendian-event-cal {
+    color: var(--text-faint);
+    font-size: var(--cal-fs-meta);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Retire the old filled badge inside event rows */
+.calendian-event-item .macos-item-badges {
+    display: none;
+}
+
+/* Event states */
+.calendian-event-past {
+    opacity: 0.45;
+}
+.macos-item-ongoing {
+    box-shadow: inset var(--cal-rail) 0 0 var(--interactive-accent);
+    background: color-mix(in srgb, var(--interactive-accent) 6%, transparent);
+}
+.macos-item-ongoing .macos-item-time {
+    color: var(--interactive-accent);
+    font-weight: 600;
+}
+.macos-item-soon {
+    border-left: none;
+    background: color-mix(in srgb, var(--interactive-accent) 6%, transparent);
+    box-shadow: inset var(--cal-rail) 0 0 var(--interactive-accent);
+}
+
+/* "soon" chip — small label next to title */
+.cal-soon-chip {
+    font-size: 0.85em;
+    color: var(--text-accent);
+    border: 1px solid color-mix(in srgb, var(--interactive-accent) 45%, transparent);
+    border-radius: calc(var(--cal-radius) * 2);
+    padding: 0 5px;
+    margin-left: 6px;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+/* All-day: the time cell reads "all-day" in a lighter style */
+.calendian-event-allday .macos-item-time {
+    font-variant-numeric: normal;
+    font-size: 0.92em;
+    color: var(--text-muted);
+}
+
+/* Override old all-day style */
+.macos-time-allday {
+    color: var(--text-muted);
+    font-style: normal;
+    font-weight: normal;
+}
+
+/* ------------------------------------------------------------------- */
+/* 9. Expanded event/reminder detail — nested, editorial                */
+/* ------------------------------------------------------------------- */
+.calendian-event-detail,
+.calendian-reminder-detail {
+    margin: 0 8px 4px 20px;
+    padding: 7px 10px;
+    border-left: 2px solid var(--background-modifier-border);
+    background: var(--background-primary-alt);
+    border-radius: 0 var(--radius-s) var(--radius-s) 0;
+    font-size: 0.82em;
+}
+.calendian-detail-field {
+    display: flex;
+    gap: 6px;
+    padding: 2px 0;
+    line-height: 1.45;
+}
+.calendian-detail-field strong {
+    color: var(--text-faint);
+    min-width: 52px;
+    flex-shrink: 0;
+    font-size: 0.9em;
+    font-weight: 500;
+}
+
+.calendian-detail-actions {
+    display: flex;
+    gap: var(--cal-gap-sm);
+    margin-top: var(--cal-gap-sm);
+    border-top: 1px solid var(--background-modifier-border);
+    padding-top: var(--cal-gap-sm);
+}
+
+/* Action buttons — horizontal flex row, evenly spaced */
+.calendian-detail-actions {
+    display: flex !important;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--cal-gap-sm);
+    margin-top: var(--cal-gap-sm);
+    border-top: 1px solid var(--background-modifier-border);
+    padding-top: var(--cal-gap-sm);
+}
+.calendian-detail-actions .macos-refresh-btn {
+    display: inline-flex;
+    align-items: center;
+    font-size: var(--cal-fs-meta);
+    padding: 3px 10px;
+    height: auto;
+    line-height: 1.4;
+    cursor: pointer;
+    border-radius: var(--cal-radius);
+    color: var(--text-muted);
+    transition: background-color 0.12s, color 0.12s;
+    flex-shrink: 0;
+}
+.calendian-detail-actions .macos-refresh-btn:hover {
+    background-color: var(--background-modifier-hover);
+    color: var(--text-normal);
+}
+.calendian-detail-actions .calendian-action-danger {
     color: var(--text-error) !important;
-    font-weight: 700 !important;
+}
+.calendian-detail-actions .calendian-action-danger:hover {
+    background-color: color-mix(in srgb, var(--text-error) 12%, transparent) !important;
+}
+.calendian-detail-actions .calendian-action-copy {
+    color: var(--text-faint);
+}
+.calendian-detail-actions .calendian-action-copy:hover {
+    color: var(--text-muted);
+}
+
+/* ------------------------------------------------------------------- */
+/* 10. Reminder rows — checkbox + priority dot + due date              */
+/* ------------------------------------------------------------------- */
+.calendian-reminder-checkbox {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-faint);
+    cursor: pointer;
+    flex-shrink: 0;
+    border-radius: 50%;
+    font-size: 1em;
+    padding: 0 2px 0 0;
+}
+.calendian-reminder-checkbox:hover {
+    color: var(--text-muted);
+}
+.calendian-reminder-checkbox svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* Completed reminder */
+.calendian-reminder-completed .calendian-reminder-checkbox {
+    color: var(--interactive-accent);
+}
+.calendian-reminder-completed .macos-item-title {
+    text-decoration: line-through;
+    color: var(--text-faint);
+}
+
+/* Priority as quiet color dot — replaces "!!! / !! / !" */
+.calendian-priority-dot {
+    width: var(--cal-dot);
+    height: var(--cal-dot);
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.calendian-priority-high   { background: var(--color-red); }
+.calendian-priority-medium { background: var(--color-orange); }
+.calendian-priority-low    { background: var(--color-yellow); }
+
+/* Keep old priority classes working but add dot option */
+.macos-priority {
+    display: none;  /* hide old text-based "!!!" priority */
+}
+
+/* Due date for reminders */
+.calendian-reminder-due {
+    color: var(--text-muted);
+    font-size: var(--cal-fs-meta);
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+}
+
+/* Overdue styling */
+.calendian-reminder-overdue {
+    box-shadow: inset var(--cal-rail) 0 0 var(--color-red);
+    padding-left: calc(var(--cal-pad-x) + 2px);
+}
+.calendian-reminder-overdue .calendian-reminder-due {
+    color: var(--text-error);
+    font-weight: var(--font-semibold);
+}
+
+/* Retire list-name badge — keep it neutral if it still renders */
+.calendian-reminder-overdue .macos-item-badge,
+.macos-item .macos-item-badge {
+    display: none;
+}
+
+/* Overdue badge text — also retire, use color rail instead */
+.calendian-reminder-overdue-badge {
+    display: none;
+}
+
+/* Refined empty & item-empty states */
+.macos-empty {
+    text-align: center;
+    color: var(--text-faint);
+    font-size: 0.88em;
+    padding: 28px 12px;
+    font-style: normal;
+}
+.macos-item-empty {
+    color: var(--text-faint);
+    font-size: 0.82em;
+    padding: 6px var(--cal-pad-x) 8px;
+    font-style: normal;
+}
+
+/* ------------------------------------------------------------------- */
+/* 11. Reminder range selector                                         */
+/* ------------------------------------------------------------------- */
+.calendian-reminders-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--cal-gap-sm);
+}
+/* Section header inside reminders header — inline with range selector */
+.calendian-reminders-header .macos-section-header {
+    width: auto;
+    flex: none;
+    padding: 2px 0 6px;
+}
+.calendian-reminder-range-selector {
+    font-size: var(--cal-fs-meta);
+    color: var(--text-muted);
+    background: transparent;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--cal-radius);
+    padding: 1px 6px;
+    height: auto;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+/* ------------------------------------------------------------------- */
+/* 12. No-date reminders — <details> folding (no JS re-render)        */
+/* ------------------------------------------------------------------- */
+.calendian-reminder-nodate-section {
+    margin-top: 2px;
+}
+.calendian-reminder-nodate-section > summary {
+    list-style: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: var(--cal-pad-y) var(--cal-pad-x);
+    font-size: var(--cal-fs-meta);
+    color: var(--text-faint);
+}
+.calendian-reminder-nodate-section > summary::-webkit-details-marker {
+    display: none;
+}
+.calendian-reminder-nodate-section > summary .cal-chevron {
+    transition: transform 0.15s ease;
+    display: inline-flex;
+}
+.calendian-reminder-nodate-section > summary .cal-chevron svg {
+    width: 14px;
+    height: 14px;
+}
+.calendian-reminder-nodate-section[open] > summary .cal-chevron {
+    transform: rotate(90deg);
+}
+
+/* Old no-date header — retired in favor of <details> */
+.calendian-reminder-nodate-header {
+    display: none;
+}
+
+/* ------------------------------------------------------------------- */
+/* 13. Loading skeleton                                                */
+/* ------------------------------------------------------------------- */
+.calendian-skeleton-row {
+    display: grid;
+    grid-template-columns: var(--cal-time-col) 1fr;
+    column-gap: var(--cal-gap-sm);
+    padding: calc(var(--cal-pad-y) + 2px) var(--cal-pad-x);
+}
+.calendian-skeleton {
+    height: 12px;
+    border-radius: var(--cal-radius);
+    background: var(--background-modifier-hover);
+    animation: cal-pulse 1.4s ease-in-out infinite;
+}
+.calendian-skeleton.is-short {
+    width: 60%;
+}
+@keyframes cal-pulse {
+    0%, 100% { opacity: 0.45; }
+    50%      { opacity: 1; }
+}
+
+/* ------------------------------------------------------------------- */
+/* 14. Error / empty / permission states — buttons not divs            */
+/* ------------------------------------------------------------------- */
+.macos-cache-miss {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--cal-gap-sm);
+    text-align: center;
+    color: var(--text-muted);
+    font-size: var(--cal-fs-title);
+    padding: 20px 12px;
+}
+.macos-cache-miss .macos-today-btn {
+    font-size: var(--cal-fs-title);
+    padding: 4px 14px;
+    border-radius: var(--cal-radius);
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    cursor: pointer;
+    border: none;
+    transition: opacity 0.12s;
+}
+.macos-cache-miss .macos-today-btn:hover {
+    opacity: 0.85;
+}
+
+/* ------------------------------------------------------------------- */
+/* 15. Codeblock container — adaptive width                             */
+/* ------------------------------------------------------------------- */
+.calendian-block,
+.calendian-create-block {
+    max-width: 100%;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    padding: var(--cal-gap) 0 4px;
+    background: var(--background-primary-alt);
+    overflow: hidden;
+}
+
+/* Section label inside codeblock */
+.calendian-block .calendian-block-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px var(--cal-gap) 4px;
+    font-size: 0.68em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-faint);
+}
+.calendian-block .calendian-block-label::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--background-modifier-border);
+    margin-left: 4px;
+}
+
+/* Item row: flex with elastic title column */
+.calendian-block-item {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 5px var(--cal-gap);
+    padding-left: calc(var(--cal-gap) + 2px);
+    border-radius: 0 var(--radius-s) var(--radius-s) 0;
+    margin-right: 2px;
+    cursor: pointer;
+    transition: background-color 0.12s;
+}
+.calendian-block-item:hover {
+    background-color: var(--background-modifier-hover);
+}
+
+/* Event rows get a left color rail matching the calendar */
+.calendian-block-event {
+    box-shadow: inset 3px 0 0 var(--cal-event-color, var(--interactive-accent));
+}
+
+/* Columns */
+.calendian-block-date {
+    width: 50px;
+    flex-shrink: 0;
+    text-align: right;
+    font-size: 0.84em;
+    color: var(--text-faint);
+    font-variant-numeric: tabular-nums;
+    font-family: var(--font-monospace);
+}
+.calendian-block-icon {
+    width: 16px;
+    flex-shrink: 0;
+    text-align: center;
+    font-size: 0.88em;
+    color: var(--text-faint);
+}
+.calendian-block-title {
+    flex: 1;
+    min-width: 60px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.calendian-block-time {
+    width: 90px;
+    flex-shrink: 0;
+    text-align: right;
+    font-size: 0.84em;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    font-family: var(--font-monospace);
+}
+.calendian-block-time-allday {
+    font-family: var(--font-interface);
+    font-style: italic;
+    color: var(--text-faint);
+    letter-spacing: 0.01em;
+}
+.calendian-block-indicator {
+    width: 22px;
+    flex-shrink: 0;
+    text-align: center;
+    font-size: 0.84em;
+    color: var(--text-muted);
+}
+
+/* ------------------------------------------------------------------- */
+/* 16. Inline ref — single chip                                        */
+/* ------------------------------------------------------------------- */
+.calendian-inline-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    vertical-align: baseline;
+    padding: 1px 8px;
+    border-radius: 11px;
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+    font-size: var(--font-ui-smaller);
+    line-height: 1.5;
+    cursor: pointer;
+    transition: background-color 0.12s ease;
+}
+.calendian-inline-chip:hover {
+    background: var(--background-modifier-active-hover);
+}
+.calendian-inline-chip .cal-chip-icon {
+    color: var(--text-muted);
+    display: inline-flex;
+}
+.calendian-inline-chip .cal-chip-icon svg {
+    width: 13px;
+    height: 13px;
+}
+.calendian-inline-chip.calendian-inline-notfound {
+    opacity: 0.6;
+    font-style: italic;
 }

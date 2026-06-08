@@ -39,28 +39,37 @@ function renderCalendianBlock(plugin, source, el, ctx) {
 
         if (dayEvents.length === 0 && dayReminders.length === 0) {
             container.createDiv("calendian-block-empty").textContent = "No events or reminders for this date";
-            return;
+        } else {
+            _renderBlockContent(container, dayEvents, dayReminders, integ, plugin);
         }
 
-        if (dayEvents.length > 0) {
-            var evtLabel = container.createDiv("calendian-block-label");
-            evtLabel.textContent = "Events";
-            for (var i = 0; i < dayEvents.length; i++) {
-                renderEventItem(container, dayEvents[i], integ, plugin);
-            }
-        }
-
-        if (dayReminders.length > 0) {
-            var remLabel = container.createDiv("calendian-block-label");
-            remLabel.textContent = "Reminders";
-            for (var j = 0; j < dayReminders.length; j++) {
-                renderReminderItem(container, dayReminders[j], integ, plugin);
-            }
+        // Register live-update child — re-renders when schedule data changes
+        if (ctx && typeof ctx.addChild === "function") {
+            ctx.addChild(new CalendianBlockChild(container, plugin, targetDate));
         }
     } catch (err) {
         console.warn("[Calendian] Failed to render calendian code block:", err.message);
         el.createDiv("calendian-block-empty").textContent =
             "Calendian: unable to render (see console for details)";
+    }
+}
+
+/** Helper: render events/reminders into a container. Shared by initial render and live-update. */
+function _renderBlockContent(container, dayEvents, dayReminders, integ, plugin) {
+    if (dayEvents.length > 0) {
+        var evtLabel = container.createDiv("calendian-block-label");
+        evtLabel.textContent = "Events";
+        for (var i = 0; i < dayEvents.length; i++) {
+            renderEventItem(container, dayEvents[i], integ, plugin);
+        }
+    }
+
+    if (dayReminders.length > 0) {
+        var remLabel = container.createDiv("calendian-block-label");
+        remLabel.textContent = "Reminders";
+        for (var j = 0; j < dayReminders.length; j++) {
+            renderReminderItem(container, dayReminders[j], integ, plugin);
+        }
     }
 }
 
@@ -78,19 +87,21 @@ function renderEventItem(container, evt, integ, plugin) {
         if (em) timeStr += "-" + em.format("HH:mm");
     }
 
-    // Columns: date → title → time → badge → indicator
+    // Columns: date → title → time → indicator
     var item = container.createDiv("calendian-block-item calendian-block-event");
     item.createDiv("calendian-block-date").textContent = dateStr;
+
+    // Left color rail — calendar color
+    var calColor = evt.calendarColor || (evt.calendarName ? integ.calendarColors[evt.calendarName] : "");
+    if (calColor) {
+        var cssColor = integ.calendarToCSS(calColor);
+        if (cssColor) item.style.setProperty("--cal-event-color", cssColor);
+    }
+
     item.createDiv("calendian-block-title").textContent = evt.title || evt.summary || "";
     var timeEl = item.createDiv("calendian-block-time");
     timeEl.textContent = timeStr;
     if (isAllDay) timeEl.classList.add("calendian-block-time-allday");
-
-    var calName = evt.calendarName || evt.calendar || "";
-    var badge = item.createDiv("calendian-block-badge");
-    badge.textContent = calName;
-    var color = integ.calendarToCSS(integ.calendarColors[calName]);
-    if (color) { badge.style.backgroundColor = color; badge.style.color = "#fff"; }
 
     var ind = item.createDiv("calendian-block-indicator");
     ind.textContent = evt.isRecurring ? "⟳" : "";
@@ -105,7 +116,7 @@ function renderReminderItem(container, rem, integ, plugin) {
     var dateStr = dm ? dm.format("MM-DD") : "";
     var dueStr = reminderHasDueTime(rem) && dm ? (rem.dueTime || dm.format("HH:mm")) : "";
 
-    // Unified column order: date → icon → title → time → badge → indicators
+    // Columns: date → icon → title → time → indicator
     var item = container.createDiv("calendian-block-item calendian-block-reminder");
     item.createDiv("calendian-block-date").textContent = dateStr;
     var chkEl = item.createDiv("calendian-block-icon");
@@ -119,11 +130,7 @@ function renderReminderItem(container, rem, integ, plugin) {
     var timeEl = item.createDiv("calendian-block-time");
     timeEl.textContent = dueStr;
 
-    var listName = rem.listName || rem.list || "";
-    var badge = item.createDiv("calendian-block-badge");
-    badge.textContent = listName;
-
-    // Indicators
+    // Indicator
     if (rem.priority === "high") {
         item.createDiv("calendian-block-indicator").textContent = "!!!";
     } else {
@@ -142,6 +149,9 @@ function renderReminderItem(container, rem, integ, plugin) {
  * and replace them with an aligned table. Multiple refs in the same
  * paragraph share one table so columns align perfectly.
  *
+ * Even if an item is not found, render it as a grayed-out placeholder row.
+ * This helps users understand when a reference is broken vs. waiting for data.
+ *
  * Registered as registerMarkdownPostProcessor in CalendarPlugin.onload().
  */
 function renderCalendianInline(plugin, el, ctx) {
@@ -152,13 +162,15 @@ function renderCalendianInline(plugin, el, ctx) {
     var codes = el.querySelectorAll("code");
     var matches = [];
 
-    // Collect all matching codes
+    // Collect ALL matching codes (format: cal:ev:ID or cal:rem:ID)
+    // Skip refs when data hasn't loaded yet (keep raw <code> for next pass).
+    // After data loads, show placeholder for genuinely missing items.
     for (var i = 0; i < codes.length; i++) {
         var text = (codes[i].textContent || "").trim();
         var match = text.match(/^cal:(ev|rem):(.+)$/);
         if (!match) continue;
         var item = findItemById(integ, match[1], match[2]);
-        if (!item) continue;
+        if (!item && !integ._dataLoaded) continue; // data not ready yet — leave as-is
         matches.push({ code: codes[i], itemType: match[1], itemId: match[2], item: item });
     }
 
@@ -172,9 +184,9 @@ function renderCalendianInline(plugin, el, ctx) {
         attr: { title: "Click to navigate in Calendian" }
     });
 
-    // Fixed column widths via colgroup for guaranteed alignment
+    // Column widths — title flexes, others fixed: icon | date | title | time | ind
     var colgroup = table.createEl("colgroup");
-    var cols = ["24px", "68px", "130px", "160px", "90px", "28px"]; // icon, date, time, title, badge, ind
+    var cols = ["20px", "", "", "82px", "24px"]; // icon, date(flex), title(flex), time, ind
     for (var ci = 0; ci < cols.length; ci++) {
         var col = colgroup.createEl("col");
         if (cols[ci]) col.style.width = cols[ci];
@@ -184,9 +196,10 @@ function renderCalendianInline(plugin, el, ctx) {
     for (var r = 0; r < matches.length; r++) {
         var ref = matches[r];
         var tr = tbody.createEl("tr", {
-            cls: "calendian-inline-row" + (ref.itemType === "rem" ? " calendian-inline-reminder" : "")
+            cls: "calendian-inline-row" + (ref.itemType === "rem" ? " calendian-inline-reminder" : "") +
+                 (ref.item ? "" : " calendian-inline-notfound")
         });
-        buildInlineRow(tr, ref.item, ref.itemType, plugin);
+        buildInlineRow(tr, ref.item, ref.itemType, ref.itemId, plugin);
     }
 
     // Replace the first code element with the table, remove the rest
@@ -195,18 +208,47 @@ function renderCalendianInline(plugin, el, ctx) {
         var c = matches[x].code;
         if (c.parentNode) c.parentNode.removeChild(c);
     }
+
+    // Register live-update child — re-renders rows when schedule data changes
+    if (ctx && typeof ctx.addChild === "function") {
+        var childMatches = matches.map(function(m) {
+            return { itemType: m.itemType, itemId: m.itemId };
+        });
+        ctx.addChild(new CalendianInlineChild(table, plugin, childMatches));
+    }
 }
 
 /**
  * Build a <tr> row for an inline reference.
- * Columns: date | time | title | badge | indicators
- * No icon column — reminder ○/☑ merged into title.
+ * If item is null, shows a grayed-out "not found" placeholder.
+ * Columns: icon | date | time | title | badge | indicators
  */
-function buildInlineRow(tr, item, itemType, plugin) {
-    // Type icon
+function buildInlineRow(tr, item, itemType, itemId, plugin) {
+    // If item not found, render a placeholder row
+    if (!item) {
+        var tdIcon = tr.createEl("td", { cls: "calendian-inline-type" });
+        tdIcon.textContent = "—";
+
+        var tdDate = tr.createEl("td", { cls: "calendian-inline-date" });
+        tdDate.textContent = "—";
+
+        var tdTitle = tr.createEl("td", { cls: "calendian-inline-title" });
+        tdTitle.textContent = itemType === "ev" ? ("Event not found: " + itemId) : ("Reminder not found: " + itemId);
+
+        var tdTime = tr.createEl("td", { cls: "calendian-inline-time" });
+        tdTime.textContent = "—";
+
+        var tdInd = tr.createEl("td", { cls: "calendian-inline-indicators" });
+        tdInd.textContent = "?";
+
+        // Not clickable, not navigable
+        return;
+    }
+
+    // Type icon — use text symbols for wide compatibility
     var tdIcon = tr.createEl("td", { cls: "calendian-inline-type" });
     if (itemType === "rem") {
-        tdIcon.textContent = item.completed ? "✅" : "🔔";
+        tdIcon.textContent = item.completed ? "☑" : "○";
     } else {
         tdIcon.textContent = "📅";
     }
@@ -220,22 +262,16 @@ function buildInlineRow(tr, item, itemType, plugin) {
         tdDate.textContent = d2 ? window.moment(d2).format("MM-DD") : "";
     }
 
-    // Title — with ○/☑ prefix for reminders
-    var prefix = "";
-    if (itemType === "rem" && item.completed) {
-        prefix = "☑ ";
-    } else if (itemType === "rem") {
-        prefix = "○ ";
-    }
+    // Title
     var tdTitle = tr.createEl("td", { cls: "calendian-inline-title" });
-    tdTitle.textContent = prefix + (item.title || item.summary || item.name || "");
+    tdTitle.textContent = item.title || item.summary || item.name || "";
 
     // Time
     var tdTime = tr.createEl("td", { cls: "calendian-inline-time" });
     if (itemType === "ev") {
         var isAllDay = item.isAllDay !== undefined ? item.isAllDay : item.allday;
         if (isAllDay) {
-            tdTime.textContent = "All day";
+            tdTime.textContent = "all-day";
             tdTime.classList.add("calendian-inline-time-allday");
         } else if (item.start) {
             var t = window.moment(item.start).format("HH:mm");
@@ -247,14 +283,10 @@ function buildInlineRow(tr, item, itemType, plugin) {
         tdTime.textContent = d && reminderHasDueTime(item) ? (item.dueTime || window.moment(d).format("HH:mm")) : "";
     }
 
-    // Badge
-    var tdBadge = tr.createEl("td", { cls: "calendian-inline-badge" });
-    tdBadge.textContent = itemType === "ev" ? (item.calendarName || item.calendar || "") : (item.listName || item.list || "");
-
     // Indicators
     var inds = [];
-    if (itemType === "rem" && item.priority === "high") inds.push("!!!");
     if (itemType === "ev" && item.isRecurring) inds.push("⟳");
+    if (itemType === "rem" && item.priority === "high") inds.push("!");
     var tdInd = tr.createEl("td", { cls: "calendian-inline-indicators" });
     tdInd.textContent = inds.join(" ");
 
@@ -335,25 +367,83 @@ function navigateToDate(date, plugin, itemId) {
     }
 }
 
-// ── Note re-render helper ───────────────────────────────────────────
+// ── Live-update render children ─────────────────────────────────────
 
 /**
- * Force re-render of all open MarkdownViews so that inline `cal:ev:ID` /
- * `cal:rem:ID` post-processors re-run with fresh cache data.
- * Called after data changes (init/render) and after cc block creation.
+ * MarkdownRenderChild for inline `cal:ev:ID` / `cal:rem:ID` tables.
+ * Listens for calendian:schedule-changed and re-renders rows with fresh data.
  */
-function triggerNoteRerender(plugin) {
+var CalendianInlineChild = class extends obsidian.MarkdownRenderChild {
+    constructor(containerEl, plugin, matches) {
+        super(containerEl);
+        this.plugin = plugin;
+        this.matches = matches; // [{ itemType, itemId }]
+        this._handler = this._onScheduleChanged.bind(this);
+    }
+    onload() {
+        document.addEventListener("calendian:schedule-changed", this._handler);
+    }
+    onunload() {
+        document.removeEventListener("calendian:schedule-changed", this._handler);
+    }
+    _onScheduleChanged() {
+        var integ = this.plugin.view && this.plugin.view.macosIntegration;
+        if (!integ || !integ._dataLoaded) return;
+        var tbody = this.containerEl.querySelector("tbody");
+        if (!tbody) return;
+        tbody.empty();
+        for (var i = 0; i < this.matches.length; i++) {
+            var ref = this.matches[i];
+            var item = findItemById(integ, ref.itemType, ref.itemId);
+            var tr = tbody.createEl("tr", {
+                cls: "calendian-inline-row" + (ref.itemType === "rem" ? " calendian-inline-reminder" : "") +
+                     (item ? "" : " calendian-inline-notfound")
+            });
+            buildInlineRow(tr, item, ref.itemType, ref.itemId, this.plugin);
+        }
+    }
+};
+
+/**
+ * MarkdownRenderChild for ```calendian``` code blocks.
+ * Listens for calendian:schedule-changed and re-renders the day's events/reminders.
+ */
+var CalendianBlockChild = class extends obsidian.MarkdownRenderChild {
+    constructor(containerEl, plugin, targetDate) {
+        super(containerEl);
+        this.plugin = plugin;
+        this.targetDate = targetDate;
+        this._handler = this._onScheduleChanged.bind(this);
+    }
+    onload() {
+        document.addEventListener("calendian:schedule-changed", this._handler);
+    }
+    onunload() {
+        document.removeEventListener("calendian:schedule-changed", this._handler);
+    }
+    _onScheduleChanged() {
+        var integ = this.plugin.view && this.plugin.view.macosIntegration;
+        if (!integ || !integ._dataLoaded) return;
+        var dayEvents = integ.getEventsForDate(this.targetDate) || [];
+        var dayReminders = integ.getRemindersForDate(this.targetDate) || [];
+        this.containerEl.empty();
+        if (dayEvents.length === 0 && dayReminders.length === 0) {
+            this.containerEl.createDiv("calendian-block-empty").textContent = "No events or reminders for this date";
+            return;
+        }
+        _renderBlockContent(this.containerEl, dayEvents, dayReminders, integ, this.plugin);
+    }
+};
+
+// ── Schedule change notification ────────────────────────────────────
+
+/**
+ * Notify all Calendian MarkdownRenderChild instances that schedule data changed.
+ * Called after data loads and refreshes.
+ */
+function notifyScheduleChanged() {
     try {
-        plugin.app.workspace.iterateAllLeaves(function(leaf) {
-            if (leaf.view && leaf.view.getViewType && leaf.view.getViewType() === "markdown") {
-                try {
-                    // Reading mode: rerender the preview
-                    if (leaf.view.previewMode && leaf.view.previewMode.rerender) {
-                        leaf.view.previewMode.rerender();
-                    }
-                } catch (e) {}
-            }
-        });
+        document.dispatchEvent(new CustomEvent("calendian:schedule-changed"));
     } catch (e) {}
 }
 
@@ -867,8 +957,6 @@ async function createEventFromFields(integ, plugin, fields, ctx, el, btn, errorE
         // Refresh data FIRST so the item is in cache when the post-processor re-runs
         await integ.init(true);
         await replaceBlockWithInlineRef(plugin, ctx, el, result.id, "event");
-        // Force note re-render so the inline ref renders immediately
-        triggerNoteRerender(plugin);
     } else {
         errorEl.textContent = "Failed to create event.";
         errorEl.style.display = "block";
@@ -921,8 +1009,6 @@ async function createReminderFromFields(integ, plugin, fields, ctx, el, btn, err
         // Refresh data FIRST so the item is in cache when the post-processor re-runs
         await integ.init(true);
         await replaceBlockWithInlineRef(plugin, ctx, el, result.id, "reminder");
-        // Force note re-render so the inline ref renders immediately
-        triggerNoteRerender(plugin);
     } else {
         errorEl.textContent = "Failed to create reminder.";
         errorEl.style.display = "block";

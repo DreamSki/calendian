@@ -145,8 +145,11 @@ MacOSIntegration.prototype.preloadAll = async function() {
 
         try {
             var startMs = Date.now();
+            // Always fetch all events from helper — JS-side filtering in getEventsForDate
+            // handles name/ID matching. Passing names to helper fails because helper
+            // matches against UUIDs, not display names. (REQ-FILTER-001)
             var args = ['events', fromISO, toISO];
-            if (filterIds.length > 0) { args = args.concat(filterIds); }
+            // NOTE: filterIds intentionally NOT passed to helper — see above
             var rawEvents = await this.execHelper(args);
             console.log("[Calendian] EventKit events completed in " + (Date.now() - startMs) + "ms, " + rawEvents.length + " events");
 
@@ -203,8 +206,10 @@ MacOSIntegration.prototype.preloadReminders = async function() {
         var filterIds = opts.selectedReminderListIds || [];
 
         try {
+            // Always fetch all reminders from helper — JS-side filtering in getRemindersForDate
+            // handles name/ID matching. (REQ-FILTER-001)
             var args = ['reminders', fromISO, toISO];
-            if (filterIds.length > 0) { args = args.concat(filterIds); }
+            // NOTE: filterIds intentionally NOT passed to helper
             var rawReminders = await this.execHelper(args);
 
             var reminders = [];
@@ -229,8 +234,8 @@ MacOSIntegration.prototype.preloadReminders = async function() {
             }
             // Fetch no-due-date reminders and merge
             try {
+                // Same as above: don't pass filter names to helper (REQ-FILTER-001)
                 var nodateArgs = ['reminders-nodate'];
-                if (filterIds.length > 0) { nodateArgs = nodateArgs.concat(filterIds); }
                 var rawNoDate = await this.execHelper(nodateArgs);
                 for (var j = 0; j < rawNoDate.length; j++) {
                     var nd = rawNoDate[j];

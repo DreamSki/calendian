@@ -6961,6 +6961,7 @@ class MacOSIntegration {
         this.plugin = plugin;
         this.refreshTimer = null;
         this.eventsPanelEl = null;
+        this._dataLoaded = false;
         this.selectedDate = window.moment();
         // Native helper binary path (EventKit, much faster than JXA)
         this.helperPath = plugin.helperPath || null;
@@ -7092,7 +7093,7 @@ class MacOSIntegration {
         if (forceRefresh) {
             console.log("[Calendian] Force refresh — loading fresh data from helper...");
             this.renderSyncing();
-            this.initBackground(initStart, true);
+            await this.initBackground(initStart, true);
             return;
         }
 
@@ -7108,6 +7109,8 @@ class MacOSIntegration {
             this.lastRefreshDurationMs = Date.now() - initStart;
             this.render();
             this.notifyDueItems();
+            this._dataLoaded = true;
+            if (typeof notifyScheduleChanged === "function") notifyScheduleChanged();
 
             // Phase 2: Only background refresh if cache is stale
             if (this.isCacheFresh()) {
@@ -7143,9 +7146,11 @@ class MacOSIntegration {
         this.lastRefreshDurationMs = Date.now() - initStart;
         this.notifyDueItems();
         this.render();
+        this._dataLoaded = true;
+        if (typeof notifyScheduleChanged === "function") notifyScheduleChanged();
     }
 
-    // Refresh from JXA in background (used when cache already shown)
+    // Background refresh via helper (used when cache already shown)
     async refreshInBackground() {
         if (this._refreshRunning) { console.log("[Calendian] Background refresh skipped (refresh already running)"); return; }
         this._refreshRunning = true;
@@ -7162,8 +7167,13 @@ class MacOSIntegration {
         this._refreshRunning = false;
         this.lastRefreshTime = new Date().toISOString();
         this.lastRefreshDurationMs = Date.now() - start;
+        this._dataLoaded = true;
+        if (typeof notifyScheduleChanged === "function") notifyScheduleChanged();
+        this.render();
         this.notifyDueItems();
         this.render();
+        this._dataLoaded = true;
+        if (typeof notifyScheduleChanged === "function") notifyScheduleChanged();
     }
 
     // Render syncing state (shown during first-ever load)
@@ -7182,12 +7192,19 @@ class MacOSIntegration {
         this.render();
     }
 
-    // --- Render loading state ---
+    // --- Render loading state (skeleton placeholder) ---
     renderLoading() {
         if (!this.eventsPanelEl) return;
         this.eventsPanelEl.empty();
         const loadingEl = this.eventsPanelEl.createDiv("macos-loading");
-        loadingEl.textContent = "Loading events & reminders...";
+        loadingEl.textContent = "Loading…";
+
+        // Skeleton rows — pulse placeholders matching the agenda layout
+        for (var i = 0; i < 4; i++) {
+            var row = this.eventsPanelEl.createDiv("calendian-skeleton-row");
+            row.createDiv("calendian-skeleton");                          // time column
+            row.createDiv("calendian-skeleton" + (i % 2 ? " is-short" : "")); // title column
+        }
     }
 
     // --- Check if event is within cached range ---
@@ -7365,6 +7382,11 @@ class MacOSIntegration {
     // --- Render the panel ---
     render() {
         if (!this.eventsPanelEl) return;
+
+        // Save scroll position before clearing (prevents jump-to-top on refresh)
+        var scroller = this.eventsPanelEl;
+        var savedScrollTop = scroller.scrollTop;
+
         this.eventsPanelEl.empty();
 
         const opts = this.plugin.options || {};
@@ -7414,52 +7436,22 @@ class MacOSIntegration {
             return;
         }
 
-        // REQ-UX-010: Today summary bar — quick glance at today's counts
         const today = window.moment();
         const isToday = this.selectedDate.isSame(today, "day");
-        const todayEvents = this.getEventsForDate(today);
-        // Count all incomplete reminders (with or without due date)
-        var todayReminderCount = 0;
-        for (var ri = 0; ri < this.allReminders.length; ri++) {
-            if (!this.allReminders[ri].completed) todayReminderCount++;
-        }
-        var overdueCount = 0;
-        var nowTs = Date.now();
-        for (var oi = 0; oi < this.allReminders.length; oi++) {
-            var r = this.allReminders[oi];
-            if (!r.completed && r.due && r.due.getTime() < nowTs) overdueCount++;
-        }
-        const summaryBar = this.eventsPanelEl.createDiv("macos-today-summary");
-        const summaryText = summaryBar.createDiv("macos-today-summary-text");
-        var parts = [];
-        parts.push(todayEvents.length + " events");
-        parts.push(todayReminderCount + " reminders");
-        if (overdueCount > 0) parts.push(overdueCount + " overdue");
-        summaryText.textContent = "📅 Today · " + parts.join(" · ");
-        if (!isToday) {
-            summaryBar.addClass("macos-clickable");
-            summaryBar.setAttribute("title", "Click to go to today");
-            summaryBar.addEventListener("click", () => {
-                this.selectedDate = window.moment();
-                this.render();
-                if (this.calendarComponent) {
-                    this.calendarComponent.$set({ displayedMonth: window.moment() });
-                }
-            });
-        }
 
-        // Date header row with refresh button
+        // Date header row — date label + optional back-to-today dot, toolbar on right
         const headerRow = this.eventsPanelEl.createDiv("macos-date-header-row");
         const dateLabel = headerRow.createDiv("macos-date-label");
         if (isToday) {
-            dateLabel.textContent = "Today · " + this.selectedDate.format("YYYY-MM-DD");
+            dateLabel.textContent = "Today · " + this.selectedDate.format("MMM D");
         } else {
-            dateLabel.textContent = this.selectedDate.format("dddd, MMM D, YYYY");
-        }
-        if (!isToday) {
-            const todayBtn = headerRow.createDiv("macos-today-btn");
-            todayBtn.textContent = "← Today";
-            todayBtn.addEventListener("click", () => {
+            dateLabel.textContent = this.selectedDate.format("MMM D (ddd)");
+            // Small circle button to jump back to today
+            const todayDot = headerRow.createDiv("calendian-today-dot");
+            todayDot.setAttribute("aria-label", "Back to today");
+            try { obsidian.setIcon(todayDot, "dot"); } catch(e) { todayDot.textContent = "●"; }
+            todayDot.addEventListener("click", (e) => {
+                e.stopPropagation();
                 this.selectedDate = window.moment();
                 this.render();
                 if (this.calendarComponent) {
@@ -7467,37 +7459,32 @@ class MacOSIntegration {
                 }
             });
         }
-        // REQ-CACHE-006: Manual refresh button
-        const refreshBtn = headerRow.createDiv("macos-refresh-btn");
-        refreshBtn.textContent = "↻";
-        refreshBtn.setAttribute("title", "Refresh calendar data");
-        refreshBtn.addEventListener("click", () => { this.init(true); });
 
-        // v0.3: Create buttons (REQ-WRITE-001, REQ-WRITE-006, REQ-NL-001)
+        // Toolbar buttons — inside the header row, pushed to the right
+        const toolbarBtns = headerRow.createDiv("calendian-toolbar");
+
+        const iconBtn = function(icon, label, fn) {
+            var b = toolbarBtns.createDiv("calendian-toolbar-btn");
+            b.setAttribute("aria-label", label);
+            try { obsidian.setIcon(b, icon); } catch(e) { b.textContent = label; }
+            b.addEventListener("click", fn);
+            return b;
+        };
+
+        // Refresh button
+        iconBtn("refresh-cw", "Refresh", () => { this.init(true); });
+
+        // Create buttons (only when permission is granted)
         if (showCal && calPerm === 'granted') {
-            const addEventBtn = headerRow.createDiv("macos-refresh-btn");
-            addEventBtn.textContent = "+Event";
-            addEventBtn.setAttribute("title", "Create event on " + this.selectedDate.format("YYYY-MM-DD"));
-            addEventBtn.style.marginLeft = "4px";
-            addEventBtn.addEventListener("click", () => {
+            iconBtn("calendar-plus", "New event", () => {
                 new EventCreateModal(this.plugin.app, this).open();
             });
-
-            // Quick-create with NL parsing (REQ-NL-001)
-            const quickBtn = headerRow.createDiv("macos-refresh-btn");
-            quickBtn.textContent = "⚡";
-            quickBtn.setAttribute("title", "Quick create with natural language (e.g. \"tomorrow 3pm meeting\")");
-            quickBtn.style.marginLeft = "2px";
-            quickBtn.addEventListener("click", () => {
+            iconBtn("zap", "Quick create", () => {
                 new QuickEventModal(this.plugin.app, this).open();
             });
         }
         if (showRem && remPerm === 'granted') {
-            const addRemBtn = headerRow.createDiv("macos-refresh-btn");
-            addRemBtn.textContent = "+Remind";
-            addRemBtn.setAttribute("title", "Create reminder");
-            addRemBtn.style.marginLeft = "4px";
-            addRemBtn.addEventListener("click", () => {
+            iconBtn("bell-plus", "New reminder", () => {
                 new ReminderCreateModal(this.plugin.app, this).open();
             });
         }
@@ -7565,16 +7552,16 @@ class MacOSIntegration {
 
         // v0.5: Clear highlight after render (one-shot, auto-cleared on next render)
         if (this._highlightedItemId) {
-            var self = this;
+            const renderSelf = this;
             clearTimeout(this._highlightTimer);
             this._highlightTimer = setTimeout(function() {
-                self._highlightedItemId = null;
+                renderSelf._highlightedItemId = null;
             }, 3000);
         }
 
-        // Re-render open notes so inline cal:ev:ID / cal:rem:ID refs update with fresh data
-        if (typeof triggerNoteRerender === "function") {
-            triggerNoteRerender(this.plugin);
+        // Restore scroll position (prevents jump-to-top on data refresh)
+        if (scroller && savedScrollTop > 0) {
+            scroller.scrollTop = savedScrollTop;
         }
     }
 
@@ -7612,12 +7599,15 @@ class MacOSIntegration {
     // REQ-CAL-011: Recurring event read-only indicator
     renderEventsSection(parent, events) {
         const sectionEl = parent.createDiv("macos-section");
+        sectionEl.setAttribute("data-section", "events");
         const headerEl = sectionEl.createDiv("macos-section-header");
-        headerEl.textContent = "Calendar Events";
+        headerEl.textContent = "Events";
+
+        console.log("[Calendian] renderEventsSection: " + events.length + " events for " + this.selectedDate.format("YYYY-MM-DD"));
 
         if (events.length === 0) {
             const emptyEl = sectionEl.createDiv("macos-item-empty");
-            emptyEl.textContent = "No events for this day";
+            emptyEl.textContent = "No events";
             return;
         }
 
@@ -7638,8 +7628,15 @@ class MacOSIntegration {
             }
             if (pastDisplay === 'hidden' && isPast) continue;
 
-            const itemEl = sectionEl.createDiv("macos-item");
-            itemEl.addClass("calendian-event-item");
+            var calName = evt.calendarName || evt.calendar || "";
+            var calColor = evt.calendarColor || (calName ? this.calendarColors[calName] : "");
+            var itemEl = sectionEl.createDiv("macos-item calendian-event-item");
+            itemEl.setAttribute("data-source", "event");
+            if (evt.id) itemEl.setAttribute("data-id", evt.id);
+
+            // Left color rail — always have a color, fallback to accent
+            var cssColor = calColor ? this.calendarToCSS(calColor) : "var(--interactive-accent)";
+            itemEl.style.setProperty("--cal-event-color", cssColor);
 
             // REQ-CAL-010: Dim past events
             if (isPast && pastDisplay === 'dimmed') {
@@ -7651,6 +7648,11 @@ class MacOSIntegration {
                 itemEl.addClass("calendian-item-highlight");
             }
 
+            // All-day class
+            if (isAllDay) {
+                itemEl.addClass("calendian-event-allday");
+            }
+
             // Highlight: starting soon or ongoing
             if (this.isStartingSoon(evt)) {
                 itemEl.addClass("macos-item-soon");
@@ -7658,20 +7660,27 @@ class MacOSIntegration {
                 itemEl.addClass("macos-item-ongoing");
             }
 
-            // Time column
+            // Time column (fixed-width, tabular numbers)
             const timeEl = itemEl.createDiv("macos-item-time");
             if (isAllDay) {
-                timeEl.textContent = "All day";
+                timeEl.textContent = "all-day";
                 timeEl.addClass("macos-time-allday");
             } else if (evt.start) {
                 timeEl.textContent = this.formatTimeRange(evt.start, evt.end);
             }
 
-            // Title + optional details column
+            // Title + subtitle column
             const detailsCol = itemEl.createDiv("macos-item-details");
             const titleRow = detailsCol.createDiv("calendian-event-title-row");
             const titleEl = titleRow.createDiv("macos-item-title");
             titleEl.textContent = evt.title || evt.summary || "";
+
+            // "soon" chip — small label next to title
+            if (this.isStartingSoon(evt)) {
+                const chip = titleRow.createSpan("cal-soon-chip");
+                var minLeft = Math.round((evt.start.getTime() - now.getTime()) / 60000);
+                chip.textContent = minLeft <= 1 ? "now" : ("in " + minLeft + "m");
+            }
 
             // REQ-CAL-011: Recurring event indicator (read-only)
             if (evt.isRecurring) {
@@ -7680,34 +7689,15 @@ class MacOSIntegration {
                 recEl.setAttribute("title", evt.recurrenceSummary || "Recurring event");
             }
 
-            // Inline meta: location and recurrence summary shown inline
-            if (evt.location) {
-                const locEl = detailsCol.createDiv("macos-item-meta");
-                locEl.textContent = "📍 " + evt.location;
-                locEl.addClass("macos-meta-location");
-            }
-            if (evt.isRecurring && evt.recurrenceSummary) {
-                const recEl = detailsCol.createDiv("macos-item-meta");
-                recEl.textContent = "↻ " + evt.recurrenceSummary;
-                recEl.addClass("macos-meta-recurring");
+            // Calendar name as muted subtitle
+            if (calName) {
+                var subEl = detailsCol.createDiv("calendian-event-cal");
+                subEl.textContent = calName;
             }
 
             // REQ-CAL-008: Click to expand/collapse detail panel
             let evtId = evt.id || (evt.title + "-" + (evt.start ? evt.start.getTime() : i));
             var self = this;
-
-            // Calendar badge with color
-            var calName = evt.calendarName || evt.calendar || "";
-            const badgeRow = itemEl.createDiv("macos-item-badges");
-            if (calName) {
-                const badgeEl = badgeRow.createDiv("macos-item-badge");
-                badgeEl.textContent = calName;
-                const color = this.calendarToCSS(this.calendarColors[calName]);
-                if (color) {
-                    badgeEl.style.backgroundColor = color;
-                    badgeEl.style.color = "#fff";
-                }
-            }
 
             itemEl.addEventListener("click", function(e) {
                 if (self._expandedEvents.has(evtId)) {
@@ -7725,7 +7715,7 @@ class MacOSIntegration {
                 detailEl.className = "calendian-event-detail";
                 itemEl.after(detailEl);
 
-                // Location
+                // Location (shown in detail when present)
                 if (evt.location) {
                     var field = detailEl.createDiv("calendian-event-detail-field");
                     field.createEl("strong").textContent = "Location";
@@ -7775,7 +7765,7 @@ class MacOSIntegration {
                     field.appendText(": " + evt.recurrenceSummary);
                 }
 
-                // v0.4: Edit/Delete action buttons (REQ-WRITE-011, REQ-WRITE-012)
+                // v0.4: Edit/Delete/Copy action buttons in one row
                 if (!evt.isDisplayOnly && evt.id) {
                     var actionsEl = detailEl.createDiv("calendian-detail-actions");
 
@@ -7812,6 +7802,14 @@ class MacOSIntegration {
                         }
                         self.confirmDeleteEvent(evt);
                     });
+
+                    // Copy ref button (in the same row)
+                    var copyBtn = actionsEl.createDiv("macos-refresh-btn calendian-action-copy");
+                    copyBtn.textContent = "Copy ref";
+                    copyBtn.addEventListener("click", function(e) {
+                        e.stopPropagation();
+                        self.copyItemText(evt, "event");
+                    });
                 }
 
                 // v0.5: Associated notes (REQ-NOTE-001, REQ-NOTE-003)
@@ -7833,16 +7831,6 @@ class MacOSIntegration {
                         })(noteInfo.path));
                     }
                 }
-                // v0.5: Copy inline ref (REQ-NOTE-009)
-                if (evt.id && !evt.isDisplayOnly) {
-                    var noteActionsEl = detailEl.createDiv("calendian-detail-actions");
-                    var copyBtn = noteActionsEl.createDiv("macos-refresh-btn calendian-action-copy");
-                    copyBtn.textContent = "📋 Copy ref";
-                    copyBtn.addEventListener("click", function(e) {
-                        e.stopPropagation();
-                        self.copyItemText(evt, "event");
-                    });
-                }
             }
         }
     }
@@ -7853,6 +7841,9 @@ class MacOSIntegration {
         const self = this;
         const opts = this.plugin.options || {};
         const sectionEl = parent.createDiv("macos-section");
+        sectionEl.setAttribute("data-section", "reminders");
+
+        console.log("[Calendian] renderRemindersSection: " + reminders.length + " dated + " + (noDateReminders ? noDateReminders.length : 0) + " no-date reminders");
 
         // REQ-REM-007: Header with inline range selector
         const headerRow = sectionEl.createDiv("calendian-reminders-header");
@@ -7889,6 +7880,15 @@ class MacOSIntegration {
             return 0;
         });
 
+        // Helper: safely set an icon on an element, fallback to emoji
+        function setReminderIcon(el, completed) {
+            try {
+                obsidian.setIcon(el, completed ? "check-circle-2" : "circle");
+            } catch(e) {
+                el.textContent = completed ? "☑" : "○";
+            }
+        }
+
         if (sortedReminders.length === 0 && (!noDateReminders || noDateReminders.length === 0)) {
             const emptyEl = sectionEl.createDiv("macos-item-empty");
             emptyEl.textContent = "No reminders";
@@ -7899,8 +7899,10 @@ class MacOSIntegration {
         for (let i = 0; i < sortedReminders.length; i++) {
             const rem = sortedReminders[i];
             const itemEl = sectionEl.createDiv("macos-item");
+            itemEl.setAttribute("data-source", "reminder");
+            if (rem.id) itemEl.setAttribute("data-id", rem.id);
 
-            // REQ-REM-005: Overdue detection and styling
+            // REQ-REM-005: Overdue detection and styling (color rail + red due text via CSS)
             var isOverdue = rem.due && rem.due < todayStart;
             if (isOverdue) {
                 itemEl.addClass("calendian-reminder-overdue");
@@ -7919,11 +7921,11 @@ class MacOSIntegration {
             // Checkbox + title (v0.4: clickable checkbox for completion toggle, REQ-WRITE-016)
             if (!rem.isDisplayOnly && rem.id) {
                 var checkbox = itemEl.createDiv("calendian-reminder-checkbox");
-                checkbox.textContent = rem.completed ? "☑" : "○";
                 checkbox.setAttribute("title", rem.completed ? "Mark incomplete" : "Mark complete");
                 checkbox._reminder = rem;         // back-reference for closure-free click handler
                 checkbox._self = self;            // ditto
                 checkbox._itemEl = itemEl;        // ditto
+                setReminderIcon(checkbox, rem.completed);
                 checkbox.addEventListener("click", function(e) {
                     e.stopPropagation();
                     var me = e.currentTarget;
@@ -7934,14 +7936,15 @@ class MacOSIntegration {
                     if (meSelf._togglingReminders[rid]) return;
                     meSelf._togglingReminders[rid] = true;
 
-                    me.textContent = "◌";
+                    // Loading spinner
+                    try { obsidian.setIcon(me, "loader"); } catch(e) { me.textContent = "◌"; }
                     me.style.opacity = "0.5";
 
                     meSelf.toggleReminder(meRem).then(function(result) {
                         meSelf._togglingReminders[rid] = false;
                         var newCompleted = !!(result && result.completed);
                         meRem.completed = newCompleted;
-                        me.textContent = newCompleted ? "☑" : "○";
+                        setReminderIcon(me, newCompleted);
                         me.style.opacity = "1";
                         me.setAttribute("title", newCompleted ? "Mark incomplete" : "Mark complete");
                         if (newCompleted) {
@@ -7951,7 +7954,7 @@ class MacOSIntegration {
                         }
                     }).catch(function(err) {
                         meSelf._togglingReminders[rid] = false;
-                        me.textContent = meRem.completed ? "☑" : "○";
+                        setReminderIcon(me, meRem.completed);
                         me.style.opacity = "1";
                         console.error("[Calendian] Toggle FAILED:", err.error?.message || err.stderr || err);
                         new obsidian.Notice("Failed to update reminder");
@@ -7960,30 +7963,21 @@ class MacOSIntegration {
             } else {
                 // Display-only: show status icon without click
                 var icon = itemEl.createDiv("calendian-reminder-checkbox");
-                icon.textContent = rem.completed ? "☑" : "○";
+                setReminderIcon(icon, rem.completed);
                 icon.style.cursor = "default";
             }
             const titleEl = itemEl.createDiv("macos-item-title");
             titleEl.textContent = (rem.title || rem.name || "");
 
-            // REQ-REM-005: Overdue badge
-            if (isOverdue) {
-                const overdueBadge = itemEl.createDiv("calendian-reminder-overdue-badge");
-                overdueBadge.textContent = "overdue";
-            }
-
-            // Priority indicator
+            // Priority — color dot replaces "!!!/!!/!" text
             if (rem.priority && rem.priority !== "none") {
-                const priorityEl = itemEl.createDiv("macos-priority");
+                const dotEl = itemEl.createDiv("calendian-priority-dot");
                 if (rem.priority === "high") {
-                    priorityEl.textContent = "!!!";
-                    priorityEl.addClass("macos-priority-high");
+                    dotEl.addClass("calendian-priority-high");
                 } else if (rem.priority === "medium") {
-                    priorityEl.textContent = "!!";
-                    priorityEl.addClass("macos-priority-medium");
+                    dotEl.addClass("calendian-priority-medium");
                 } else {
-                    priorityEl.textContent = "!";
-                    priorityEl.addClass("macos-priority-low");
+                    dotEl.addClass("calendian-priority-low");
                 }
             }
 
@@ -7996,12 +7990,8 @@ class MacOSIntegration {
                 }
             }
 
-            // List badge
-            var listName = rem.listName || rem.list || "";
-            if (listName) {
-                const badgeEl = itemEl.createDiv("macos-item-badge");
-                badgeEl.textContent = listName;
-            }
+            // List badge — retired, using color rail instead
+            // kept as hidden for backward compat
 
             // REQ-REM-010: Click-to-expand detail panel
             itemEl.addEventListener("click", function(e) {
@@ -8034,8 +8024,8 @@ class MacOSIntegration {
                 if (rem.priority && rem.priority !== "none") {
                     var prioField = detailEl.createDiv("calendian-event-detail-field");
                     prioField.createEl("strong").textContent = "Priority";
-                    var prioLabel = rem.priority === "high" ? "High (!!!)"
-                        : rem.priority === "medium" ? "Medium (!!)" : "Low (!)";
+                    var prioLabel = rem.priority === "high" ? "High"
+                        : rem.priority === "medium" ? "Medium" : "Low";
                     prioField.appendText(": " + prioLabel);
                 }
 
@@ -8115,9 +8105,6 @@ class MacOSIntegration {
             }
 
             // REQ-REM-009: Subtasks — render child reminders indented under parent
-            // TODO: Subtask display is data-dependent. The helper provides parentId field
-            // but does not yet populate it. Once the helper fetches subtasks, this code
-            // will find children by parentId and render them.
             var children = this.getSubtasksForReminder(rem);
             for (var j = 0; j < children.length; j++) {
                 var child = children[j];
@@ -8131,21 +8118,16 @@ class MacOSIntegration {
             }
         }
 
-        // REQ-REM-006: No-date reminders section
+        // REQ-REM-006: No-date reminders section — uses <details> for CSS-only folding
         if (noDateReminders && noDateReminders.length > 0) {
-            var nodateSection = sectionEl.createDiv("calendian-reminder-nodate-section");
+            var nodateSection = sectionEl.createEl("details", { cls: "calendian-reminder-nodate-section" });
+            nodateSection.setAttribute("open", ""); // expanded by default
 
-            // Collapsible header
-            var nodateHeader = nodateSection.createDiv("calendian-reminder-nodate-header");
-            nodateHeader.textContent = "▾ Reminders without due date (" + noDateReminders.length + ")";
-            var nodateList = nodateSection.createDiv("calendian-reminder-nodate-list");
-            nodateList.style.display = "block"; // expanded by default
-
-            nodateHeader.addEventListener("click", function() {
-                var isExpanded = nodateList.style.display !== "none";
-                nodateList.style.display = isExpanded ? "none" : "block";
-                nodateHeader.textContent = (isExpanded ? "▸" : "▾") + " Reminders without due date (" + noDateReminders.length + ")";
-            });
+            // Summary header
+            var nodateSummary = nodateSection.createEl("summary");
+            var chevronSpan = nodateSummary.createSpan("cal-chevron");
+            try { obsidian.setIcon(chevronSpan, "chevron-right"); } catch(e) { chevronSpan.textContent = "▸"; }
+            nodateSummary.appendText(" Reminders without due date (" + noDateReminders.length + ")");
 
             // Sort no-date: incomplete first, completed at bottom
             noDateReminders.sort(function(a, b) {
@@ -8155,22 +8137,22 @@ class MacOSIntegration {
             });
 
             for (var k = 0; k < noDateReminders.length; k++) {
-                (function(nr) {
-                var nrItemEl = nodateList.createDiv("macos-item");
+                var nr = noDateReminders[k];
+                var nrItemEl = nodateSection.createDiv("macos-item");
 
                 // Completed styling
                 if (nr.completed) {
                     nrItemEl.addClass("calendian-reminder-completed");
                 }
 
-                // v0.4: Clickable checkbox for no-date reminders
+                // Clickable checkbox for no-date reminders
                 if (!nr.isDisplayOnly && nr.id) {
                     var nrCheckbox = nrItemEl.createDiv("calendian-reminder-checkbox");
-                    nrCheckbox.textContent = nr.completed ? "☑" : "○";
                     nrCheckbox.setAttribute("title", nr.completed ? "Mark incomplete" : "Mark complete");
                     nrCheckbox._reminder = nr;
                     nrCheckbox._self = self;
                     nrCheckbox._itemEl = nrItemEl;
+                    setReminderIcon(nrCheckbox, nr.completed);
                     nrCheckbox.addEventListener("click", function(e) {
                         e.stopPropagation();
                         var me = e.currentTarget;
@@ -8181,14 +8163,14 @@ class MacOSIntegration {
                         if (meSelf._togglingReminders[rid]) return;
                         meSelf._togglingReminders[rid] = true;
 
-                        me.textContent = "◌";
+                        try { obsidian.setIcon(me, "loader"); } catch(e2) { me.textContent = "◌"; }
                         me.style.opacity = "0.5";
 
                         meSelf.toggleReminder(meRem).then(function(result) {
                             meSelf._togglingReminders[rid] = false;
                             var newCompleted = !!(result && result.completed);
                             meRem.completed = newCompleted;
-                            me.textContent = newCompleted ? "☑" : "○";
+                            setReminderIcon(me, newCompleted);
                             me.style.opacity = "1";
                             me.setAttribute("title", newCompleted ? "Mark incomplete" : "Mark complete");
                             if (newCompleted) {
@@ -8198,42 +8180,33 @@ class MacOSIntegration {
                             }
                         }).catch(function(err) {
                             meSelf._togglingReminders[rid] = false;
-                            me.textContent = meRem.completed ? "☑" : "○";
+                            setReminderIcon(me, meRem.completed);
                             me.style.opacity = "1";
                             console.error("[Calendian] Toggle FAILED (no-date):", err.error?.message || err.stderr || err);
                             new obsidian.Notice("Failed to update reminder");
                         });
                     });
                 } else {
-                    // Display-only icon
                     var nrIcon = nrItemEl.createDiv("calendian-reminder-checkbox");
-                    nrIcon.textContent = nr.completed ? "☑" : "○";
+                    setReminderIcon(nrIcon, nr.completed);
                     nrIcon.style.cursor = "default";
                 }
                 var nrTitleEl = nrItemEl.createDiv("macos-item-title");
                 nrTitleEl.textContent = (nr.title || nr.name || "");
 
+                // Priority — color dot
                 if (nr.priority && nr.priority !== "none") {
-                    const prEl = nrItemEl.createDiv("macos-priority");
+                    var prDotEl = nrItemEl.createDiv("calendian-priority-dot");
                     if (nr.priority === "high") {
-                        prEl.textContent = "!!!";
-                        prEl.addClass("macos-priority-high");
+                        prDotEl.addClass("calendian-priority-high");
                     } else if (nr.priority === "medium") {
-                        prEl.textContent = "!!";
-                        prEl.addClass("macos-priority-medium");
+                        prDotEl.addClass("calendian-priority-medium");
                     } else {
-                        prEl.textContent = "!";
-                        prEl.addClass("macos-priority-low");
+                        prDotEl.addClass("calendian-priority-low");
                     }
                 }
 
-                var nrListName = nr.listName || nr.list || "";
-                if (nrListName) {
-                    const nrBadgeEl = nrItemEl.createDiv("macos-item-badge");
-                    nrBadgeEl.textContent = nrListName;
-                }
-
-                // v0.4: Edit/Delete buttons for no-date reminders
+                // Edit/Delete buttons for no-date reminders
                 if (!nr.isDisplayOnly && nr.id) {
                     var nrActionsEl = nrItemEl.createDiv("calendian-item-actions");
                     var nrEditBtn = nrActionsEl.createDiv("macos-refresh-btn");
@@ -8249,7 +8222,6 @@ class MacOSIntegration {
                         self.confirmDeleteReminder(nr);
                     });
                 }
-                })(noDateReminders[k]);
             }
         }
     }
