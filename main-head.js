@@ -7713,7 +7713,7 @@ class MacOSIntegration {
                 }
 
                 // v0.5: Associated notes (REQ-NOTE-001, REQ-NOTE-003)
-                var associatedNotes = self.getAssociatedNotes(evt);
+                var associatedNotes = self.getAssociatedNotes(evt, "event");
                 if (associatedNotes.length > 0) {
                     var notesField = detailEl.createDiv("calendian-event-detail-field");
                     notesField.createEl("strong").textContent = "Linked Notes";
@@ -7920,9 +7920,7 @@ class MacOSIntegration {
 
             // v0.5: Associated notes indicator (REQ-NOTE-002, REQ-NOTE-003)
             if (!rem.isDisplayOnly && rem.id) {
-                var remNotes = self.getAssociatedNotes(rem);
-                // Show linked notes count, click to expand list
-                var remNotes = self.getAssociatedNotes(rem);
+                var remNotes = self.getAssociatedNotes(rem, "reminder");
                 if (remNotes.length > 0) {
                     var remNoteBtn = remActionsEl.createDiv("calendian-note-indicator");
                     remNoteBtn.textContent = "📝" + remNotes.length;
@@ -8400,14 +8398,14 @@ class CalendarView extends obsidian.ItemView {
         // Click day: single click = select date (show events), Cmd/Ctrl+click = open/create note
         const self = this;
 
-        // v0.5: Auto-rebuild every 30s — fresh body scan picks up new inline refs
+        // v0.5: Auto-rebuild association index every 60s to pick up new inline refs.
+        // Only re-renders if the index actually changed (dirty gate).
         setInterval(function() {
             if (self.macosIntegration) {
-                self.macosIntegration._bodyScanIndex = null;
                 self.macosIntegration._associationIndexDirty = true;
                 self.macosIntegration.render();
             }
-        }, 30000);
+        }, 60000);
         this.macosWrappedOnClickDay = (date, inNewSplit) => {
             // Always update the panel to show selected date's events (instant from cache)
             if (self.macosIntegration) {

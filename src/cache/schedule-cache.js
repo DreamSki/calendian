@@ -17,6 +17,7 @@ MacOSIntegration.prototype.loadEventsFromCache = async function() {
                     events.push(e);
                 }
                 this.allEvents = events;
+                this._itemLookupCache = null;  // invalidate reverse index
                 if (raw.colors) this.calendarColors = raw.colors;
                 if (raw.cacheStart) this.cacheStart = window.moment(raw.cacheStart);
                 if (raw.cacheEnd) this.cacheEnd = window.moment(raw.cacheEnd);
@@ -118,6 +119,7 @@ MacOSIntegration.prototype.loadRemindersFromCache = async function() {
                     reminders.push(r);
                 }
                 this.allReminders = reminders;
+                this._itemLookupCache = null;  // invalidate reverse index
                 this.permissionState.reminders = 'granted';
                 console.log("[Calendian] Loaded " + reminders.length + " reminders from disk cache");
                 return true;
@@ -174,6 +176,7 @@ MacOSIntegration.prototype.preloadAll = async function() {
             }
             this.calendarColors = colors;
             this.allEvents = events;
+            this._itemLookupCache = null;  // invalidate reverse index
             this.permissionState.calendar = 'granted';
             this.lastError.calendar = null;
             this.sourceCounts.calendars = Object.keys(colors).length;
@@ -183,7 +186,7 @@ MacOSIntegration.prototype.preloadAll = async function() {
             var errorType = this.classifyError(err);
             this.permissionState.calendar = errorType;
             this.lastError.calendar = { type: errorType, message: (err.stderr || err.error?.message || 'Unknown error'), timestamp: new Date().toISOString() };
-            if (errorType === 'permission_denied') { this.allEvents = []; }
+            if (errorType === 'permission_denied') { this.allEvents = []; this._itemLookupCache = null; }
         }
         this.isLoading.calendar = false;
     }
@@ -246,6 +249,7 @@ MacOSIntegration.prototype.preloadReminders = async function() {
                 console.warn("[Calendian] No-date reminders fetch failed:", nodateErr.stderr || nodateErr.message);
             }
             this.allReminders = reminders;
+            this._itemLookupCache = null;  // invalidate reverse index
             this.permissionState.reminders = 'granted';
             this.lastError.reminders = null;
             this.sourceCounts.reminderLists = this.countReminderLists(reminders);
@@ -255,7 +259,7 @@ MacOSIntegration.prototype.preloadReminders = async function() {
             var errorType = this.classifyError(err);
             this.permissionState.reminders = errorType;
             this.lastError.reminders = { type: errorType, message: (err.stderr || err.error?.message || 'Unknown error'), timestamp: new Date().toISOString() };
-            if (errorType === 'permission_denied') { this.allReminders = []; }
+            if (errorType === 'permission_denied') { this.allReminders = []; this._itemLookupCache = null; }
         }
         this.isLoading.reminders = false;
     }

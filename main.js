@@ -7713,7 +7713,7 @@ class MacOSIntegration {
                 }
 
                 // v0.5: Associated notes (REQ-NOTE-001, REQ-NOTE-003)
-                var associatedNotes = self.getAssociatedNotes(evt);
+                var associatedNotes = self.getAssociatedNotes(evt, "event");
                 if (associatedNotes.length > 0) {
                     var notesField = detailEl.createDiv("calendian-event-detail-field");
                     notesField.createEl("strong").textContent = "Linked Notes";
@@ -7920,9 +7920,7 @@ class MacOSIntegration {
 
             // v0.5: Associated notes indicator (REQ-NOTE-002, REQ-NOTE-003)
             if (!rem.isDisplayOnly && rem.id) {
-                var remNotes = self.getAssociatedNotes(rem);
-                // Show linked notes count, click to expand list
-                var remNotes = self.getAssociatedNotes(rem);
+                var remNotes = self.getAssociatedNotes(rem, "reminder");
                 if (remNotes.length > 0) {
                     var remNoteBtn = remActionsEl.createDiv("calendian-note-indicator");
                     remNoteBtn.textContent = "📝" + remNotes.length;
@@ -8425,6 +8423,7 @@ MacOSIntegration.prototype.loadEventsFromCache = async function() {
                     events.push(e);
                 }
                 this.allEvents = events;
+                this._itemLookupCache = null;  // invalidate reverse index
                 if (raw.colors) this.calendarColors = raw.colors;
                 if (raw.cacheStart) this.cacheStart = window.moment(raw.cacheStart);
                 if (raw.cacheEnd) this.cacheEnd = window.moment(raw.cacheEnd);
@@ -8526,6 +8525,7 @@ MacOSIntegration.prototype.loadRemindersFromCache = async function() {
                     reminders.push(r);
                 }
                 this.allReminders = reminders;
+                this._itemLookupCache = null;  // invalidate reverse index
                 this.permissionState.reminders = 'granted';
                 console.log("[Calendian] Loaded " + reminders.length + " reminders from disk cache");
                 return true;
@@ -8582,6 +8582,7 @@ MacOSIntegration.prototype.preloadAll = async function() {
             }
             this.calendarColors = colors;
             this.allEvents = events;
+            this._itemLookupCache = null;  // invalidate reverse index
             this.permissionState.calendar = 'granted';
             this.lastError.calendar = null;
             this.sourceCounts.calendars = Object.keys(colors).length;
@@ -8591,7 +8592,7 @@ MacOSIntegration.prototype.preloadAll = async function() {
             var errorType = this.classifyError(err);
             this.permissionState.calendar = errorType;
             this.lastError.calendar = { type: errorType, message: (err.stderr || err.error?.message || 'Unknown error'), timestamp: new Date().toISOString() };
-            if (errorType === 'permission_denied') { this.allEvents = []; }
+            if (errorType === 'permission_denied') { this.allEvents = []; this._itemLookupCache = null; }
         }
         this.isLoading.calendar = false;
     }
@@ -8654,6 +8655,7 @@ MacOSIntegration.prototype.preloadReminders = async function() {
                 console.warn("[Calendian] No-date reminders fetch failed:", nodateErr.stderr || nodateErr.message);
             }
             this.allReminders = reminders;
+            this._itemLookupCache = null;  // invalidate reverse index
             this.permissionState.reminders = 'granted';
             this.lastError.reminders = null;
             this.sourceCounts.reminderLists = this.countReminderLists(reminders);
@@ -8663,7 +8665,7 @@ MacOSIntegration.prototype.preloadReminders = async function() {
             var errorType = this.classifyError(err);
             this.permissionState.reminders = errorType;
             this.lastError.reminders = { type: errorType, message: (err.stderr || err.error?.message || 'Unknown error'), timestamp: new Date().toISOString() };
-            if (errorType === 'permission_denied') { this.allReminders = []; }
+            if (errorType === 'permission_denied') { this.allReminders = []; this._itemLookupCache = null; }
         }
         this.isLoading.reminders = false;
     }
@@ -9157,13 +9159,13 @@ function buildCompactFrontmatterYAML(eventIds, reminderIds) {
     if (eventIds && eventIds.length > 0) {
         lines.push("  events:");
         for (var i = 0; i < eventIds.length; i++) {
-            lines.push("    - \"" + eventIds[i] + "\"");
+            lines.push("    - \"" + escapeYAMLValue(eventIds[i]) + "\"");
         }
     }
     if (reminderIds && reminderIds.length > 0) {
         lines.push("  reminders:");
         for (var i = 0; i < reminderIds.length; i++) {
-            lines.push("    - \"" + reminderIds[i] + "\"");
+            lines.push("    - \"" + escapeYAMLValue(reminderIds[i]) + "\"");
         }
     }
     lines.push("---");
@@ -9200,11 +9202,8 @@ function sanitizeFilename(name) {
 }
 
 /**
- * Add an entry to the index, avoiding duplicates.
- */
-/**
  * Background: scan note bodies for inline cal:ev:ID / cal:rem:ID refs.
- * Updates the index in-place. Capped at 200 files.
+ * Updates the index in-place. Capped at 200 files scanned.
  */
 async function scanBodiesForInlineRefs(app, files, index) {
     var count = 0, hitCount = 0;
@@ -9219,14 +9218,19 @@ async function scanBodiesForInlineRefs(app, files, index) {
                 hitCount++;
             }
             count++;
-        } catch (e) { /* skip */ }
+        } catch (e) { console.debug("[Calendian] Body scan skip:", e.message); }
     }
-    var evTotal = 0, remTotal = 0;
-    index.events.forEach(function(list) { evTotal += list.length; });
-    index.reminders.forEach(function(list) { remTotal += list.length; });
-    console.log("[Calendian] Body scan: " + count + " files, " + evTotal + " event links, " + remTotal + " reminder links");
+    console.log("[Calendian] Body scan: " + count + " files, " + hitCount + " inline refs found");
 }
 
+/**
+ * Add an entry to the association index, avoiding duplicate paths for the same item.
+ * @param {object} index — { events: Map, reminders: Map }
+ * @param {string} type — "event" or "reminder"
+ * @param {string} id — stable event/reminder ID
+ * @param {string} path — vault-relative note path
+ * @param {string} title — file basename (without .md extension)
+ */
 function addToIndex(index, type, id, path, title) {
     var map = type === "reminder" ? index.reminders : index.events;
     var list = map.get(id);
@@ -9291,37 +9295,41 @@ MacOSIntegration.prototype.ensureAssociationIndex = function() {
         scanBodiesForInlineRefs(app, files, index).then(function() {
             self._bodyScanIndex = index;
             self._associationIndexDirty = false;
-            console.log("[Calendian] Body scan done, refreshing panel...");
             self.render();
         });
     } catch (err) {
         console.warn("[Calendian] Failed to build association index:", err.message);
     }
 
+    // Note: _associationIndexDirty stays true until the async body scan completes.
+    // The index is usable immediately (frontmatter results), but will gain body scan
+    // results when scanBodiesForInlineRefs resolves.
     this._associationIndex = index;
-    this._associationIndexDirty = false;
     return index;
 };
 
 /**
  * Get notes associated with an event or reminder item.
  * @param {object} item — event or reminder from cache
+ * @param {string} [itemType] — "event" or "reminder" (preferred). Falls back to heuristic if omitted.
  * @returns {{path: string, title: string}[]}
  */
-MacOSIntegration.prototype.getAssociatedNotes = function(item) {
+MacOSIntegration.prototype.getAssociatedNotes = function(item, itemType) {
     if (!item || !item.id) return [];
 
     var index = this.ensureAssociationIndex();
-    var isReminder = item.source === "macos-reminders" || item.listId || (item.dueDate !== undefined && !item.calendarName);
+    var isReminder;
+    if (itemType === "reminder") {
+        isReminder = true;
+    } else if (itemType === "event") {
+        isReminder = false;
+    } else {
+        // Fallback heuristic for backward compat
+        isReminder = item.source === "macos-reminders" || item.listId ||
+            (item.dueDate !== undefined && !item.calendarName);
+    }
     var map = isReminder ? index.reminders : index.events;
     var entries = map.get(item.id);
-    // Debug: log first few lookups
-    if (!this._debugLogged) { this._debugLogged = {}; }
-    var dbgKey = (isReminder ? "rem:" : "ev:") + item.id;
-    if (!this._debugLogged[dbgKey]) {
-        this._debugLogged[dbgKey] = true;
-        console.log("[Calendian] Lookup " + dbgKey + " -> " + (entries ? entries.length : 0) + " notes (map has " + map.size + " entries)");
-    }
     if (!entries || entries.length === 0) return [];
 
     // REQ-NOTE-004: Filter out entries whose files no longer exist
@@ -9383,19 +9391,26 @@ MacOSIntegration.prototype._addToAssociationIndex = function(type, itemId, path,
 // ── Note creation (+ Note button) ───────────────────────────────────
 
 /**
- * Internal: try to create a note file, falling back to a safe filename if Obsidian rejects it.
+ * Create a unique filepath by appending a counter if the preferred path is taken.
+ * Returns the first available filepath.
  */
-async function tryCreateNoteFile(app, folderPath, preferredName, fallbackName, content) {
-    var filename = preferredName;
+function resolveAvailablePath(app, folderPath, filename) {
     var filepath = (folderPath ? folderPath + "/" : "") + filename + ".md";
     filepath = filepath.replace(/^\//, "");
-
     var baseFilename = filename;
     var counter = 1;
     while (app.vault.getAbstractFileByPath(filepath)) {
-        filename = baseFilename + " (" + (++counter) + ")";
-        filepath = (folderPath ? folderPath + "/" : "") + filename + ".md";
+        counter++;
+        filepath = (folderPath ? folderPath + "/" : "") + baseFilename + " (" + counter + ")" + ".md";
     }
+    return filepath;
+}
+
+/**
+ * Try to create a note file, falling back to a safe filename if Obsidian rejects the preferred one.
+ */
+async function tryCreateNoteFile(app, folderPath, preferredName, fallbackName, content) {
+    var filepath = resolveAvailablePath(app, folderPath, preferredName);
 
     try {
         var file = await app.vault.create(filepath, content);
@@ -9403,11 +9418,7 @@ async function tryCreateNoteFile(app, folderPath, preferredName, fallbackName, c
     } catch (e) {
         if (e.message && e.message.indexOf("File name") !== -1) {
             console.log("[Calendian] Preferred filename rejected, using fallback:", fallbackName);
-            var safePath = (folderPath ? folderPath + "/" : "") + fallbackName + ".md";
-            var safeCounter = 1;
-            while (app.vault.getAbstractFileByPath(safePath)) {
-                safePath = (folderPath ? folderPath + "/" : "") + fallbackName + " (" + (++safeCounter) + ").md";
-            }
+            var safePath = resolveAvailablePath(app, folderPath, fallbackName);
             var safeFile = await app.vault.create(safePath, content);
             return { file: safeFile, filepath: safePath };
         }
@@ -9416,91 +9427,90 @@ async function tryCreateNoteFile(app, folderPath, preferredName, fallbackName, c
 }
 
 /**
- * Create a note file with association frontmatter for an event.
+ * Ensure a folder exists, creating it if needed.
+ * Returns the sanitized folder path, or "" on failure.
  */
-MacOSIntegration.prototype.createNoteForEvent = async function(evt) {
-    if (!evt.id || evt.isDisplayOnly) {
-        new obsidian.Notice("Cannot create note: event has no stable identifier");
+async function ensureNoteFolder(app, folderPath) {
+    if (!folderPath) return "";
+    try {
+        if (!app.vault.getAbstractFileByPath(folderPath)) {
+            await app.vault.createFolder(folderPath);
+        }
+        return folderPath;
+    } catch (e) {
+        return "";
+    }
+}
+
+/**
+ * Shared: create a note file with association frontmatter for an event or reminder.
+ * Called by createNoteForEvent and createNoteForReminder (thin wrappers).
+ */
+async function createNoteForItem(integ, item, itemType) {
+    if (!item.id || item.isDisplayOnly) {
+        new obsidian.Notice("Cannot create note: " + itemType + " has no stable identifier");
         return;
     }
 
-    var app = this.plugin.app;
-    var frontmatter = this.generateEventFrontmatter(evt);
-    var dateStr = evt.start ? window.moment(evt.start).format("YYYY-MM-DD") : "";
-    var safeTitle = sanitizeFilename(evt.title || evt.summary || "");
-    var preferredName = safeTitle ? (dateStr ? dateStr + " " + safeTitle : safeTitle) : (dateStr || "untitled-event");
-    var fallbackName = dateStr ? dateStr + " Event" : "calendian-event-" + Date.now();
+    var app = integ.plugin.app;
+    var isEvent = itemType === "event";
+
+    // Frontmatter
+    var frontmatter = isEvent
+        ? integ.generateEventFrontmatter(item)
+        : integ.generateReminderFrontmatter(item);
+
+    // Date string
+    var rawDate = isEvent ? item.start : (item.dueDate || item.due);
+    var dateStr = rawDate ? window.moment(rawDate).format("YYYY-MM-DD") : "";
+    if (dateStr === "Invalid date") dateStr = "";
+
+    // Title & filename
+    var rawTitle = isEvent ? (item.title || item.summary || "") : (item.title || item.name || "");
+    var safeTitle = sanitizeFilename(rawTitle);
+    var preferredName = safeTitle
+        ? (dateStr ? dateStr + " " + safeTitle : safeTitle)
+        : (dateStr || ("untitled-" + itemType));
+    var fallbackName = dateStr
+        ? dateStr + (isEvent ? " Event" : " Reminder")
+        : "calendian-" + itemType + "-" + Date.now();
 
     try {
-        var opts = this.plugin.options || {};
-        var folderPath = (opts.noteFolder || "").trim().replace(/\/+$/, "");
-        if (folderPath) {
-            try {
-                if (!app.vault.getAbstractFileByPath(folderPath)) {
-                    await app.vault.createFolder(folderPath);
-                }
-            } catch (e) { folderPath = ""; }
-        }
+        var opts = integ.plugin.options || {};
+        var folderPath = await ensureNoteFolder(app, (opts.noteFolder || "").trim().replace(/\/+$/, ""));
 
-        var template = opts.eventNoteTemplate || "# {{title}}\n";
-        var templateVars = this.buildEventTemplateVars(evt);
+        var template = isEvent
+            ? (opts.eventNoteTemplate || "# {{title}}\n")
+            : (opts.reminderNoteTemplate || "# {{title}}\n");
+        var templateVars = isEvent
+            ? integ.buildEventTemplateVars(item)
+            : integ.buildReminderTemplateVars(item);
         var body = expandTemplate(template, templateVars);
         var content = frontmatter + body;
         var result = await tryCreateNoteFile(app, folderPath, preferredName, fallbackName, content);
 
-        console.log("[Calendian] Created note for event:", result.filepath);
+        console.log("[Calendian] Created note for " + itemType + ":", result.filepath);
         // Add to index immediately — metadata cache may not have updated yet
-        this._addToAssociationIndex("event", evt.id, result.filepath, result.file.basename);
+        integ._addToAssociationIndex(itemType, item.id, result.filepath, result.file.basename);
         await app.workspace.openLinkText(result.filepath, "", false);
     } catch (err) {
-        console.error("[Calendian] Failed to create note for event:", err.message);
+        console.error("[Calendian] Failed to create note for " + itemType + ":", err.message);
         new obsidian.Notice("Failed to create note: " + err.message);
     }
+}
+
+/**
+ * Create a note file with association frontmatter for an event.
+ */
+MacOSIntegration.prototype.createNoteForEvent = async function(evt) {
+    await createNoteForItem(this, evt, "event");
 };
 
 /**
  * Create a note file with association frontmatter for a reminder.
  */
 MacOSIntegration.prototype.createNoteForReminder = async function(rem) {
-    if (!rem.id || rem.isDisplayOnly) {
-        new obsidian.Notice("Cannot create note: reminder has no stable identifier");
-        return;
-    }
-
-    var app = this.plugin.app;
-    var frontmatter = this.generateReminderFrontmatter(rem);
-    var rawDate = rem.dueDate || rem.due;
-    var dateStr = rawDate ? window.moment(rawDate).format("YYYY-MM-DD") : "";
-    if (dateStr === "Invalid date") dateStr = "";
-    var safeTitle = sanitizeFilename(rem.title || rem.name || "");
-    var preferredName = safeTitle ? (dateStr ? dateStr + " " + safeTitle : safeTitle) : (dateStr || "untitled-reminder");
-    var fallbackName = dateStr ? dateStr + " Reminder" : "calendian-reminder-" + Date.now();
-
-    try {
-        var opts = this.plugin.options || {};
-        var folderPath = (opts.noteFolder || "").trim().replace(/\/+$/, "");
-        if (folderPath) {
-            try {
-                if (!app.vault.getAbstractFileByPath(folderPath)) {
-                    await app.vault.createFolder(folderPath);
-                }
-            } catch (e) { folderPath = ""; }
-        }
-
-        var template = opts.reminderNoteTemplate || "# {{title}}\n";
-        var templateVars = this.buildReminderTemplateVars(rem);
-        var body = expandTemplate(template, templateVars);
-        var content = frontmatter + body;
-        var result = await tryCreateNoteFile(app, folderPath, preferredName, fallbackName, content);
-
-        console.log("[Calendian] Created note for reminder:", result.filepath);
-        // Add to index immediately — metadata cache may not have updated yet
-        this._addToAssociationIndex("reminder", rem.id, result.filepath, result.file.basename);
-        await app.workspace.openLinkText(result.filepath, "", false);
-    } catch (err) {
-        console.error("[Calendian] Failed to create note for reminder:", err.message);
-        new obsidian.Notice("Failed to create note: " + err.message);
-    }
+    await createNoteForItem(this, rem, "reminder");
 };
 // src/notes/note-link-resolver.js — note path resolution (v0.5)
 // REQ-NOTE-004: Handle missing or renamed notes safely
@@ -9703,21 +9713,6 @@ MacOSIntegration.prototype.copyItemText = async function(item, itemType) {
  * Render a ```calendian``` code block.
  */
 function renderCalendianBlock(plugin, source, el, ctx) {
-    var targetDate;
-    var sourceText = (source || "").trim();
-    if (sourceText && sourceText !== "today") {
-        var parsed = window.moment(sourceText);
-        if (parsed.isValid()) targetDate = parsed;
-    }
-    if (!targetDate && ctx && ctx.sourcePath) {
-        try {
-            var basename = ctx.sourcePath.replace(/\.md$/, "").split("/").pop();
-            var fromFile = window.moment(basename, "YYYY-MM-DD", true);
-            if (fromFile.isValid()) targetDate = fromFile;
-        } catch (e) {}
-    }
-    if (!targetDate) targetDate = window.moment();
-
     var view = plugin.view;
     if (!view || !view.macosIntegration) {
         el.createDiv("calendian-block-empty").textContent =
@@ -9725,31 +9720,52 @@ function renderCalendianBlock(plugin, source, el, ctx) {
         return;
     }
 
-    var integ = view.macosIntegration;
-    var dayEvents = integ.getEventsForDate(targetDate) || [];
-    var dayReminders = integ.getRemindersForDate(targetDate) || [];
-
-    var container = el.createDiv("calendian-block");
-
-    if (dayEvents.length === 0 && dayReminders.length === 0) {
-        container.createDiv("calendian-block-empty").textContent = "No events or reminders for this date";
-        return;
-    }
-
-    if (dayEvents.length > 0) {
-        var evtLabel = container.createDiv("calendian-block-label");
-        evtLabel.textContent = "Events";
-        for (var i = 0; i < dayEvents.length; i++) {
-            renderEventItem(container, dayEvents[i], integ, plugin);
+    try {
+        var targetDate;
+        var sourceText = (source || "").trim();
+        if (sourceText && sourceText !== "today") {
+            var parsed = window.moment(sourceText);
+            if (parsed.isValid()) targetDate = parsed;
         }
-    }
-
-    if (dayReminders.length > 0) {
-        var remLabel = container.createDiv("calendian-block-label");
-        remLabel.textContent = "Reminders";
-        for (var j = 0; j < dayReminders.length; j++) {
-            renderReminderItem(container, dayReminders[j], integ, plugin);
+        if (!targetDate && ctx && ctx.sourcePath) {
+            try {
+                var basename = ctx.sourcePath.replace(/\.md$/, "").split("/").pop();
+                var fromFile = window.moment(basename, "YYYY-MM-DD", true);
+                if (fromFile.isValid()) targetDate = fromFile;
+            } catch (e) {}
         }
+        if (!targetDate) targetDate = window.moment();
+
+        var integ = view.macosIntegration;
+        var dayEvents = integ.getEventsForDate(targetDate) || [];
+        var dayReminders = integ.getRemindersForDate(targetDate) || [];
+
+        var container = el.createDiv("calendian-block");
+
+        if (dayEvents.length === 0 && dayReminders.length === 0) {
+            container.createDiv("calendian-block-empty").textContent = "No events or reminders for this date";
+            return;
+        }
+
+        if (dayEvents.length > 0) {
+            var evtLabel = container.createDiv("calendian-block-label");
+            evtLabel.textContent = "Events";
+            for (var i = 0; i < dayEvents.length; i++) {
+                renderEventItem(container, dayEvents[i], integ, plugin);
+            }
+        }
+
+        if (dayReminders.length > 0) {
+            var remLabel = container.createDiv("calendian-block-label");
+            remLabel.textContent = "Reminders";
+            for (var j = 0; j < dayReminders.length; j++) {
+                renderReminderItem(container, dayReminders[j], integ, plugin);
+            }
+        }
+    } catch (err) {
+        console.warn("[Calendian] Failed to render calendian code block:", err.message);
+        el.createDiv("calendian-block-empty").textContent =
+            "Calendian: unable to render (see console for details)";
     }
 }
 
@@ -9855,30 +9871,28 @@ function renderCalendianInline(plugin, el, ctx) {
 
     // Build ONE table for all refs found in this post-processor run.
     // Column alignment is guaranteed within a single table.
-    var table = document.createElement("table");
-    table.className = "calendian-inline-table";
-    table.setAttribute("title", "Click to navigate in Calendian");
+    // Create via el so the table inherits Obsidian theme scoping.
+    var table = el.createEl("table", {
+        cls: "calendian-inline-table",
+        attr: { title: "Click to navigate in Calendian" }
+    });
 
     // Fixed column widths via colgroup for guaranteed alignment
-    var colgroup = document.createElement("colgroup");
+    var colgroup = table.createEl("colgroup");
     var cols = ["24px", "68px", "130px", "160px", "90px", "28px"]; // icon, date, time, title, badge, ind
     for (var ci = 0; ci < cols.length; ci++) {
-        var col = document.createElement("col");
+        var col = colgroup.createEl("col");
         if (cols[ci]) col.style.width = cols[ci];
-        colgroup.appendChild(col);
     }
-    table.appendChild(colgroup);
 
-    var tbody = document.createElement("tbody");
+    var tbody = table.createEl("tbody");
     for (var r = 0; r < matches.length; r++) {
         var ref = matches[r];
-        var tr = document.createElement("tr");
-        tr.className = "calendian-inline-row";
-        if (ref.itemType === "rem") tr.classList.add("calendian-inline-reminder");
+        var tr = tbody.createEl("tr", {
+            cls: "calendian-inline-row" + (ref.itemType === "rem" ? " calendian-inline-reminder" : "")
+        });
         buildInlineRow(tr, ref.item, ref.itemType, plugin);
-        tbody.appendChild(tr);
     }
-    table.appendChild(tbody);
 
     // Replace the first code element with the table, remove the rest
     matches[0].code.parentNode.replaceChild(table, matches[0].code);
@@ -9895,41 +9909,34 @@ function renderCalendianInline(plugin, el, ctx) {
  */
 function buildInlineRow(tr, item, itemType, plugin) {
     // Type icon
-    var tdIcon = document.createElement("td");
-    tdIcon.className = "calendian-inline-type";
+    var tdIcon = tr.createEl("td", { cls: "calendian-inline-type" });
     if (itemType === "rem") {
         tdIcon.textContent = item.completed ? "✅" : "🔔";
     } else {
         tdIcon.textContent = "📅";
     }
-    tr.appendChild(tdIcon);
 
     // Date
-    var tdDate = document.createElement("td");
-    tdDate.className = "calendian-inline-date";
+    var tdDate = tr.createEl("td", { cls: "calendian-inline-date" });
     if (itemType === "ev") {
         tdDate.textContent = item.start ? window.moment(item.start).format("MM-DD") : "";
     } else {
         var d2 = item.dueDate || item.due;
         tdDate.textContent = d2 ? window.moment(d2).format("MM-DD") : "";
     }
-    tr.appendChild(tdDate);
 
     // Title — with ○/☑ prefix for reminders
-    var tdTitle = document.createElement("td");
-    tdTitle.className = "calendian-inline-title";
     var prefix = "";
     if (itemType === "rem" && item.completed) {
         prefix = "☑ ";
     } else if (itemType === "rem") {
         prefix = "○ ";
     }
+    var tdTitle = tr.createEl("td", { cls: "calendian-inline-title" });
     tdTitle.textContent = prefix + (item.title || item.summary || item.name || "");
-    tr.appendChild(tdTitle);
 
     // Time
-    var tdTime = document.createElement("td");
-    tdTime.className = "calendian-inline-time";
+    var tdTime = tr.createEl("td", { cls: "calendian-inline-time" });
     if (itemType === "ev") {
         var isAllDay = item.isAllDay !== undefined ? item.isAllDay : item.allday;
         if (isAllDay) {
@@ -9944,22 +9951,17 @@ function buildInlineRow(tr, item, itemType, plugin) {
         var d = item.due || item.dueDate;
         tdTime.textContent = d ? window.moment(d).format("HH:mm") : "";
     }
-    tr.appendChild(tdTime);
 
     // Badge
-    var tdBadge = document.createElement("td");
-    tdBadge.className = "calendian-inline-badge";
+    var tdBadge = tr.createEl("td", { cls: "calendian-inline-badge" });
     tdBadge.textContent = itemType === "ev" ? (item.calendarName || item.calendar || "") : (item.listName || item.list || "");
-    tr.appendChild(tdBadge);
 
     // Indicators
-    var tdInd = document.createElement("td");
-    tdInd.className = "calendian-inline-indicators";
     var inds = [];
     if (itemType === "rem" && item.priority === "high") inds.push("!!!");
     if (itemType === "ev" && item.isRecurring) inds.push("⟳");
+    var tdInd = tr.createEl("td", { cls: "calendian-inline-indicators" });
     tdInd.textContent = inds.join(" ");
-    tr.appendChild(tdInd);
 
     tr.addEventListener("click", function() {
         var eventDate = itemType === "ev" ? item.start : (item.dueDate || item.due);
@@ -9968,9 +9970,37 @@ function buildInlineRow(tr, item, itemType, plugin) {
 }
 
 /**
+ * Build (or return cached) reverse lookup maps: event/reminder ID → item.
+ * Stored on the integration object as _itemLookupCache.
+ */
+function getItemLookup(integ) {
+    if (!integ._itemLookupCache) {
+        var events = integ.allEvents || [];
+        var reminders = integ.allReminders || [];
+        var evtMap = new Map();
+        var remMap = new Map();
+        for (var i = 0; i < events.length; i++) {
+            if (events[i].id) evtMap.set(events[i].id, events[i]);
+        }
+        for (var j = 0; j < reminders.length; j++) {
+            if (reminders[j].id) remMap.set(reminders[j].id, reminders[j]);
+        }
+        integ._itemLookupCache = { events: evtMap, reminders: remMap };
+    }
+    return integ._itemLookupCache;
+}
+
+/**
  * Find an event or reminder by ID in the cache.
+ * Uses O(1) reverse index when available, falls back to linear scan.
  */
 function findItemById(integ, type, id) {
+    var lookup = getItemLookup(integ);
+    var map = type === "ev" ? lookup.events : lookup.reminders;
+    var item = map.get(id);
+    if (item) return item;
+
+    // Fallback: linear scan (item may have been added after cache was built)
     if (type === "ev") {
         var events = integ.allEvents || [];
         for (var i = 0; i < events.length; i++) {
@@ -10110,14 +10140,14 @@ class CalendarView extends obsidian.ItemView {
         // Click day: single click = select date (show events), Cmd/Ctrl+click = open/create note
         const self = this;
 
-        // v0.5: Auto-rebuild every 30s — fresh body scan picks up new inline refs
+        // v0.5: Auto-rebuild association index every 60s to pick up new inline refs.
+        // Only re-renders if the index actually changed (dirty gate).
         setInterval(function() {
             if (self.macosIntegration) {
-                self.macosIntegration._bodyScanIndex = null;
                 self.macosIntegration._associationIndexDirty = true;
                 self.macosIntegration.render();
             }
-        }, 30000);
+        }, 60000);
         this.macosWrappedOnClickDay = (date, inNewSplit) => {
             // Always update the panel to show selected date's events (instant from cache)
             if (self.macosIntegration) {

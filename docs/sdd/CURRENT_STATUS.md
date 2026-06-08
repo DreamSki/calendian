@@ -95,19 +95,17 @@ Everything else must be marked as planned, experimental, or future.
 
 > Updated by AI after every meaningful step. Next session reads this to continue without re-explaining context.
 
-- **Doing:** v0.5 note association — documentation update pass.
+- **Doing:** TASK-040/041 code quality fixes — all phases complete.
 - **Completed this session:**
-  - Squashed 71 local commits into 5 logical commits (removed 3 debug log commits, merged style/fix chains).
-  - Debug console.log lines removed from `src/notes/frontmatter.js`.
-  - Full documentation audit: README, CURRENT_STATUS, TASKS, SPEC, ARCHITECTURE, ROADMAP, CLAUDE.md updated.
+  - Phase 1 critical bugs fixed: race condition (dirty flag now set only after body scan completes), body scan data loss (30s timer no longer nulls `_bodyScanIndex`), duplicate `getAssociatedNotes` call removed, `escapeYAMLValue` now actually called in `buildCompactFrontmatterYAML`.
+  - Phase 2 correctness/perf: `getAssociatedNotes` now accepts explicit `itemType` param, O(1) reverse index (`_itemLookupCache`) for inline ref resolution with invalidation hooks, rebuild interval aligned to SPEC (60s), gate render behind dirty check.
+  - Phase 3 code quality: `createNoteForEvent`/`createNoteForReminder` ~90% dedup via shared `createNoteForItem()`; `resolveAvailablePath` extracted from duplicated file collision logic; broken JSDoc fixed (`addToIndex` JSDoc moved, orphaned fragment removed); error boundary try/catch added to `renderCalendianBlock`; `document.createElement` replaced with Obsidian `createEl` API in `renderCalendianInline` + `buildInlineRow`; body scan errors now logged via `console.debug`.
+  - Files changed: `src/notes/frontmatter.js` (major), `src/notes/codeblock.js` (major), `src/cache/schedule-cache.js` (minor — `_itemLookupCache` invalidation at 6 cache update points), `main-head.js` (minor — timer fix, duplicate call removal, explicit itemType params).
+  - `build-main.sh` ran successfully; helper binary compiled successfully.
 - **Decisions:**
-  - Plugin NEVER auto-modifies note files. All association is user-initiated.
-  - Compact frontmatter: `calendian: { events: [...], reminders: [...] }` (IDs only)
-  - "+ Note": creates a dedicated note with calendian frontmatter
-  - "📋 Copy": copies `cal:ev:ID` or `cal:rem:ID` inline reference to clipboard
-  - "Linked Notes" in event detail: shows associated notes, click to open
-  - Body scan auto-links notes with inline `cal:ev:ID` / `cal:rem:ID` refs
-  - `calendian-event` code block renders events/reminders for a date
-  - Highlight navigation: clicking ref/codeblock item → panel highlight + scroll
+  - All fixes from the code audit (15 issues) applied.
+  - `escapeYAMLValue` kept and wired in (not removed) since it's now used.
+  - Reverse lookup cache (`_itemLookupCache`) is lazily built and invalidated at every `allEvents`/`allReminders` assignment.
+  - Body scan results now survive rebuild cycles — `_bodyScanIndex` is only nulled at construction, preserved across `ensureAssociationIndex` rebuilds.
 - **Next:** TASK-043 (notifications) or TASK-050 (Tasks integration experiment).
-- **Last action:** 2026-06-08 — documentation audit and update pass.
+- **Last action:** 2026-06-08 — TASK-040/041 code quality fixes applied and verified.

@@ -106,13 +106,13 @@ function buildCompactFrontmatterYAML(eventIds, reminderIds) {
     if (eventIds && eventIds.length > 0) {
         lines.push("  events:");
         for (var i = 0; i < eventIds.length; i++) {
-            lines.push("    - \"" + eventIds[i] + "\"");
+            lines.push("    - \"" + escapeYAMLValue(eventIds[i]) + "\"");
         }
     }
     if (reminderIds && reminderIds.length > 0) {
         lines.push("  reminders:");
         for (var i = 0; i < reminderIds.length; i++) {
-            lines.push("    - \"" + reminderIds[i] + "\"");
+            lines.push("    - \"" + escapeYAMLValue(reminderIds[i]) + "\"");
         }
     }
     lines.push("---");
@@ -149,11 +149,8 @@ function sanitizeFilename(name) {
 }
 
 /**
- * Add an entry to the index, avoiding duplicates.
- */
-/**
  * Background: scan note bodies for inline cal:ev:ID / cal:rem:ID refs.
- * Updates the index in-place. Capped at 200 files.
+ * Updates the index in-place. Capped at 200 files scanned.
  */
 async function scanBodiesForInlineRefs(app, files, index) {
     var count = 0, hitCount = 0;
@@ -168,11 +165,19 @@ async function scanBodiesForInlineRefs(app, files, index) {
                 hitCount++;
             }
             count++;
-        } catch (e) { /* skip */ }
+        } catch (e) { console.debug("[Calendian] Body scan skip:", e.message); }
     }
     console.log("[Calendian] Body scan: " + count + " files, " + hitCount + " inline refs found");
 }
 
+/**
+ * Add an entry to the association index, avoiding duplicate paths for the same item.
+ * @param {object} index — { events: Map, reminders: Map }
+ * @param {string} type — "event" or "reminder"
+ * @param {string} id — stable event/reminder ID
+ * @param {string} path — vault-relative note path
+ * @param {string} title — file basename (without .md extension)
+ */
 function addToIndex(index, type, id, path, title) {
     var map = type === "reminder" ? index.reminders : index.events;
     var list = map.get(id);
@@ -243,21 +248,33 @@ MacOSIntegration.prototype.ensureAssociationIndex = function() {
         console.warn("[Calendian] Failed to build association index:", err.message);
     }
 
+    // Note: _associationIndexDirty stays true until the async body scan completes.
+    // The index is usable immediately (frontmatter results), but will gain body scan
+    // results when scanBodiesForInlineRefs resolves.
     this._associationIndex = index;
-    this._associationIndexDirty = false;
     return index;
 };
 
 /**
  * Get notes associated with an event or reminder item.
  * @param {object} item — event or reminder from cache
+ * @param {string} [itemType] — "event" or "reminder" (preferred). Falls back to heuristic if omitted.
  * @returns {{path: string, title: string}[]}
  */
-MacOSIntegration.prototype.getAssociatedNotes = function(item) {
+MacOSIntegration.prototype.getAssociatedNotes = function(item, itemType) {
     if (!item || !item.id) return [];
 
     var index = this.ensureAssociationIndex();
-    var isReminder = item.source === "macos-reminders" || item.listId || (item.dueDate !== undefined && !item.calendarName);
+    var isReminder;
+    if (itemType === "reminder") {
+        isReminder = true;
+    } else if (itemType === "event") {
+        isReminder = false;
+    } else {
+        // Fallback heuristic for backward compat
+        isReminder = item.source === "macos-reminders" || item.listId ||
+            (item.dueDate !== undefined && !item.calendarName);
+    }
     var map = isReminder ? index.reminders : index.events;
     var entries = map.get(item.id);
     if (!entries || entries.length === 0) return [];
@@ -321,19 +338,26 @@ MacOSIntegration.prototype._addToAssociationIndex = function(type, itemId, path,
 // ── Note creation (+ Note button) ───────────────────────────────────
 
 /**
- * Internal: try to create a note file, falling back to a safe filename if Obsidian rejects it.
+ * Create a unique filepath by appending a counter if the preferred path is taken.
+ * Returns the first available filepath.
  */
-async function tryCreateNoteFile(app, folderPath, preferredName, fallbackName, content) {
-    var filename = preferredName;
+function resolveAvailablePath(app, folderPath, filename) {
     var filepath = (folderPath ? folderPath + "/" : "") + filename + ".md";
     filepath = filepath.replace(/^\//, "");
-
     var baseFilename = filename;
     var counter = 1;
     while (app.vault.getAbstractFileByPath(filepath)) {
-        filename = baseFilename + " (" + (++counter) + ")";
-        filepath = (folderPath ? folderPath + "/" : "") + filename + ".md";
+        counter++;
+        filepath = (folderPath ? folderPath + "/" : "") + baseFilename + " (" + counter + ")" + ".md";
     }
+    return filepath;
+}
+
+/**
+ * Try to create a note file, falling back to a safe filename if Obsidian rejects the preferred one.
+ */
+async function tryCreateNoteFile(app, folderPath, preferredName, fallbackName, content) {
+    var filepath = resolveAvailablePath(app, folderPath, preferredName);
 
     try {
         var file = await app.vault.create(filepath, content);
@@ -341,11 +365,7 @@ async function tryCreateNoteFile(app, folderPath, preferredName, fallbackName, c
     } catch (e) {
         if (e.message && e.message.indexOf("File name") !== -1) {
             console.log("[Calendian] Preferred filename rejected, using fallback:", fallbackName);
-            var safePath = (folderPath ? folderPath + "/" : "") + fallbackName + ".md";
-            var safeCounter = 1;
-            while (app.vault.getAbstractFileByPath(safePath)) {
-                safePath = (folderPath ? folderPath + "/" : "") + fallbackName + " (" + (++safeCounter) + ").md";
-            }
+            var safePath = resolveAvailablePath(app, folderPath, fallbackName);
             var safeFile = await app.vault.create(safePath, content);
             return { file: safeFile, filepath: safePath };
         }
@@ -354,89 +374,88 @@ async function tryCreateNoteFile(app, folderPath, preferredName, fallbackName, c
 }
 
 /**
- * Create a note file with association frontmatter for an event.
+ * Ensure a folder exists, creating it if needed.
+ * Returns the sanitized folder path, or "" on failure.
  */
-MacOSIntegration.prototype.createNoteForEvent = async function(evt) {
-    if (!evt.id || evt.isDisplayOnly) {
-        new obsidian.Notice("Cannot create note: event has no stable identifier");
+async function ensureNoteFolder(app, folderPath) {
+    if (!folderPath) return "";
+    try {
+        if (!app.vault.getAbstractFileByPath(folderPath)) {
+            await app.vault.createFolder(folderPath);
+        }
+        return folderPath;
+    } catch (e) {
+        return "";
+    }
+}
+
+/**
+ * Shared: create a note file with association frontmatter for an event or reminder.
+ * Called by createNoteForEvent and createNoteForReminder (thin wrappers).
+ */
+async function createNoteForItem(integ, item, itemType) {
+    if (!item.id || item.isDisplayOnly) {
+        new obsidian.Notice("Cannot create note: " + itemType + " has no stable identifier");
         return;
     }
 
-    var app = this.plugin.app;
-    var frontmatter = this.generateEventFrontmatter(evt);
-    var dateStr = evt.start ? window.moment(evt.start).format("YYYY-MM-DD") : "";
-    var safeTitle = sanitizeFilename(evt.title || evt.summary || "");
-    var preferredName = safeTitle ? (dateStr ? dateStr + " " + safeTitle : safeTitle) : (dateStr || "untitled-event");
-    var fallbackName = dateStr ? dateStr + " Event" : "calendian-event-" + Date.now();
+    var app = integ.plugin.app;
+    var isEvent = itemType === "event";
+
+    // Frontmatter
+    var frontmatter = isEvent
+        ? integ.generateEventFrontmatter(item)
+        : integ.generateReminderFrontmatter(item);
+
+    // Date string
+    var rawDate = isEvent ? item.start : (item.dueDate || item.due);
+    var dateStr = rawDate ? window.moment(rawDate).format("YYYY-MM-DD") : "";
+    if (dateStr === "Invalid date") dateStr = "";
+
+    // Title & filename
+    var rawTitle = isEvent ? (item.title || item.summary || "") : (item.title || item.name || "");
+    var safeTitle = sanitizeFilename(rawTitle);
+    var preferredName = safeTitle
+        ? (dateStr ? dateStr + " " + safeTitle : safeTitle)
+        : (dateStr || ("untitled-" + itemType));
+    var fallbackName = dateStr
+        ? dateStr + (isEvent ? " Event" : " Reminder")
+        : "calendian-" + itemType + "-" + Date.now();
 
     try {
-        var opts = this.plugin.options || {};
-        var folderPath = (opts.noteFolder || "").trim().replace(/\/+$/, "");
-        if (folderPath) {
-            try {
-                if (!app.vault.getAbstractFileByPath(folderPath)) {
-                    await app.vault.createFolder(folderPath);
-                }
-            } catch (e) { folderPath = ""; }
-        }
+        var opts = integ.plugin.options || {};
+        var folderPath = await ensureNoteFolder(app, (opts.noteFolder || "").trim().replace(/\/+$/, ""));
 
-        var template = opts.eventNoteTemplate || "# {{title}}\n";
-        var templateVars = this.buildEventTemplateVars(evt);
+        var template = isEvent
+            ? (opts.eventNoteTemplate || "# {{title}}\n")
+            : (opts.reminderNoteTemplate || "# {{title}}\n");
+        var templateVars = isEvent
+            ? integ.buildEventTemplateVars(item)
+            : integ.buildReminderTemplateVars(item);
         var body = expandTemplate(template, templateVars);
         var content = frontmatter + body;
         var result = await tryCreateNoteFile(app, folderPath, preferredName, fallbackName, content);
 
-        console.log("[Calendian] Created note for event:", result.filepath);
+        console.log("[Calendian] Created note for " + itemType + ":", result.filepath);
         // Add to index immediately — metadata cache may not have updated yet
-        this._addToAssociationIndex("event", evt.id, result.filepath, result.file.basename);
+        integ._addToAssociationIndex(itemType, item.id, result.filepath, result.file.basename);
         await app.workspace.openLinkText(result.filepath, "", false);
     } catch (err) {
-        console.error("[Calendian] Failed to create note for event:", err.message);
+        console.error("[Calendian] Failed to create note for " + itemType + ":", err.message);
         new obsidian.Notice("Failed to create note: " + err.message);
     }
+}
+
+/**
+ * Create a note file with association frontmatter for an event.
+ */
+MacOSIntegration.prototype.createNoteForEvent = async function(evt) {
+    await createNoteForItem(this, evt, "event");
 };
 
 /**
  * Create a note file with association frontmatter for a reminder.
  */
 MacOSIntegration.prototype.createNoteForReminder = async function(rem) {
-    if (!rem.id || rem.isDisplayOnly) {
-        new obsidian.Notice("Cannot create note: reminder has no stable identifier");
-        return;
-    }
-
-    var app = this.plugin.app;
-    var frontmatter = this.generateReminderFrontmatter(rem);
-    var rawDate = rem.dueDate || rem.due;
-    var dateStr = rawDate ? window.moment(rawDate).format("YYYY-MM-DD") : "";
-    if (dateStr === "Invalid date") dateStr = "";
-    var safeTitle = sanitizeFilename(rem.title || rem.name || "");
-    var preferredName = safeTitle ? (dateStr ? dateStr + " " + safeTitle : safeTitle) : (dateStr || "untitled-reminder");
-    var fallbackName = dateStr ? dateStr + " Reminder" : "calendian-reminder-" + Date.now();
-
-    try {
-        var opts = this.plugin.options || {};
-        var folderPath = (opts.noteFolder || "").trim().replace(/\/+$/, "");
-        if (folderPath) {
-            try {
-                if (!app.vault.getAbstractFileByPath(folderPath)) {
-                    await app.vault.createFolder(folderPath);
-                }
-            } catch (e) { folderPath = ""; }
-        }
-
-        var template = opts.reminderNoteTemplate || "# {{title}}\n";
-        var templateVars = this.buildReminderTemplateVars(rem);
-        var body = expandTemplate(template, templateVars);
-        var content = frontmatter + body;
-        var result = await tryCreateNoteFile(app, folderPath, preferredName, fallbackName, content);
-
-        console.log("[Calendian] Created note for reminder:", result.filepath);
-        // Add to index immediately — metadata cache may not have updated yet
-        this._addToAssociationIndex("reminder", rem.id, result.filepath, result.file.basename);
-        await app.workspace.openLinkText(result.filepath, "", false);
-    } catch (err) {
-        console.error("[Calendian] Failed to create note for reminder:", err.message);
-        new obsidian.Notice("Failed to create note: " + err.message);
-    }
+    await createNoteForItem(this, rem, "reminder");
 };
