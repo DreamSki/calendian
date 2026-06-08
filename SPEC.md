@@ -203,7 +203,7 @@ The following features are currently implemented in the codebase. All macOS data
 - ✅ Reminder items: 📝 note indicator (clickable), "+📝" create button
 - ✅ Lazy index rebuild via `metadataCache.on("changed"/"resolved")` listeners
 - ✅ Build: `src/notes/frontmatter.js` + `src/notes/note-link-resolver.js` concatenated by `build-main.sh`
-- ⬜ Reminder expandable detail panel: click-to-expand consistent with event behavior (REQ-REM-010, v0.5.1)
+- ✅ Reminder expandable detail panel: click-to-expand consistent with event behavior (REQ-REM-010, v0.5.1)
 - ✅ File-change → association index live sync: vault `modify`/`create`/`delete` hooks trigger index rebuild + re-render within 500ms debounce (REQ-NOTE-011, v0.5.1)
 - ⬜ Create event/reminder from note code block: parse structured block, call helper, write back ID to note (REQ-WRITE-021/022, v0.5.1)
 
@@ -561,8 +561,7 @@ Goal, habit, intention, nudge, and review data SHALL reside exclusively in Obsid
 | REQ-REM-006 | THE SYSTEM SHALL display no-date reminders in a separate configurable section. | P1 | v0.2 | Implemented |
 | REQ-REM-007 | THE SYSTEM SHALL support display ranges: selected day, next 7 days, all incomplete. | P1 | v0.2 | Implemented |
 | REQ-REM-008 | THE SYSTEM SHOULD display reminder priority where available. | P2 | v0.1 | Implemented |
-| REQ-REM-009 | THE SYSTEM SHOULD display reminder subtasks where available. | P2 | v0.3 | Blocked — EKReminder does not expose parent/child hierarchy in public EventKit API; subtask relationship is iCloud-internal |
-| REQ-REM-010 | THE SYSTEM SHALL support click-to-expand detail panel for reminders, consistent with event behavior, showing due date, priority, list, notes, linked notes, and action buttons (edit/delete/copy). | P1 | v0.5.1 | Planned |
+| REQ-REM-010 | THE SYSTEM SHALL support click-to-expand detail panel for reminders, consistent with event behavior, showing due date, priority, list, notes, linked notes, and action buttons (edit/delete/copy). | P1 | v0.5.1 | Implemented |
 | REQ-REM-011 | THE SYSTEM SHALL distinguish no-date, date-only, and date+time reminders in the read model and UI. Date-only reminders SHALL NOT display a synthetic `00:00` time. | P0 | v0.5.1 | Implemented |
 | REQ-REM-012 | Reminder create/edit forms SHALL preserve date-only reminders without inserting `00:00` unless the user explicitly sets a time. | P0 | v0.5.1 | Implemented |
 

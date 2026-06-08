@@ -757,6 +757,25 @@
 .calendian-action-copy:hover {
     opacity: 1;
 }
+
+/* REQ-REM-010: Reminder detail panel (mirrors event detail) */
+.calendian-reminder-detail {
+    padding: 6px 10px;
+    margin: 2px 6px 6px;
+    background: var(--background-secondary);
+    border-radius: 4px;
+    font-size: 0.78em;
+    border-left: 2px solid var(--background-modifier-border);
+}
+
+.calendian-reminder-expanded {
+    background-color: var(--background-modifier-hover);
+}
+
+.calendian-note-create-btn {
+    margin-top: 4px;
+    font-size: 0.85em;
+}
 /* Copy hint button in reminder hover actions */
 .calendian-action-copy-hint {
     cursor: pointer;

@@ -58,7 +58,7 @@ The repository contains the following implemented features:
 - **Note association via frontmatter**: events and reminders linked to notes via `calendian: { events: [...], reminders: [...] }` YAML frontmatter.
 - **Create note from event/reminder**: generates a note with frontmatter + template body; configurable note folder and templates.
 - **Template engine**: `{{variable}}` substitution with conditional blocks (`{{#key}}...{{/key}}`). Event vars: title, date, startTime, endTime, time, calendar, location, url, notes, isAllDay, recurrence. Reminder vars: title, date, dueTime, time, list, priority, notes.
-- **Linked Notes in panel**: event detail panel shows associated notes with links; reminder items show expandable linked notes list.
+- **Linked Notes in panel**: event detail panel and reminder detail panel show associated notes with links; both include a `+ Note` create button.
 - **Copy inline reference**: `📋` button copies `cal:ev:ID` or `cal:rem:ID` inline reference to clipboard.
 - **`calendian-event` code block**: embed events/reminders in notes with ` ```calendian ` — renders a styled table for the target date.
 - **Inline reference renderer**: `cal:ev:ID` / `cal:rem:ID` in notes renders as a styled mini-table with event/reminder details.

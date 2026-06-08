@@ -19,7 +19,7 @@ This document records the actual repository state. It intentionally separates im
 | Calendar source discovery | Implemented | EventKit `calendar.calendarIdentifier` (UUID), account name (`source.title`), color, type. Display name includes account suffix ("日历 — chengbo.sun123@outlook.com"). |
 | Reminder list discovery | Implemented | EventKit lists with UUID, account name, color. |
 | Event display | Implemented | Title, time range, all-day handling, calendar badge with color, location, recurrence indicator, ongoing/soon highlights. Expandable detail panel (click to show location, URL, notes, attendees, calendar source, recurrence summary). Multi-day events shown on all overlapping days. Past events dimmed/hidden per setting. Recurring events marked with read-only indicator. |
-| Reminder display | Implemented | Title, due date/time, list badge, priority indicator (high/medium/low). Completed reminders hidden by default. Overdue reminders visually distinguished (red border + badge + due date). No-date reminders in collapsible section. Display range selector (today / 7 days / all incomplete). Date-only reminders do not display synthetic `00:00` and edit forms preserve date-only shape. Subtask rendering ready (data-dependent — helper parentId not yet populated). |
+| Reminder display | Implemented | Title, due date/time, list badge, priority indicator (high/medium/low). Completed reminders hidden by default. Overdue reminders visually distinguished (red border + badge + due date). No-date reminders in collapsible section. Display range selector (today / 7 days / all incomplete). Date-only reminders do not display synthetic `00:00` and edit forms preserve date-only shape. Subtask rendering ready (data-dependent — helper parentId not yet populated). Expandable detail panel (click-to-expand, shows due date, priority, list, notes, linked notes, edit/delete/copy). |
 | Source filtering | Implemented | Toggle individual calendars/lists via settings. Filter by stable UUID (EventKit `calendarIdentifier`). In-memory instant apply via `render()`. Persisted in `data.json`. |
 | Permission handling | Implemented | Independent calendar/reminder permission states with recovery guidance and retry buttons. Partial permission support (show available data + banner for denied source). |
 | Error states | Implemented | Error classification (permission_denied, timeout, error). Per-source error banners with retry. Parse-failure isolation. Empty vs error distinction. |
@@ -39,7 +39,7 @@ This document records the actual repository state. It intentionally separates im
 
 ## Current release label
 
-Current repository state: **v0.5 complete — note association, rendering, live association sync, baseline notifications, reminder temporal semantics, and classified notifications done**. TASK-040 (frontmatter schema) done. TASK-041 (create/open notes with templates) done. TASK-042 (template variables) done. TASK-043 (baseline notifications) done. TASK-043a (temporal semantics/classified notifications) done. TASK-045 (file-change live sync) done. Another session may own TASK-044 (reminder detail panel).
+Current repository state: **v0.5 complete — note association, rendering, live association sync, baseline notifications, reminder temporal semantics, classified notifications, and reminder detail panel done**. TASK-040 (frontmatter schema) done. TASK-041 (create/open notes with templates) done. TASK-042 (template variables) done. TASK-043 (baseline notifications) done. TASK-043a (temporal semantics/classified notifications) done. TASK-044 (reminder detail panel) done. TASK-045 (file-change live sync) done. Next: TASK-046 (note→calendar creation).
 
 ## README policy
 
@@ -97,17 +97,17 @@ Everything else must be marked as planned, experimental, or future.
 
 > Updated by AI after every meaningful step. Next session reads this to continue without re-explaining context.
 
-- **Doing:** None in this worktree. Another session is working on TASK-044.
+- **Doing:** None.
 - **Completed this session:**
   - TASK-043 (in-app notifications, REQ-NOTIF-001..005) implemented. Added `src/macos/notifications.js`, notification settings, refresh-path delivery, session de-duplication, unavailable status handling, diagnostics status, and focused Node tests.
   - TASK-043a (reminder temporal semantics and classified notifications, REQ-REM-011/012 and REQ-NOTIF-006..010) implemented. Added `src/reminders/temporal.js`, preserved `dueTime`/`hasDueTime` through helper/cache/UI/note renderers, added previous-day settings, and made notification de-duplication phase-aware.
-- **Recent prior handoff:**
-  - TASK-045 (file-change live sync, REQ-NOTE-011) was already implemented before this worktree picked up TASK-043.
+  - Merged with main after TASK-044 (reminder detail panel), TASK-045 (file-change live sync), and event detail panel bug fixes.
 - **Decisions:**
   - Notifications are disabled by default to avoid surprise notices; event/reminder notification sub-toggles default enabled so the global switch is the main opt-in.
   - Notification de-duplication is session-local (`_deliveredNotifications`) and pruned after 48h; it prevents repeated notices during refresh loops without writing notification history into `data.json`.
   - Date-only reminders must keep their date-only shape end-to-end; UI/templates/edit forms should not synthesize `00:00`.
   - Previous-day notifications are refresh-driven, not exact OS alarms: they fire after Calendian loads/refreshes on the previous local day at or after the configured local time.
+  - Completion checkbox stays inline outside reminder detail panels for fast toggle.
 - **Verification:** `node tests/notifications.test.js`, `node tests/reminder-temporal.test.js`, `node --check main.js`, `env CLANG_MODULE_CACHE_PATH=/tmp/calendian-clang-cache swiftc -parse-as-library helper/Sources/main.swift -o /tmp/calendian-helper-check` (existing EventKit `Sendable` warning only).
-- **Next:** TASK-046 (note→calendar creation) after confirming TASK-044 is still owned by the other session.
-- **Last action:** 2026-06-08 — TASK-043a implemented and verified.
+- **Next:** TASK-046 (note→calendar creation).
+- **Last action:** 2026-06-08 — TASK-043a merged with main.
