@@ -952,6 +952,16 @@
     font-size: 0.82em;
     margin-top: 6px;
 }
+.calendian-create-ai-badge {
+    display: none;
+    float: right;
+    font-size: 0.75em;
+    color: var(--text-muted);
+    opacity: 0.7;
+    margin-top: 2px;
+    font-size: 0.82em;
+    margin-top: 6px;
+}
 .calendian-create-btn {
     display: block;
     width: 100%;

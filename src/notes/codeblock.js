@@ -570,16 +570,66 @@ function renderCalendianCreateBlock(plugin, source, el, ctx) {
     if (!sourceText) {
         var help = el.createDiv("calendian-create-block calendian-create-empty");
         help.createDiv("calendian-create-help").innerHTML =
-            "Add fields to create an event or reminder:<br>" +
-            "<code>type: event</code> or <code>type: reminder</code><br>" +
-            "<code>title: My title</code> (required)<br>" +
-            "<code>date: 2024-03-15</code> (required for events)<br>" +
-            "<code>time: 09:00-10:00</code> or <code>time: allday</code><br>" +
-            "<code>calendar: CalendarName</code> or <code>list: ListName</code>";
+            "输入事件描述即可创建，例如：<br>" +
+            "<code>明天下午3点开会</code> 或 <code>提醒我周五买菜</code><br>" +
+            "<br>或使用结构化字段：<br>" +
+            "<code>title: 标题</code> · <code>date: 2024-03-15</code> · <code>time: 14:00-15:00</code><br>" +
+            "<code>calendar: 日历名</code> · <code>list: 列表名</code> · <code>location: 地点</code>";
         return;
     }
 
-    var fields = parseCreateFields(sourceText);
+    // Detect natural language: single line without any "key:" pattern
+    var isNaturalLanguage = sourceText.indexOf("\n") === -1 && !/^\w+\s*:/.test(sourceText);
+    var fields;
+    if (isNaturalLanguage && typeof parseNaturalLanguage === "function") {
+        try {
+            // Build refDate: prefer note filename date, fall back to selected date, then today
+            var refDate = null;
+            if (ctx && ctx.sourcePath) {
+                try {
+                    var bn = ctx.sourcePath.replace(/\.md$/, "").split("/").pop();
+                    var fromFn = window.moment(bn, "YYYY-MM-DD", true);
+                    if (fromFn.isValid()) refDate = fromFn;
+                } catch (e) {}
+            }
+            if (!refDate) {
+                var integ0 = view.macosIntegration;
+                if (integ0.selectedDate) refDate = integ0.selectedDate.clone();
+            }
+
+            // Strip type-indicating keywords before parsing, keep for type inference
+            var isReminder = /^(提醒我?|提醒|remind\s*(me)?|todo:?)\s*/i.test(sourceText);
+            var cleanText = sourceText
+                .replace(/^(提醒我?|提醒|remind\s*(me)?|todo:?)\s*/i, '')
+                .trim();
+            if (!cleanText) cleanText = sourceText; // fallback if stripping ate everything
+
+            var nlResult = parseNaturalLanguage(cleanText, refDate);
+            if (nlResult && nlResult.title) {
+                fields = {
+                    type: isReminder ? "reminder" : "event",
+                    title: nlResult.title || "",
+                    date: nlResult.date ? nlResult.date.format("YYYY-MM-DD") : "",
+                    startTime: nlResult.time || "",
+                    endTime: nlResult.endTime || "",
+                    isAllDay: nlResult.allDay || false,
+                    calendar: "",
+                    list: "",
+                    location: "",
+                    notes: "",
+                    priority: isReminder ? "none" : "",
+                    url: "",
+                    errors: []
+                };
+            }
+        } catch (e) {
+            console.warn("[Calendian] NL parse in code block failed:", e.message);
+        }
+    }
+
+    if (!fields) {
+        fields = parseCreateFields(sourceText);
+    }
     var integ = view.macosIntegration;
 
     // Date inference from note filename (for events)
@@ -611,37 +661,41 @@ function renderCalendianCreateBlock(plugin, source, el, ctx) {
     // Field preview rows
     var preview = container.createDiv("calendian-create-preview");
 
-    function addFieldRow(key, value, cls) {
-        if (!value && value !== false) return;
-        var row = preview.createDiv("calendian-create-field");
-        row.createDiv("calendian-create-field-key").textContent = key;
-        row.createDiv("calendian-create-field-val" + (cls ? " " + cls : "")).textContent =
-            (typeof value === "boolean") ? (value ? "Yes" : "No") : String(value);
+    function renderFieldRows(f) {
+        preview.empty();
+        function addFieldRow(key, value, cls) {
+            if (!value && value !== false) return;
+            var row = preview.createDiv("calendian-create-field");
+            row.createDiv("calendian-create-field-key").textContent = key;
+            row.createDiv("calendian-create-field-val" + (cls ? " " + cls : "")).textContent =
+                (typeof value === "boolean") ? (value ? "Yes" : "No") : String(value);
+        }
+        addFieldRow("Title", f.title, "calendian-create-title");
+        if (f.type === "event") {
+            addFieldRow("Date", f.date);
+            if (f.isAllDay) {
+                addFieldRow("Time", "All day", "calendian-create-time-allday");
+            } else if (f.startTime) {
+                var td = f.startTime;
+                if (f.endTime) td += " – " + f.endTime;
+                addFieldRow("Time", td);
+            }
+            addFieldRow("Calendar", f.calendar || "(default)");
+        } else {
+            addFieldRow("Due", f.date || "(no date)");
+            if (f.startTime) addFieldRow("Time", f.startTime);
+            addFieldRow("List", f.list || "(default)");
+            if (f.priority && f.priority !== "none") addFieldRow("Priority", f.priority);
+        }
+        if (f.location) addFieldRow("Location", f.location);
+        if (f.notes) {
+            var np = f.notes.split("\n")[0];
+            if (np.length > 60) np = np.substring(0, 57) + "...";
+            addFieldRow("Notes", np);
+        }
     }
 
-    addFieldRow("Title", fields.title, "calendian-create-title");
-    if (fields.type === "event") {
-        addFieldRow("Date", fields.date);
-        if (fields.isAllDay) {
-            addFieldRow("Time", "All day", "calendian-create-time-allday");
-        } else if (fields.startTime) {
-            var timeDisplay = fields.startTime;
-            if (fields.endTime) timeDisplay += " – " + fields.endTime;
-            addFieldRow("Time", timeDisplay);
-        }
-        addFieldRow("Calendar", fields.calendar || "(default)");
-    } else {
-        addFieldRow("Due", fields.date || "(no date)");
-        if (fields.startTime) addFieldRow("Time", fields.startTime);
-        addFieldRow("List", fields.list || "(default)");
-        if (fields.priority && fields.priority !== "none") addFieldRow("Priority", fields.priority);
-    }
-    if (fields.location) addFieldRow("Location", fields.location);
-    if (fields.notes) {
-        var notesPreview = fields.notes.split("\n")[0];
-        if (notesPreview.length > 60) notesPreview = notesPreview.substring(0, 57) + "...";
-        addFieldRow("Notes", notesPreview);
-    }
+    renderFieldRows(fields);
 
     // Error display area (hidden initially)
     var errorEl = container.createDiv("calendian-create-error");
@@ -654,11 +708,57 @@ function renderCalendianCreateBlock(plugin, source, el, ctx) {
         return;
     }
 
+    // AI badge (shown when AI result is used)
+    var aiBadge = container.createDiv("calendian-create-ai-badge");
+    aiBadge.textContent = "";
+    aiBadge.style.display = "none";
+
     // Create button
     var btn = container.createEl("button", {
         cls: "calendian-create-btn",
         text: fields.type === "reminder" ? "Create Reminder" : "Create Event"
     });
+
+    // If NL input and AI is configured, try AI parsing in background
+    if (isNaturalLanguage && typeof callAIForParsing === "function") {
+        var opts = (integ.plugin && integ.plugin.options) || {};
+        if (opts.aiParsingEnabled && opts.aiEndpoint && opts.aiApiKey) {
+            // Build refDate for AI (same as above)
+            var aiRefDate = null;
+            if (ctx && ctx.sourcePath) {
+                try {
+                    var bn2 = ctx.sourcePath.replace(/\.md$/, "").split("/").pop();
+                    var ff2 = window.moment(bn2, "YYYY-MM-DD", true);
+                    if (ff2.isValid()) aiRefDate = ff2;
+                } catch (e) {}
+            }
+            if (!aiRefDate && integ.selectedDate) aiRefDate = integ.selectedDate.clone();
+
+            var cleanText2 = sourceText.replace(/^(提醒我?|提醒|remind\s*(me)?|todo:?)\s*/i, '').trim();
+            if (!cleanText2) cleanText2 = sourceText;
+
+            callAIForParsing(cleanText2, opts, aiRefDate).then(function(aiResult) {
+                if (aiResult && aiResult.title && !btn.disabled) {
+                    // Update fields with AI result
+                    fields.title = aiResult.title;
+                    if (aiResult.date && aiResult.date.isValid()) {
+                        fields.date = aiResult.date.format("YYYY-MM-DD");
+                    }
+                    if (aiResult.time) fields.startTime = aiResult.time;
+                    if (aiResult.endTime) fields.endTime = aiResult.endTime;
+                    if (aiResult.allDay) { fields.isAllDay = true; fields.startTime = ""; fields.endTime = ""; }
+
+                    // Update header and preview
+                    header.textContent = (isReminder ? "🔔" : "📅") + " New " + (isReminder ? "Reminder" : "Event");
+                    renderFieldRows(fields);
+
+                    // Show AI badge
+                    aiBadge.textContent = "✨ AI";
+                    aiBadge.style.display = "inline-block";
+                }
+            }).catch(function() { /* silent — regex result already shown */ });
+        }
+    }
 
     btn.addEventListener("click", async function() {
         btn.disabled = true;

@@ -2295,7 +2295,7 @@ function parseNaturalLanguage(text, refDate) {
     }
 
     // Chinese standalone period words (vague time without hour)
-    if (!time && !date) {
+    if (!time) {
         var cnPeriodAlone = { '中午': '12:00', '早上': '09:00', '上午': '09:00', '白天': '09:00', '下午': '14:00', '晚上': '19:00', '傍晚': '18:00', '凌晨': '03:00', '夜里': '22:00' };
         for (var cp in cnPeriodAlone) {
             if (working.indexOf(cp) !== -1) {
@@ -8861,10 +8861,12 @@ class CalendarPlugin extends obsidian.Plugin {
         this.registerMarkdownPostProcessor(function(el, ctx) {
             renderCalendianInline(self, el, ctx);
         });
-        // v0.5.1: ```calendian-create``` code block for in-note event/reminder creation
-        this.registerMarkdownCodeBlockProcessor("calendian-create", function(source, el, ctx) {
+        // v0.5.1: ```calendian-create``` / ```cc``` code block for in-note event/reminder creation
+        var createBlockHandler = function(source, el, ctx) {
             renderCalendianCreateBlock(self, source, el, ctx);
-        });
+        };
+        this.registerMarkdownCodeBlockProcessor("calendian-create", createBlockHandler);
+        this.registerMarkdownCodeBlockProcessor("cc", createBlockHandler);
         await this.loadOptions();
         this.addSettingTab(new CalendarSettingsTab(this.app, this));
         if (this.app.workspace.layoutReady) {
