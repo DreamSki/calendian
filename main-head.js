@@ -7624,7 +7624,9 @@ class MacOSIntegration {
             // REQ-CAL-007: Expanded detail panel
             if (this._expandedEvents.has(evtId)) {
                 itemEl.addClass("calendian-event-expanded");
-                var detailEl = sectionEl.createDiv("calendian-event-detail");
+                var detailEl = document.createElement("div");
+                detailEl.className = "calendian-event-detail";
+                itemEl.after(detailEl);
 
                 // Location
                 if (evt.location) {
@@ -7920,7 +7922,9 @@ class MacOSIntegration {
             // REQ-REM-010: Expanded detail panel
             if (this._expandedReminders.has(rem.id)) {
                 itemEl.addClass("calendian-reminder-expanded");
-                var detailEl = sectionEl.createDiv("calendian-reminder-detail");
+                var detailEl = document.createElement("div");
+                detailEl.className = "calendian-reminder-detail";
+                itemEl.after(detailEl);
 
                 // Due date (full format)
                 if (rem.due) {
