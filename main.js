@@ -757,9 +757,9 @@ const defaultSettings = Object.freeze({
     notificationLeadMinutes: 10,
     previousDayNotificationsEnabled: true,
     previousDayNotificationTime: "18:00",
-    // Reminder display settings (v0.2 schema)
+    // Reminder display settings
     showNoDateReminders: true,
-    reminderDisplayRange: 'today',
+    upcomingReminderDays: 7,   // 0 = all future, 3, 7 (default) — today view shows reminders due within this range
     // Default calendar/reminder list for create modals (v0.3 schema)
     defaultCalendarId: '',
     defaultReminderListId: '',
@@ -1259,7 +1259,7 @@ class CalendarSettingsTab extends obsidian.PluginSettingTab {
                 });
         });
     }
-    // REQ-REM-006, REQ-REM-007: Reminder display settings
+    // REQ-REM-006: Reminder display settings
     addReminderDisplaySettings() {
         // No-date reminders toggle
         new obsidian.Setting(this.containerEl)
@@ -1272,19 +1272,21 @@ class CalendarSettingsTab extends obsidian.PluginSettingTab {
             });
         });
 
-        // Default display range
+        // Upcoming reminder days (today view scope)
         new obsidian.Setting(this.containerEl)
-            .setName("Default reminder display range")
-            .setDesc("Choose how many days of reminders to show. You can also change this inline in the reminder panel.")
+            .setName("Upcoming reminder days")
+            .setDesc("On today's view, show reminders due within this many days. Other days show only that day's reminders.")
             .addDropdown((dropdown) => {
-            dropdown.addOption("today", "Selected day only");
-            dropdown.addOption("7days", "Next 7 days");
-            dropdown.addOption("all", "All incomplete");
-            dropdown.setValue(this.plugin.options.reminderDisplayRange || "today");
-            dropdown.onChange(async (value) => {
-                this.plugin.writeOptions(() => ({ reminderDisplayRange: value }));
+                dropdown.addOptions({ "3": "3 days", "7": "7 days", "0": "All future" });
+                dropdown.setValue(String(this.plugin.options.upcomingReminderDays ?? 7));
+                dropdown.onChange(async (value) => {
+                    this.plugin.writeOptions(() => ({ upcomingReminderDays: Number(value) }));
+                    const leaves = this.app.workspace.getLeavesOfType("calendar");
+                    if (leaves && leaves[0] && leaves[0].view && leaves[0].view.macosIntegration) {
+                        leaves[0].view.macosIntegration.render();
+                    }
+                });
             });
-        });
     }
     addMacOSRefreshIntervalSetting() {
         new obsidian.Setting(this.containerEl)
@@ -7506,6 +7508,7 @@ class MacOSIntegration {
         }
 
         // Get data from cache
+        this._currentRenderDate = this.selectedDate; // for renderRemindersSection isToday detection
         var dayEvents = [];
         var dayReminders = [];
         var noDateReminders = [];
@@ -7689,12 +7692,6 @@ class MacOSIntegration {
                 recEl.setAttribute("title", evt.recurrenceSummary || "Recurring event");
             }
 
-            // Calendar name as muted subtitle
-            if (calName) {
-                var subEl = detailsCol.createDiv("calendian-event-cal");
-                subEl.textContent = calName;
-            }
-
             // REQ-CAL-008: Click to expand/collapse detail panel
             let evtId = evt.id || (evt.title + "-" + (evt.start ? evt.start.getTime() : i));
             var self = this;
@@ -7839,41 +7836,47 @@ class MacOSIntegration {
     // REQ-REM-005: Overdue styling. REQ-REM-006: No-date section. REQ-REM-007: Display range. REQ-REM-009: Subtasks.
     renderRemindersSection(parent, reminders, noDateReminders) {
         const self = this;
-        const opts = this.plugin.options || {};
         const sectionEl = parent.createDiv("macos-section");
         sectionEl.setAttribute("data-section", "reminders");
 
         console.log("[Calendian] renderRemindersSection: " + reminders.length + " dated + " + (noDateReminders ? noDateReminders.length : 0) + " no-date reminders");
 
-        // REQ-REM-007: Header with inline range selector
-        const headerRow = sectionEl.createDiv("calendian-reminders-header");
-        const headerEl = headerRow.createDiv("macos-section-header");
+        const headerEl = sectionEl.createDiv("macos-section-header");
         headerEl.textContent = "Reminders";
 
-        // Inline range selector dropdown
-        const rangeSelector = headerRow.createEl("select", { cls: "calendian-reminder-range-selector" });
-        rangeSelector.innerHTML =
-            '<option value="today">Today</option>' +
-            '<option value="7days">Next 7 days</option>' +
-            '<option value="all">All incomplete</option>';
-        rangeSelector.value = opts.reminderDisplayRange || 'today';
-        rangeSelector.addEventListener("change", function() {
-            self.plugin.calendarPlugin.writeOptions(function() { return { reminderDisplayRange: rangeSelector.value }; });
-            self.render();
-        });
+        // REQ-REM-005/007: Sort — today view: today → future → overdue → completed
+        var now = new Date();
+        var todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+        var todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
 
-        // REQ-REM-005: Sort — overdue first, then by due date, completed at bottom
-        var todayStart = new Date();
-        todayStart.setHours(0, 0, 0, 0);
+        // Determine if we're rendering the "today" view
+        var isTodayView = false;
+        if (self._currentRenderDate) {
+            var rd = self._currentRenderDate.toDate();
+            isTodayView = rd.getFullYear() === now.getFullYear()
+                && rd.getMonth() === now.getMonth()
+                && rd.getDate() === now.getDate();
+        }
 
         var sortedReminders = reminders.slice().sort(function(a, b) {
-            // Completed always at bottom
+            // Completed always at very bottom
             if (a.completed && !b.completed) return 1;
             if (!a.completed && b.completed) return -1;
-            var aOverdue = a.due && a.due < todayStart;
-            var bOverdue = b.due && b.due < todayStart;
-            if (aOverdue && !bOverdue) return -1;
-            if (!aOverdue && bOverdue) return 1;
+
+            if (isTodayView) {
+                // Group: today (0) → future (1) → overdue (2)
+                function sortGroup(item) {
+                    if (!item.due) return 3;
+                    if (item.due >= todayStart && item.due <= todayEnd) return 0; // today
+                    if (item.due > todayEnd) return 1; // future
+                    return 2; // overdue
+                }
+                var aGroup = sortGroup(a);
+                var bGroup = sortGroup(b);
+                if (aGroup !== bGroup) return aGroup - bGroup;
+            }
+
+            // Within same group: sort by due date ascending
             if (a.due && b.due) return a.due - b.due;
             if (a.due) return -1;
             if (b.due) return 1;
@@ -8240,17 +8243,7 @@ class MacOSIntegration {
         const s = start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
         if (!end) return s;
         const e = end.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-        const diffMs = end.getTime() - start.getTime();
-        const diffMin = Math.round(diffMs / 60000);
-        let duration = "";
-        if (diffMin >= 60) {
-            const h = Math.floor(diffMin / 60);
-            const m = diffMin % 60;
-            duration = m > 0 ? ` (${h}h${m}m)` : ` (${h}h)`;
-        } else if (diffMin > 0) {
-            duration = ` (${diffMin}m)`;
-        }
-        return s + " - " + e + duration;
+        return s + " - " + e;
     }
 
     // --- Format single time ---
@@ -8955,24 +8948,32 @@ MacOSIntegration.prototype.getEventsForDate = function(date) {
 
 MacOSIntegration.prototype.getRemindersForDate = function(date) {
         var opts = this.plugin.options || {};
-        var displayRange = opts.reminderDisplayRange || 'today';
         var filterIds = opts.selectedReminderListIds || [];
 
         var d = date.toDate();
         var y = d.getFullYear(), m = d.getMonth(), day = d.getDate();
-        // Start far in the past so overdue reminders are always included;
-        // the range controls how far into the future we look.
-        var start = new Date(2000, 0, 1, 0, 0, 0);
-        var end;
+        var dayStart = new Date(y, m, day, 0, 0, 0, 0);
+        var dayEnd = new Date(y, m, day, 23, 59, 59, 999);
 
-        if (displayRange === '7days') {
-            end = new Date(y, m, day + 7, 23, 59, 59);
-        } else if (displayRange === 'all') {
-            // Show all incomplete reminders (full cache range)
-            end = new Date(y + 10, m, day, 23, 59, 59);
+        // Determine if selected date is today
+        var now = new Date();
+        var todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+        var isToday = dayStart.getTime() === todayStart.getTime();
+
+        var start, end;
+        if (isToday) {
+            // Today view: include overdue (from far past) + today + upcoming N days
+            start = new Date(2000, 0, 1, 0, 0, 0);
+            var upcomingDays = opts.upcomingReminderDays != null ? opts.upcomingReminderDays : 7;
+            if (upcomingDays === 0) {
+                end = new Date(2099, 11, 31, 23, 59, 59, 999); // all future
+            } else {
+                end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + upcomingDays, 23, 59, 59, 999);
+            }
         } else {
-            // 'today' — overdue + today only
-            end = new Date(y, m, day, 23, 59, 59);
+            // Non-today: only reminders due on that exact day
+            start = dayStart;
+            end = dayEnd;
         }
 
         return this.allReminders.filter(function(r) {

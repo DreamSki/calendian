@@ -310,24 +310,32 @@ MacOSIntegration.prototype.getEventsForDate = function(date) {
 
 MacOSIntegration.prototype.getRemindersForDate = function(date) {
         var opts = this.plugin.options || {};
-        var displayRange = opts.reminderDisplayRange || 'today';
         var filterIds = opts.selectedReminderListIds || [];
 
         var d = date.toDate();
         var y = d.getFullYear(), m = d.getMonth(), day = d.getDate();
-        // Start far in the past so overdue reminders are always included;
-        // the range controls how far into the future we look.
-        var start = new Date(2000, 0, 1, 0, 0, 0);
-        var end;
+        var dayStart = new Date(y, m, day, 0, 0, 0, 0);
+        var dayEnd = new Date(y, m, day, 23, 59, 59, 999);
 
-        if (displayRange === '7days') {
-            end = new Date(y, m, day + 7, 23, 59, 59);
-        } else if (displayRange === 'all') {
-            // Show all incomplete reminders (full cache range)
-            end = new Date(y + 10, m, day, 23, 59, 59);
+        // Determine if selected date is today
+        var now = new Date();
+        var todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+        var isToday = dayStart.getTime() === todayStart.getTime();
+
+        var start, end;
+        if (isToday) {
+            // Today view: include overdue (from far past) + today + upcoming N days
+            start = new Date(2000, 0, 1, 0, 0, 0);
+            var upcomingDays = opts.upcomingReminderDays != null ? opts.upcomingReminderDays : 7;
+            if (upcomingDays === 0) {
+                end = new Date(2099, 11, 31, 23, 59, 59, 999); // all future
+            } else {
+                end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + upcomingDays, 23, 59, 59, 999);
+            }
         } else {
-            // 'today' — overdue + today only
-            end = new Date(y, m, day, 23, 59, 59);
+            // Non-today: only reminders due on that exact day
+            start = dayStart;
+            end = dayEnd;
         }
 
         return this.allReminders.filter(function(r) {
