@@ -4,7 +4,7 @@
 
 Calendian is an Obsidian desktop plugin that integrates macOS Calendar events and macOS Reminders into the Obsidian sidebar. It is being developed with a Specification-Driven Development process: requirements, roadmap, tasks, tests, and release gates are tracked explicitly before features are claimed as complete.
 
-Current status: **v0.3 safe create — complete** (8/8 acceptance gates passed; all 11 deferred v0.2 items resolved; code split done via `cat` concatenation).
+Current status: **v0.4 safe edit/delete — complete** (all 5 acceptance gates passed; event/reminder creation, editing, deletion, and completion toggle all working).
 
 ---
 
@@ -16,7 +16,7 @@ Calendian is local-first by default. Early versions use macOS automation and do 
 
 ---
 
-## Current capabilities (v0.1–v0.3)
+## Current capabilities (v0.1–v0.4)
 
 The repository contains the following implemented features:
 
@@ -47,6 +47,14 @@ The repository contains the following implemented features:
 - **Natural language quick-create** (`QuickEventModal`, ⚡): English + Chinese regex parser (compact dates, numerals, duration, relative dates).
 - **AI-powered NL parsing** (optional): OpenAI-compatible backend, Enter-triggered, never auto-fires; configurable in settings; privacy-controlled.
 - Default calendar/list preference for create forms.
+- **Event editing** (`EventEditModal`): pre-filled form for simple non-recurring events; validation and post-edit refresh.
+- **Event deletion**: confirmation dialog (`ConfirmActionModal`); post-delete refresh.
+- **Recurring event safety**: edit/delete blocked with explanation dialog (`RecurringBlockModal`) and "Open in Calendar.app" redirect.
+- **Reminder completion toggle**: clickable ○/☑ checkbox with inline DOM update (no full panel refresh).
+- **Completed reminders** shown with strikethrough, sorted to bottom.
+- **Reminder editing** (`ReminderEditModal`): pre-filled form for all reminder fields.
+- **Reminder deletion**: confirmation dialog; post-delete refresh.
+- **No-date reminders** section expanded by default.
 
 For the precise truth table, see [`docs/sdd/CURRENT_STATUS.md`](./docs/sdd/CURRENT_STATUS.md) and [SPEC.md §2](./SPEC.md#2-current-implementation-status).
 
@@ -56,8 +64,7 @@ For the precise truth table, see [`docs/sdd/CURRENT_STATUS.md`](./docs/sdd/CURRE
 
 These are planned, but should not be treated as current behavior until their requirements and release gates pass:
 
-- Safe event/reminder editing and deletion (v0.4).
-- Recurring event safety model and scope selection UX.
+- Recurring event scope selection (this-only / future / all) for edit/delete.
 - Event/reminder note association through frontmatter.
 - Meeting-note templates.
 - In-app notifications for upcoming events and overdue reminders.
@@ -73,13 +80,12 @@ See [`ROADMAP.md`](./ROADMAP.md) for the requirement-driven plan.
 
 ---
 
-## Explicit non-goals for v0.1–v0.3
+## Explicit non-goals for v0.1–v0.4
 
-v0.1–v0.3 create events and reminders but do **not** yet include:
+v0.1–v0.4 do **not** yet include:
 
-- editing or deleting Calendar events;
-- editing, deleting, or completing Reminders;
-- recurring event creation, editing, or deletion;
+- recurring event scope selection (this-only / future / all) for edit/delete;
+- recurring event creation;
 - automatic Tasks ↔ Reminders sync;
 - Android, Windows, Linux, or web support;
 - direct Google Calendar API or Microsoft Graph API integration;
@@ -160,7 +166,7 @@ Then re-enable Obsidian's access.
 | Click ⚡ button | Open natural language quick-create for events/reminders. |
 | Click +Event / +Remind | Open manual create forms for events/reminders. |
 
-Event/reminder creation is available in v0.3; edit/delete are planned for v0.4.
+Event/reminder creation, editing, and deletion (with recurring event safety) are available in v0.4.
 
 ---
 
@@ -202,7 +208,7 @@ Future external API integrations, if any, must be opt-in and specified separatel
 | v0.1 | Read-only MVP | Complete |
 | v0.2 | Read-only polish | Complete |
 | v0.3 | Safe create + natural language | Complete |
-| v0.4 | Safe edit/delete | Planned |
+| v0.4 | Safe edit/delete | Complete |
 | v0.5 | Note association + notifications + Tasks | Planned |
 | v0.5.5 | Self-direction (goals, habits, nudges, reviews) | Planned |
 | v0.6 | Advanced views, search, export | Planned |

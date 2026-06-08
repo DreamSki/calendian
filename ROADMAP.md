@@ -29,7 +29,7 @@ Current repository status: **v0.3 safe create — complete**. Event/reminder cre
 | v0.1 | Read-only MVP | `REQ-PLAT-*`, `REQ-PERM-*`, `REQ-CAL-001..007`, `REQ-REM-001..004,008`, `REQ-SRC-001..005`, `REQ-CACHE-001..008`, `REQ-UX-001..004`, `REQ-PRIV-*`, `REQ-ERR-001..004`, `REQ-DIAG-001`, `REQ-DATA-*` | Complete |
 | v0.2 | Read-only polish | expandable details, overdue/no-date reminders, multi-day events, month-cell dots, full diagnostic panel | Complete |
 | v0.3 | Safe create | simple event/reminder creation, natural language (regex + AI), validation, write verification, refresh system, code split | **Complete** |
-| v0.4 | Safe edit/delete | simple event/reminder edit/delete, reminder completion, recurring safety | Planned |
+| v0.4 | Safe edit/delete | simple event/reminder edit/delete, reminder completion, recurring safety | **Complete** |
 | v0.5 | Note association & notifications | frontmatter association, meeting notes, templates, in-app notifications, limited Tasks integration | Planned |
 | v0.5.5 | Self-direction | goals, habits, nudges, reflections, encouragement statistics | Planned |
 | v0.6 | Advanced views/search | timeline, week view, search, data export, UI customization | Planned |
@@ -169,7 +169,7 @@ Allow users to create simple non-recurring events and simple reminders from Obsi
 - ✅ AI: 10s timeout, cancel on type, `response_format: json_object`, collapsible raw JSON preview.
 - ✅ Code split via `cat` concatenation (REQ-ARCH-001): `main-head.js` + `src/macos/helper-executor.js` (7 methods) + `src/cache/schedule-cache.js` (13 methods) → `build-main.sh` → `main.js`.
 - ✅ Deferred v0.2 items (10/11 resolved): window focus refresh, EK notification watch, permission retry, display-only marking, large-calendar benchmark, today summary, concurrent safety, watch fallback, data identity guard, DST excluded by user.
-- ⏸️ Recurring event safety UX (REQ-REC-002/003/007) — classification documented; edit-block code to be added in v0.4 entry points.
+- ✅ Recurring event safety UX (REQ-REC-002/003/007) — `RecurringBlockModal`, `canMutateEvent()` guard, helper data-layer rejection. Completed in v0.4.
 - ⏸️ Subtask display (REQ-REM-009) — permanently blocked by Apple EventKit API (no public parent/child for reminders).
 
 ### Explicit exclusions
@@ -179,7 +179,7 @@ Allow users to create simple non-recurring events and simple reminders from Obsi
 
 ---
 
-## v0.4 — Safe edit/delete
+## v0.4 — Safe edit/delete ✅ COMPLETE (2026-06-08)
 
 ### Goal
 
@@ -187,20 +187,21 @@ Support simple event/reminder mutation while protecting users from accidental de
 
 ### Required requirements
 
-- Event edit/delete: `REQ-WRITE-011` to `REQ-WRITE-015`
-- Reminder edit/delete/complete: `REQ-WRITE-016` to `REQ-WRITE-020`
-- Recurring safety: `REQ-REC-004` to `REQ-REC-008` if recurring mutation is enabled; otherwise block with explanation.
-- Error safety: `REQ-ERR-005`, `REQ-ERR-006` (write-path errors)
+- Event edit/delete: `REQ-WRITE-011` to `REQ-WRITE-015` ✅
+- Reminder edit/delete/complete: `REQ-WRITE-016` to `REQ-WRITE-020` ✅
+- Recurring safety: `REQ-REC-002`, `REQ-REC-003` (block + explain); `REQ-REC-004` to `REQ-REC-008` deferred for scope selection
+- Error safety: `REQ-ERR-005`, `REQ-ERR-006` (write-path errors) ✅
 
 ### Deliverables
 
-- Edit simple non-recurring events.
-- Delete simple non-recurring events with confirmation.
-- Mark reminders complete.
-- Edit reminders.
-- Delete reminders with confirmation.
-- Unsupported recurring operations open Calendar.app or show safe block.
-- Operation result feedback.
+- ✅ Edit simple non-recurring events (`EventEditModal`, `edit-event` helper command).
+- ✅ Delete simple non-recurring events with confirmation (`ConfirmActionModal`, `delete-event` helper command).
+- ✅ Mark reminders complete (clickable ○/☑ checkbox, `toggle-reminder` helper command).
+- ✅ Edit reminders (`ReminderEditModal`, `edit-reminder` helper command).
+- ✅ Delete reminders with confirmation (`delete-reminder` helper command).
+- ✅ Unsupported recurring operations open Calendar.app or show safe block (`RecurringBlockModal`).
+- ✅ Completed reminders shown with strikethrough, sorted to bottom.
+- ✅ Operation result feedback (obsidian.Notice on success/failure).
 
 ### Explicit exclusions
 

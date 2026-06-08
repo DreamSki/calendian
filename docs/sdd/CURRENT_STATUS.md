@@ -87,19 +87,22 @@ Everything else must be marked as planned, experimental, or future.
 
 > Updated by AI after every meaningful step. Next session reads this to continue without re-explaining context.
 
-- **Doing:** v0.4 safe edit/delete — code complete, docs update in progress.
+- **Doing:** v0.4 safe edit/delete — complete. Docs final audit and commit.
 - **Decisions:**
-  - writer.js `module.exports` code guarded with `typeof module !== 'undefined'` check — Node.js-only code skipped in Obsidian concatenation.
-  - writer.js added to `build-main.sh` concatenation order (was documented but not actually included).
-  - No-date reminder loop wrapped in IIFE to fix `var` closure issue.
-  - `ConfirmActionModal` reused for both event and reminder delete confirmations (instead of separate dialogs).
-  - `RecurringBlockModal` uses `x-apple-calevent:` URL scheme for Calendar.app redirect with file:// fallback.
-- **v0.4 changes:**
-  - Helper binary: `edit-event`, `delete-event`, `edit-reminder`, `delete-reminder` commands added.
-  - Writer module: `canMutateEvent`, `canMutateReminder`, `editEvent`, `deleteEvent`, `confirmDeleteEvent`, `toggleReminder`, `editReminder`, `deleteReminder`, `confirmDeleteReminder` prototype methods.
+  - writer.js Node.js code removed from concatenation entirely — only `MacOSIntegration.prototype` methods remain.
+  - Toggle checkbox uses helper-first-then-update pattern (no optimistic update, no revert flicker).
+  - Click handlers use DOM back-references (`_reminder`, `_self`, `_itemEl`) instead of IIFE closures.
+  - No-date reminder `completed` field was hardcoded `false` — fixed to read `nd.completed || false` from helper.
+  - Helper changed from `predicateForIncompleteReminders` to `predicateForReminders(in:)` to include completed reminders.
+  - `ConfirmActionModal` reused for both event and reminder delete confirmations.
+  - `RecurringBlockModal` uses `x-apple-calevent:` URL scheme for Calendar.app redirect.
+  - `_togglingReminders` flight guard prevents race on rapid checkbox clicks.
+  - No-date reminders section default expanded; arrow toggle logic corrected.
+- **v0.4 changes summary:**
+  - Helper binary: `edit-event`, `delete-event`, `edit-reminder`, `delete-reminder` commands.
+  - Writer module: 9 new `MacOSIntegration.prototype` methods (guards + edit/delete/toggle/confirm).
   - UI modals: `EventEditModal`, `ReminderEditModal`, `RecurringBlockModal`, `ConfirmActionModal`.
-  - Event detail panel: Edit/Delete action buttons (guard checks isDisplayOnly, isRecurring).
-  - Reminder rendering: clickable ○ checkbox for completion toggle, hover-visible Edit/Delete buttons.
-  - CSS: `.calendian-detail-actions`, `.calendian-action-danger`, `.calendian-reminder-checkbox`, `.calendian-item-actions`.
-- **Next:** v0.5 note association.
-- **Last action:** 2026-06-08 — v0.4 code complete, docs update in progress.
+  - Event detail: Edit/Delete buttons with safety guards.
+  - Reminders: clickable ○/☑ checkbox, hover-visible Edit/Delete, completed strikethrough.
+- **Next:** v0.5 note association + notifications.
+- **Last action:** 2026-06-08 — v0.4 complete, all docs aligned.

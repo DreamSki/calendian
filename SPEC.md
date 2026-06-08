@@ -1,7 +1,7 @@
 # Calendian Specification
 
 > Status: authoritative product specification  
-> Version target: v0.3 / safe create — complete (8/8 acceptance gates passed; 11/11 deferred v0.2 items resolved; only code split and recurring safety UX deferred to v0.4)
+> Version target: v0.4 / safe edit/delete — complete (all 5 acceptance gates passed; event/reminder creation, editing, deletion, and completion toggle all working; only recurring scope selection deferred to future)
 > Last updated: 2026-06-08  
 > Plugin ID: `calendian`  
 > Process: Specification-Driven Development (SDD)
@@ -173,14 +173,12 @@ The following features are currently implemented in the codebase. All macOS data
 
 ## 3. Non-goals and explicit boundaries
 
-### 3.1 v0.1–v0.3 non-goals
+### 3.1 v0.1–v0.4 non-goals
 
-The following are explicitly out of scope for v0.1 through v0.3:
+The following are explicitly out of scope for v0.1 through v0.4:
 
-- Editing Calendar events.
-- Deleting Calendar events.
-- Editing, deleting, or completing Reminders.
-- Editing recurring events (creation is non-recurring only).
+- Editing recurring events with scope selection (this-only / future / all) — blocked in v0.4, deferred to future.
+- Creating recurring events.
 - Two-way sync between Obsidian Tasks and macOS Reminders.
 - Android, Windows, Linux, or web support.
 - Direct Google Calendar API, Microsoft Graph API, or CalDAV API integration.
@@ -672,7 +670,7 @@ All refresh paths go through `init()`, which has a `_refreshRunning` boolean gat
 | REQ-UX-002 | WHEN a user Cmd/Ctrl-clicks a date, THE SYSTEM SHALL preserve open/create daily-note behavior. | P0 | v0.1 | Implemented |
 | REQ-UX-003 | THE SYSTEM SHALL show loading, empty, error, unsupported, and partial-permission states. | P0 | v0.1 | Implemented |
 | REQ-UX-004 | THE SYSTEM SHALL use Obsidian theme variables where possible. | P1 | v0.1 | Implemented |
-| REQ-UX-005 | THE SYSTEM SHOULD support event/reminder context menus only when actions are implemented safely. | P1 | v0.4 | Planned — depends on edit/delete actions |
+| REQ-UX-005 | THE SYSTEM SHOULD support event/reminder context menus only when actions are implemented safely. | P1 | v0.4 | Implemented — edit/delete/completion actions available via inline buttons and expanded detail panel; right-click context menu deferred |
 | REQ-UX-006 | THE SYSTEM SHOULD show calendar dots on month cells without harming navigation performance. | P1 | v0.2 | Implemented |
 | REQ-UX-007 | THE SYSTEM SHOULD support keyboard navigation and commands. | P2 | v0.6 | Planned |
 | REQ-UX-008 | THE SYSTEM SHOULD support a compact and comfortable density option. | P2 | v0.6 | Planned |
@@ -699,7 +697,7 @@ All refresh paths go through `init()`, which has a `_refreshRunning` boolean gat
 | REQ-ERR-003 | IF a data item fails to parse, THE SYSTEM SHALL skip that item and continue rendering valid items. | P1 | v0.1 | Implemented |
 | REQ-ERR-004 | THE SYSTEM SHALL distinguish empty data from failure states in the UI. | P0 | v0.1 | Implemented |
 | REQ-ERR-005 | WHEN write operations are implemented, failed writes SHALL NOT display false success and SHALL refresh from source of truth. | P0 | v0.3 | Implemented — error banners (`.calendian-form-error`) + Obsidian Notice on failure; only `init(true)` on success |
-| REQ-ERR-006 | DESTRUCTIVE OPERATIONS (delete/edit) SHALL require user confirmation and stable source identity. | P0 | v0.4 | Planned |
+| REQ-ERR-006 | DESTRUCTIVE OPERATIONS (delete/edit) SHALL require user confirmation and stable source identity. | P0 | v0.4 | Implemented — ConfirmActionModal for all delete operations; canMutateEvent/canMutateReminder guards check isDisplayOnly and isRecurring before any mutation |
 
 ### 7.10 Write requirements, future releases
 
@@ -715,16 +713,16 @@ All refresh paths go through `init()`, which has a `_refreshRunning` boolean gat
 | REQ-WRITE-008 | THE SYSTEM SHALL refresh from Reminders.app after reminder creation. | P0 | v0.3 | Implemented — calls init(true) after successful write |
 | REQ-WRITE-009 | THE SYSTEM SHOULD support due date and due time during reminder creation. | P1 | v0.3 | Implemented — optional due date and time fields |
 | REQ-WRITE-010 | THE SYSTEM SHOULD support priority during reminder creation where available. | P2 | v0.3 | Implemented — dropdown with none/low/medium/high |
-| REQ-WRITE-011 | THE SYSTEM SHALL edit simple non-recurring events with validation and safe refresh. | P0 | v0.4 | Planned |
-| REQ-WRITE-012 | THE SYSTEM SHALL delete simple non-recurring events only after confirmation. | P0 | v0.4 | Planned |
-| REQ-WRITE-013 | THE SYSTEM SHALL open unsupported events in Calendar.app when safe editing is unavailable. | P1 | v0.4 | Planned |
-| REQ-WRITE-014 | THE SYSTEM SHALL record safe failure states for event edits/deletes. | P0 | v0.4 | Planned |
-| REQ-WRITE-015 | THE SYSTEM SHALL not mutate events without a stable source identity. | P0 | v0.4 | Planned |
-| REQ-WRITE-016 | THE SYSTEM SHALL mark reminders complete with safe refresh. | P0 | v0.4 | Planned |
-| REQ-WRITE-017 | THE SYSTEM SHALL edit reminders with validation and safe refresh. | P0 | v0.4 | Planned |
-| REQ-WRITE-018 | THE SYSTEM SHALL delete reminders only after confirmation. | P0 | v0.4 | Planned |
-| REQ-WRITE-019 | THE SYSTEM SHALL not mutate reminders without a stable source identity. | P0 | v0.4 | Planned |
-| REQ-WRITE-020 | THE SYSTEM SHOULD expose write operation result feedback. | P1 | v0.4 | Planned |
+| REQ-WRITE-011 | THE SYSTEM SHALL edit simple non-recurring events with validation and safe refresh. | P0 | v0.4 | Implemented — EventEditModal pre-fills all event fields; edit-event helper command; post-edit refresh via init(true) |
+| REQ-WRITE-012 | THE SYSTEM SHALL delete simple non-recurring events only after confirmation. | P0 | v0.4 | Implemented — ConfirmActionModal with danger styling; delete-event helper command; post-delete refresh |
+| REQ-WRITE-013 | THE SYSTEM SHALL open unsupported events in Calendar.app when safe editing is unavailable. | P1 | v0.4 | Implemented — RecurringBlockModal offers "Open in Calendar.app" via x-apple-calevent URL scheme |
+| REQ-WRITE-014 | THE SYSTEM SHALL record safe failure states for event edits/deletes. | P0 | v0.4 | Implemented — write error classification via classifyError(); error display in modal .calendian-form-error; console.error logging |
+| REQ-WRITE-015 | THE SYSTEM SHALL not mutate events without a stable source identity. | P0 | v0.4 | Implemented — canMutateEvent() guard checks isDisplayOnly flag; edit/delete buttons hidden for display-only items |
+| REQ-WRITE-016 | THE SYSTEM SHALL mark reminders complete with safe refresh. | P0 | v0.4 | Implemented — clickable ○/☑ checkbox; toggle-reminder helper command; inline DOM update without full render; _togglingReminders flight guard |
+| REQ-WRITE-017 | THE SYSTEM SHALL edit reminders with validation and safe refresh. | P0 | v0.4 | Implemented — ReminderEditModal pre-fills all reminder fields; edit-reminder helper command; post-edit refresh |
+| REQ-WRITE-018 | THE SYSTEM SHALL delete reminders only after confirmation. | P0 | v0.4 | Implemented — ConfirmActionModal; delete-reminder helper command; post-delete refresh |
+| REQ-WRITE-019 | THE SYSTEM SHALL not mutate reminders without a stable source identity. | P0 | v0.4 | Implemented — canMutateReminder() guard checks isDisplayOnly flag; edit/delete/checkbox hidden for display-only items |
+| REQ-WRITE-020 | THE SYSTEM SHOULD expose write operation result feedback. | P1 | v0.4 | Implemented — obsidian.Notice on success/failure for all write operations; console.error logging on failure |
 
 ### 7.11 Recurring event safety requirements
 
@@ -786,8 +784,8 @@ All refresh paths go through `init()`, which has a `_refreshRunning` boolean gat
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
 | REQ-REC-001 | THE SYSTEM SHALL identify recurring events where possible. | P0 | v0.2 | Implemented |
-| REQ-REC-002 | THE SYSTEM SHALL treat recurring event mutation as unsupported until scope UX exists. | P0 | v0.4 | Planned — edit/delete entry points not yet implemented |
-| REQ-REC-003 | THE SYSTEM SHALL explain why recurring mutation is blocked. | P0 | v0.4 | Planned — blocking UI to be added with edit/delete modals |
+| REQ-REC-002 | THE SYSTEM SHALL treat recurring event mutation as unsupported until scope UX exists. | P0 | v0.4 | Implemented — canMutateEvent() blocks recurring event edits/deletes; RecurringBlockModal; helper edit-event/delete-event reject hasRecurrenceRules at data layer |
+| REQ-REC-003 | THE SYSTEM SHALL explain why recurring mutation is blocked. | P0 | v0.4 | Implemented — RecurringBlockModal explains scope selection complexity and redirects to Calendar.app |
 | REQ-REC-004 | THE SYSTEM SHALL offer explicit scope choices before editing recurring events. | P0 | Future | Planned |
 | REQ-REC-005 | THE SYSTEM SHALL offer explicit scope choices before deleting recurring events. | P0 | Future | Planned |
 | REQ-REC-006 | THE SYSTEM SHALL distinguish series identity from occurrence identity. | P0 | Future | Planned |

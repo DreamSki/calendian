@@ -84,15 +84,15 @@ Required P0 acceptance:
 - Ambiguous natural language input shows a confirmation dialog with extracted fields.
 - Manual event creation form remains available alongside NL parsing.
 
-## v0.4 — Safe edit/delete
+## v0.4 — Safe edit/delete ✅ PASSED (2026-06-08)
 
 Required P0 acceptance:
 
-- User can edit simple non-recurring events.
-- User can delete simple non-recurring events with confirmation.
-- User can mark reminders complete.
-- User can edit and delete reminders with confirmation where destructive.
-- Recurring event edit/delete is blocked or explicitly scoped.
+- ✅ User can edit simple non-recurring events.
+- ✅ User can delete simple non-recurring events with confirmation.
+- ✅ User can mark reminders complete.
+- ✅ User can edit and delete reminders with confirmation where destructive.
+- ✅ Recurring event edit/delete is blocked or explicitly scoped.
 
 ## v0.5 — Note association and notifications
 
