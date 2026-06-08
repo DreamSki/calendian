@@ -6852,6 +6852,8 @@ class MacOSIntegration {
         this.sourceCounts = { calendars: 0, reminderLists: 0 };
         // REQ-CAL-008: Expandable event detail state
         this._expandedEvents = new Set();
+        // v0.4: In-flight toggle guard — prevents race on rapid checkbox clicks
+        this._togglingReminders = {};
         // REQ-UX-006: Dot color CSS management for month cell event dots
         this._dotStyleEl = null;
         this._dotColorClasses = {};
@@ -7702,25 +7704,48 @@ class MacOSIntegration {
                 var checkbox = itemEl.createDiv("calendian-reminder-checkbox");
                 checkbox.textContent = rem.completed ? "☑" : "○";
                 checkbox.setAttribute("title", rem.completed ? "Mark incomplete" : "Mark complete");
-                checkbox.addEventListener("click", function(e) {
-                    e.stopPropagation();
-                    // Optimistic local update
-                    rem.completed = !rem.completed;
-                    self.render();
-                    // Sync to source of truth
-                    self.toggleReminder(rem).then(function(result) {
-                        if (result && result.ok) {
-                            new obsidian.Notice(result.completed ? "Reminder completed" : "Reminder uncompleted");
-                        }
-                    }).catch(function(err) {
-                        // Revert on failure
+                (function(remId, boxEl, itemElement) {
+                    boxEl.addEventListener("click", function(e) {
+                        e.stopPropagation();
+                        // Prevent rapid re-clicks while toggle is in flight
+                        if (self._togglingReminders[remId]) return;
+                        self._togglingReminders[remId] = true;
+
+                        var wasCompleted = rem.completed;
+                        // Optimistic inline DOM update — no full render
                         rem.completed = !rem.completed;
-                        self.render();
-                        var errMsg = err.stderr || (err.error && err.error.message) || err.message || JSON.stringify(err);
-                        console.error("[Calendian] Toggle reminder failed:", errMsg);
-                        new obsidian.Notice("Failed to update reminder");
+                        boxEl.textContent = rem.completed ? "☑" : "○";
+                        boxEl.setAttribute("title", rem.completed ? "Mark incomplete" : "Mark complete");
+                        if (rem.completed) {
+                            itemElement.addClass("calendian-reminder-completed");
+                        } else {
+                            itemElement.removeClass("calendian-reminder-completed");
+                        }
+
+                        // Sync to source of truth
+                        self.toggleReminder(rem).then(function(result) {
+                            self._togglingReminders[remId] = false;
+                            if (result && result.ok) {
+                                // Background sync: refresh cache quietly, no block
+                                self.init(true);
+                            }
+                        }).catch(function(err) {
+                            // Revert on failure
+                            self._togglingReminders[remId] = false;
+                            rem.completed = wasCompleted;
+                            boxEl.textContent = wasCompleted ? "☑" : "○";
+                            boxEl.setAttribute("title", wasCompleted ? "Mark incomplete" : "Mark complete");
+                            if (wasCompleted) {
+                                itemElement.addClass("calendian-reminder-completed");
+                            } else {
+                                itemElement.removeClass("calendian-reminder-completed");
+                            }
+                            var errMsg = err.stderr || (err.error && err.error.message) || err.message || JSON.stringify(err);
+                            console.error("[Calendian] Toggle reminder failed:", errMsg);
+                            new obsidian.Notice("Failed to update reminder");
+                        });
                     });
-                });
+                })(rem.id, checkbox, itemEl);
             } else {
                 // Display-only: show status icon without click
                 var icon = itemEl.createDiv("calendian-reminder-checkbox");
@@ -7838,24 +7863,42 @@ class MacOSIntegration {
                     var nrCheckbox = nrItemEl.createDiv("calendian-reminder-checkbox");
                     nrCheckbox.textContent = nr.completed ? "☑" : "○";
                     nrCheckbox.setAttribute("title", nr.completed ? "Mark incomplete" : "Mark complete");
-                    nrCheckbox.addEventListener("click", function(e) {
-                        e.stopPropagation();
-                        // Optimistic local update
-                        nr.completed = !nr.completed;
-                        self.render();
-                        // Sync to source of truth
-                        self.toggleReminder(nr).then(function(result) {
-                            if (result && result.ok) {
-                                new obsidian.Notice(result.completed ? "Reminder completed" : "Reminder uncompleted");
-                            }
-                        }).catch(function(err) {
-                            // Revert on failure
+                    (function(remId, boxEl, itemElement) {
+                        boxEl.addEventListener("click", function(e) {
+                            e.stopPropagation();
+                            if (self._togglingReminders[remId]) return;
+                            self._togglingReminders[remId] = true;
+
+                            var wasCompleted = nr.completed;
                             nr.completed = !nr.completed;
-                            self.render();
-                            console.error("[Calendian] Toggle reminder failed:", err);
-                            new obsidian.Notice("Failed to update reminder");
+                            boxEl.textContent = nr.completed ? "☑" : "○";
+                            boxEl.setAttribute("title", nr.completed ? "Mark incomplete" : "Mark complete");
+                            if (nr.completed) {
+                                itemElement.addClass("calendian-reminder-completed");
+                            } else {
+                                itemElement.removeClass("calendian-reminder-completed");
+                            }
+
+                            self.toggleReminder(nr).then(function(result) {
+                                self._togglingReminders[remId] = false;
+                                if (result && result.ok) {
+                                    self.init(true);
+                                }
+                            }).catch(function(err) {
+                                self._togglingReminders[remId] = false;
+                                nr.completed = wasCompleted;
+                                boxEl.textContent = wasCompleted ? "☑" : "○";
+                                boxEl.setAttribute("title", wasCompleted ? "Mark incomplete" : "Mark complete");
+                                if (wasCompleted) {
+                                    itemElement.addClass("calendian-reminder-completed");
+                                } else {
+                                    itemElement.removeClass("calendian-reminder-completed");
+                                }
+                                console.error("[Calendian] Toggle reminder failed:", err);
+                                new obsidian.Notice("Failed to update reminder");
+                            });
                         });
-                    });
+                    })(nr.id, nrCheckbox, nrItemEl);
                 } else {
                     // Display-only icon
                     var nrIcon = nrItemEl.createDiv("calendian-reminder-checkbox");
