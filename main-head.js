@@ -6923,6 +6923,7 @@ class MacOSIntegration {
         this._bodyScanIndex = null;          // persisted body scan results across rebuilds
         this._highlightedItemId = null;      // item ID to highlight on next render
         this._highlightTimer = null;         // auto-clear timer
+        this._fileChangeDebounceTimer = null; // REQ-NOTE-011: debounce for file-change → index invalidation
     }
 
     // --- Execute native helper (EventKit, fast) ---
@@ -8505,11 +8506,40 @@ class CalendarView extends obsidian.ItemView {
             weeklyNotes.reindex();
             this.updateActiveFile();
         }
+        // REQ-NOTE-011: Invalidate association index when any .md file is deleted
+        if (file.path && file.path.endsWith(".md")) {
+            this._invalidateAssociationDebounced();
+        }
     }
+    // REQ-NOTE-011: Debounced association index invalidation on vault file changes.
+    // Batches rapid changes (e.g. find-and-replace) within 500ms to avoid full re-scan per keystroke.
+    _invalidateAssociationDebounced() {
+        if (this._fileChangeDebounceTimer) {
+            clearTimeout(this._fileChangeDebounceTimer);
+        }
+        var self = this;
+        this._fileChangeDebounceTimer = setTimeout(function() {
+            self._fileChangeDebounceTimer = null;
+            if (!self.macosIntegration) return;
+            console.log("[Calendian] File change detected, rebuilding association index...");
+            // Null out bodyScanIndex to force a fresh rebuild (stale entries cleaned)
+            self.macosIntegration._bodyScanIndex = null;
+            self.macosIntegration._associationIndex = null;
+            self.macosIntegration._associationIndexDirty = true;
+            // Clear item lookup cache used by code block renderers
+            self.macosIntegration._itemLookupCache = null;
+            self.macosIntegration.render();
+        }, 500);
+    }
+
     async onFileModified(file) {
         const date = getDateFromFile_1(file, "day") || getDateFromFile_1(file, "week");
         if (date && this.calendar) {
             this.calendar.tick();
+        }
+        // REQ-NOTE-011: Invalidate association index when any .md file is modified
+        if (file.path && file.path.endsWith(".md")) {
+            this._invalidateAssociationDebounced();
         }
     }
     onFileCreated(file) {
@@ -8522,6 +8552,10 @@ class CalendarView extends obsidian.ItemView {
                 weeklyNotes.reindex();
                 this.calendar.tick();
             }
+        }
+        // REQ-NOTE-011: Invalidate association index when any .md file is created
+        if (file.path && file.path.endsWith(".md")) {
+            this._invalidateAssociationDebounced();
         }
     }
     onFileOpen(_file) {
