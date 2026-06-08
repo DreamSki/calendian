@@ -33,7 +33,7 @@ The repository contains the following implemented features:
 - Reminder display: title, due date/time, list badge, priority indicator (high/medium/low).
 - Overdue reminders visually distinguished (red border + badge + due date).
 - No-date reminders in collapsible section.
-- Reminder display range selector (today / 7 days / all incomplete).
+- Reminders display for the selected day, with overdue items included.
 - Calendar/reminder source discovery with account name disambiguation.
 - Source filtering by individual calendar/list with instant apply.
 - Configurable auto-refresh with disk cache and two-phase instant startup.
@@ -166,7 +166,6 @@ Then re-enable Obsidian's access.
 | Cmd/Ctrl + click a date | Opens or creates the daily note for that date. |
 | Click Today / month navigation | Moves the calendar view. |
 | Click ↻ button | Manually refreshes from macOS Calendar/Reminders. |
-| Reminder range selector | Filter reminders: selected day / next 7 days / all incomplete. |
 | Open settings → macOS Integration | Toggle Calendar/Reminders display, source filtering, past event display, refresh interval, in-app notifications, default calendar/list for create form, note templates, note folder, AI NL parsing config. |
 | Open settings → Diagnostics | View permission status, source counts, cache stats. Export via consent modal. |
 | Click ⚡ button | Open natural language quick-create for events/reminders. |

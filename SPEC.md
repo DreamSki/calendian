@@ -92,7 +92,7 @@ The following features are currently implemented in the codebase. All macOS data
 - ✅ Stable reminder identity (`EKReminder.calendarItemIdentifier`)
 - ✅ Overdue reminders visually distinguished (red border + badge + due date)
 - ✅ No-date reminders in collapsible section
-- ✅ Reminder display range selector (today / 7 days / all incomplete)
+- ✅ Reminders: today view shows overdue + today + upcoming N days (configurable); other days show only that day's reminders
 
 #### Cache and performance
 - ✅ ±6 month preload via EventKit date predicate
@@ -559,7 +559,7 @@ Goal, habit, intention, nudge, and review data SHALL reside exclusively in Obsid
 | REQ-REM-004 | THE SYSTEM SHALL hide completed reminders by default. | P0 | v0.1 | Implemented |
 | REQ-REM-005 | THE SYSTEM SHALL visually distinguish overdue reminders. | P1 | v0.2 | Implemented |
 | REQ-REM-006 | THE SYSTEM SHALL display no-date reminders in a separate configurable section. | P1 | v0.2 | Implemented |
-| REQ-REM-007 | THE SYSTEM SHALL support display ranges: selected day, next 7 days, all incomplete. | P1 | v0.2 | Implemented |
+| REQ-REM-007 | THE SYSTEM SHALL support configurable reminder display range. Today view shows overdue + today + upcoming N days (configurable: 3/7/all). Other days show only that day's reminders. Sort order for today: today → future → overdue → completed. | P1 | v0.2 | Implemented |
 | REQ-REM-008 | THE SYSTEM SHOULD display reminder priority where available. | P2 | v0.1 | Implemented |
 | REQ-REM-010 | THE SYSTEM SHALL support click-to-expand detail panel for reminders, consistent with event behavior, showing due date, priority, list, notes, linked notes, and action buttons (edit/delete/copy). | P1 | v0.5.1 | Implemented |
 | REQ-REM-011 | THE SYSTEM SHALL distinguish no-date, date-only, and date+time reminders in the read model and UI. Date-only reminders SHALL NOT display a synthetic `00:00` time. | P0 | v0.5.1 | Implemented |

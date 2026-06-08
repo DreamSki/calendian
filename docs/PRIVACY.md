@@ -69,7 +69,7 @@ Stored in `<vault>/.obsidian/plugins/calendian/data.json`.
 
 The disk cache (`_eventsCache`, `_remindersCache`) stores event/reminder fields (title, time, calendar name, location, notes, etc.) for fast cold-start — see §1 for the full field list. This cache is stored inside the vault and never leaves the device.
 
-**Fields added in v0.2:** `pastEventDisplay`, `reminderDisplayRange`, `showNoDateReminders`.
+**Fields added in v0.2:** `pastEventDisplay`, `showNoDateReminders`. Historical `reminderDisplayRange` values may remain in existing `data.json` files but are no longer used by the timeline panel UI.
 
 **Planned fields (v0.3+):** `cacheRangeMonthsPast`, `cacheRangeMonthsFuture`, `showCompletedReminders`, and self-direction fields (nudge config, etc.) will be added as the corresponding features ship. See [`SETTINGS_SCHEMA.md`](./SETTINGS_SCHEMA.md) for the full target schema.
 
