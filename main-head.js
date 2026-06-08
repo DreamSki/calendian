@@ -761,6 +761,11 @@ const defaultSettings = Object.freeze({
     aiEndpoint: 'https://api.deepseek.com/v1/chat/completions',
     aiApiKey: '',
     aiModel: 'deepseek-chat',
+    // v0.5: Note templates (REQ-NOTE-005, REQ-NOTE-006)
+    eventNoteTemplate: "# {{title}}\n\n- **Date:** {{date}}\n- **Time:** {{time}}\n- **Calendar:** {{calendar}}\n{{#location}}- **Location:** {{location}}\n{{/location}}{{#url}}- **URL:** {{url}}\n{{/url}}{{#notes}}\n## Notes\n{{notes}}\n{{/notes}}",
+    reminderNoteTemplate: "# {{title}}\n\n- **Due:** {{date}} {{time}}\n- **List:** {{list}}\n- **Priority:** {{priority}}\n{{#notes}}\n## Notes\n{{notes}}\n{{/notes}}",
+    // v0.5: Note folder for created notes
+    noteFolder: "",
 });
 function appHasPeriodicNotesPluginLoaded() {
     var _a, _b;
@@ -834,6 +839,16 @@ class CalendarSettingsTab extends obsidian.PluginSettingTab {
             text: "AI Natural Language Parsing (optional)",
         });
         this.addAISettings();
+
+        // === Note Templates Section (v0.5, REQ-NOTE-005/006) ===
+        this.containerEl.createEl("h3", {
+            text: "Note Templates",
+        });
+        this.containerEl.createEl("p", {
+            cls: "setting-item-description",
+            text: "Template for notes created from events and reminders. Use {{variable}} placeholders. Available variables: title, date, time, calendar/list, location, url, notes, priority, isAllDay, recurrence.",
+        });
+        this.addNoteTemplateSettings();
 
         // === Privacy & Diagnostics Section ===
         this.containerEl.createEl("h3", {
@@ -1409,6 +1424,50 @@ class CalendarSettingsTab extends obsidian.PluginSettingTab {
         privacyNote.style.color = "var(--text-muted)";
         privacyNote.style.fontSize = "0.85em";
         privacyNote.textContent = "⚠️ Privacy: When enabled, the text you type in quick-create is sent to the configured AI API endpoint. No calendar data, reminder data, or personal information is sent — only the natural language text you explicitly type for parsing. The API key is stored in your local vault's data.json (which is gitignored).";
+    }
+
+    // v0.5: Note template settings (REQ-NOTE-005, REQ-NOTE-006)
+    addNoteTemplateSettings() {
+        var self = this;
+        var opts = this.plugin.options || {};
+
+        // Event note template
+        new obsidian.Setting(this.containerEl)
+            .setName("Event note template")
+            .setDesc("Template body for notes created from calendar events. Variables: {{title}}, {{date}}, {{startTime}}, {{endTime}}, {{time}}, {{calendar}}, {{location}}, {{url}}, {{notes}}, {{isAllDay}}, {{recurrence}}. Use {{#key}}...{{/key}} for conditional blocks.")
+            .addTextArea(function(cmp) {
+                cmp.setPlaceholder("# {{title}}\n\n- **Date:** {{date}}\n- **Time:** {{time}}");
+                cmp.setValue(opts.eventNoteTemplate || "");
+                cmp.inputEl.rows = 6;
+                cmp.onChange(async function(value) {
+                    await self.plugin.writeOptions(function() { return { eventNoteTemplate: value }; });
+                });
+            });
+
+        // Reminder note template
+        new obsidian.Setting(this.containerEl)
+            .setName("Reminder note template")
+            .setDesc("Template body for notes created from reminders. Variables: {{title}}, {{date}}, {{dueTime}}, {{time}}, {{list}}, {{priority}}, {{notes}}.")
+            .addTextArea(function(cmp) {
+                cmp.setPlaceholder("# {{title}}\n\n- **Due:** {{date}} {{time}}\n- **List:** {{list}}");
+                cmp.setValue(opts.reminderNoteTemplate || "");
+                cmp.inputEl.rows = 6;
+                cmp.onChange(async function(value) {
+                    await self.plugin.writeOptions(function() { return { reminderNoteTemplate: value }; });
+                });
+            });
+
+        // Note folder
+        new obsidian.Setting(this.containerEl)
+            .setName("Note folder")
+            .setDesc("Folder path (relative to vault root) for notes created from events and reminders. Leave empty for vault root.")
+            .addText(function(cmp) {
+                cmp.setPlaceholder("e.g. Calendar Notes");
+                cmp.setValue(opts.noteFolder || "");
+                cmp.onChange(async function(value) {
+                    await self.plugin.writeOptions(function() { return { noteFolder: value.trim() }; });
+                });
+            });
     }
 }
 
@@ -6858,6 +6917,12 @@ class MacOSIntegration {
         this._dotStyleEl = null;
         this._dotColorClasses = {};
         this._calendarSources = null;  // Reference to sources array passed to Calendar
+        // v0.5: Note association index (REQ-NOTE-001, REQ-NOTE-002)
+        this._associationIndex = null;       // { events: Map<id, [{path,title}]>, reminders: Map<id, [{path,title}]> }
+        this._associationIndexDirty = true;  // force rebuild on first access
+        this._bodyScanIndex = null;          // persisted body scan results across rebuilds
+        this._highlightedItemId = null;      // item ID to highlight on next render
+        this._highlightTimer = null;         // auto-clear timer
     }
 
     // --- Execute native helper (EventKit, fast) ---
@@ -7402,6 +7467,15 @@ class MacOSIntegration {
             // Trigger Svelte re-render by replacing sources with a new array reference
             this.calendarComponent.$set({ sources: [...this._calendarSources] });
         }
+
+        // v0.5: Clear highlight after render (one-shot, auto-cleared on next render)
+        if (this._highlightedItemId) {
+            var self = this;
+            clearTimeout(this._highlightTimer);
+            this._highlightTimer = setTimeout(function() {
+                self._highlightedItemId = null;
+            }, 3000);
+        }
     }
 
     // REQ-PERM-001, REQ-PERM-002: Actionable permission recovery guidance
@@ -7472,6 +7546,11 @@ class MacOSIntegration {
                 itemEl.addClass("calendian-event-past");
             }
 
+            // v0.5: Highlight clicked-from-note item
+            if (this._highlightedItemId && evt.id === this._highlightedItemId) {
+                itemEl.addClass("calendian-item-highlight");
+            }
+
             // Highlight: starting soon or ongoing
             if (this.isStartingSoon(evt)) {
                 itemEl.addClass("macos-item-soon");
@@ -7513,6 +7592,10 @@ class MacOSIntegration {
                 recEl.addClass("macos-meta-recurring");
             }
 
+            // REQ-CAL-008: Click to expand/collapse detail panel
+            var evtId = evt.id || (evt.title + "-" + (evt.start ? evt.start.getTime() : i));
+            var self = this;
+
             // Calendar badge with color
             var calName = evt.calendarName || evt.calendar || "";
             const badgeRow = itemEl.createDiv("macos-item-badges");
@@ -7526,9 +7609,6 @@ class MacOSIntegration {
                 }
             }
 
-            // REQ-CAL-008: Click to expand/collapse detail panel
-            var evtId = evt.id || (evt.title + "-" + (evt.start ? evt.start.getTime() : i));
-            var self = this;
             itemEl.addEventListener("click", function(e) {
                 if (self._expandedEvents.has(evtId)) {
                     self._expandedEvents.delete(evtId);
@@ -7631,6 +7711,36 @@ class MacOSIntegration {
                         self.confirmDeleteEvent(evt);
                     });
                 }
+
+                // v0.5: Associated notes (REQ-NOTE-001, REQ-NOTE-003)
+                var associatedNotes = self.getAssociatedNotes(evt);
+                if (associatedNotes.length > 0) {
+                    var notesField = detailEl.createDiv("calendian-event-detail-field");
+                    notesField.createEl("strong").textContent = "Linked Notes";
+                    for (var ni = 0; ni < associatedNotes.length; ni++) {
+                        var noteInfo = associatedNotes[ni];
+                        var noteLinkDiv = notesField.createDiv("calendian-note-link");
+                        var linkEl = noteLinkDiv.createEl("a", { cls: "internal-link", attr: { "data-href": noteInfo.path } });
+                        linkEl.textContent = "📝 " + noteInfo.title;
+                        linkEl.style.cursor = "pointer";
+                        linkEl.addEventListener("click", (function(nPath) {
+                            return function(e) {
+                                e.stopPropagation();
+                                self.plugin.app.workspace.openLinkText(nPath, "", false);
+                            };
+                        })(noteInfo.path));
+                    }
+                }
+                // v0.5: Copy inline ref (REQ-NOTE-009)
+                if (evt.id && !evt.isDisplayOnly) {
+                    var noteActionsEl = detailEl.createDiv("calendian-detail-actions");
+                    var copyBtn = noteActionsEl.createDiv("macos-refresh-btn calendian-action-copy");
+                    copyBtn.textContent = "📋 Copy ref";
+                    copyBtn.addEventListener("click", function(e) {
+                        e.stopPropagation();
+                        self.copyItemText(evt, "event");
+                    });
+                }
             }
         }
     }
@@ -7697,6 +7807,11 @@ class MacOSIntegration {
             // Completed styling
             if (rem.completed) {
                 itemEl.addClass("calendian-reminder-completed");
+            }
+
+            // v0.5: Highlight clicked-from-note item
+            if (this._highlightedItemId && rem.id === this._highlightedItemId) {
+                itemEl.addClass("calendian-item-highlight");
             }
 
             // Checkbox + title (v0.4: clickable checkbox for completion toggle, REQ-WRITE-016)
@@ -7800,6 +7915,64 @@ class MacOSIntegration {
                 remDeleteBtn.addEventListener("click", function(e) {
                     e.stopPropagation();
                     self.confirmDeleteReminder(rem);
+                });
+            }
+
+            // v0.5: Associated notes indicator (REQ-NOTE-002, REQ-NOTE-003)
+            if (!rem.isDisplayOnly && rem.id) {
+                var remNotes = self.getAssociatedNotes(rem);
+                // Show linked notes count, click to expand list
+                var remNotes = self.getAssociatedNotes(rem);
+                if (remNotes.length > 0) {
+                    var remNoteBtn = remActionsEl.createDiv("calendian-note-indicator");
+                    remNoteBtn.textContent = "📝" + remNotes.length;
+                    remNoteBtn.setAttribute("title", remNotes.length + " linked note(s)");
+                    // DOM back-references to avoid var closure issues
+                    remNoteBtn._reminder = rem;
+                    remNoteBtn._notes = remNotes;
+                    remNoteBtn._self = self;
+                    remNoteBtn.addEventListener("click", function(e) {
+                        e.stopPropagation();
+                        var me = e.currentTarget;
+                        var meRem = me._reminder;
+                        var meNotes = me._notes;
+                        var meSelf = me._self;
+                        // Find the itemEl from the button's position
+                        var targetItem = me;
+                        while (targetItem && !targetItem.classList.contains("macos-item")) {
+                            targetItem = targetItem.parentElement;
+                        }
+                        if (!targetItem) return;
+                        var sectionEl = targetItem.parentElement;
+                        // Toggle notes list below this item
+                        var existing = sectionEl.querySelector(".calendian-notes-list[data-rem-id='" + meRem.id + "']");
+                        if (existing) {
+                            existing.remove();
+                            return;
+                        }
+                        var notesList = document.createElement("div");
+                        notesList.className = "calendian-notes-list";
+                        notesList.setAttribute("data-rem-id", meRem.id);
+                        for (var ni = 0; ni < meNotes.length; ni++) {
+                            var noteLink = notesList.createDiv("calendian-notes-list-item");
+                            noteLink.textContent = "📄 " + meNotes[ni].title;
+                            noteLink.addEventListener("click", (function(np) {
+                                return function(ev) {
+                                    ev.stopPropagation();
+                                    meSelf.plugin.app.workspace.openLinkText(np, "", false);
+                                };
+                            })(meNotes[ni].path));
+                        }
+                        targetItem.parentElement.insertBefore(notesList, targetItem.nextSibling);
+                    });
+                }
+                // v0.5: Copy inline ref (REQ-NOTE-009)
+                var remCopyBtn = remActionsEl.createDiv("calendian-note-indicator calendian-action-copy-hint");
+                remCopyBtn.textContent = "📋";
+                remCopyBtn.setAttribute("title", "Copy");
+                remCopyBtn.addEventListener("click", function(e) {
+                    e.stopPropagation();
+                    self.copyItemText(rem, "reminder");
                 });
             }
 
@@ -8226,6 +8399,15 @@ class CalendarView extends obsidian.ItemView {
 
         // Click day: single click = select date (show events), Cmd/Ctrl+click = open/create note
         const self = this;
+
+        // v0.5: Auto-rebuild every 30s — fresh body scan picks up new inline refs
+        setInterval(function() {
+            if (self.macosIntegration) {
+                self.macosIntegration._bodyScanIndex = null;
+                self.macosIntegration._associationIndexDirty = true;
+                self.macosIntegration.render();
+            }
+        }, 30000);
         this.macosWrappedOnClickDay = (date, inNewSplit) => {
             // Always update the panel to show selected date's events (instant from cache)
             if (self.macosIntegration) {
@@ -8480,6 +8662,15 @@ class CalendarPlugin extends obsidian.Plugin {
             id: "reveal-active-note",
             name: "Reveal active note",
             callback: () => this.view.revealActiveNote(),
+        });
+        // v0.5: ```calendian``` code block renderer
+        var self = this;
+        this.registerMarkdownCodeBlockProcessor("calendian", function(source, el, ctx) {
+            renderCalendianBlock(self, source, el, ctx);
+        });
+        // v0.5: inline `cal:ev:ID` / `cal:rem:ID` reference renderer
+        this.registerMarkdownPostProcessor(function(el, ctx) {
+            renderCalendianInline(self, el, ctx);
         });
         await this.loadOptions();
         this.addSettingTab(new CalendarSettingsTab(this.app, this));
