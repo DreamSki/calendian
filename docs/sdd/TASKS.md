@@ -114,9 +114,10 @@ Tasks are ordered by dependency and release target. Every task references requir
 - Deliverables:
   - Overdue styling.
   - No-date section.
-  - Display range selector.
+  - Selected-day reminders with overdue items included.
   - Priority and subtasks where supported.
-- Evidence: Overdue reminders visually distinguished (red border + badge + due date). No-date reminders in collapsible section. Display range selector (today / 7 days / all incomplete). Subtask rendering ready (data-dependent — helper parentId not yet populated). Code at main.js `renderRemindersSection()`.
+  - Today view: overdue + today + upcoming N days (configurable 3/7/all); other days: only that day's reminders.
+- Evidence: Overdue reminders visually distinguished (red border + badge + due date). No-date reminders in collapsible section. Timeline panel today view shows overdue + today + upcoming N days (configurable via `upcomingReminderDays` setting, default 7); other days show only that day's reminders. Sort order for today: today → future → overdue → completed. Subtask rendering ready (data-dependent — helper parentId not yet populated). Code at main.js `renderRemindersSection()`, `src/cache/schedule-cache.js` `getRemindersForDate()`.
 
 ### TASK-013 — Month cell event dots
 

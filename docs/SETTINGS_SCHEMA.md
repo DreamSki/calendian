@@ -38,9 +38,11 @@ interface CalendianSettings {
   };
 
   // ---- Display: reminders ----
-  reminderRange: "selected-day" | "next-7-days" | "all-incomplete"; // default: "selected-day"
   showCompletedReminders: boolean;  // default: false
   noDateReminderSection: "show" | "hide"; // default: "show" (v0.2)
+  upcomingReminderDays: number;     // default: 7, options: 0 (all), 3, 7
+                                    // Today view shows reminders due within this many days.
+                                    // Other days show only that day's reminders.
 
   // ---- Display: general ----
   legacyClickBehavior: boolean;     // default: false
@@ -109,7 +111,6 @@ interface CalendianSourceMetadata {
     "location": false,
     "notes": false
   },
-  "reminderRange": "selected-day",
   "showCompletedReminders": false,
   "noDateReminderSection": "show",
   "legacyClickBehavior": false,
@@ -266,7 +267,6 @@ See `TESTING.md` → Future automated test targets → Settings migration.
 | `refreshIntervalMinutes` | `REQ-CACHE-003` |
 | `cacheRangeMonthsPast/Future` | `REQ-CACHE-001` |
 | `showPastEvents` | `REQ-CAL-010` |
-| `reminderRange` | `REQ-REM-007` |
 | `showCompletedReminders` | `REQ-REM-004` |
 | `noDateReminderSection` | `REQ-REM-006` |
 | `legacyClickBehavior` | `REQ-UX-001`, `REQ-UX-002` |

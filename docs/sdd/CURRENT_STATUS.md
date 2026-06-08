@@ -19,7 +19,7 @@ This document records the actual repository state. It intentionally separates im
 | Calendar source discovery | Implemented | EventKit `calendar.calendarIdentifier` (UUID), account name (`source.title`), color, type. Display name includes account suffix ("日历 — chengbo.sun123@outlook.com"). |
 | Reminder list discovery | Implemented | EventKit lists with UUID, account name, color. |
 | Event display | Implemented | Title, time range, all-day handling, calendar badge with color, location, recurrence indicator, ongoing/soon highlights. Expandable detail panel (click to show location, URL, notes, attendees, calendar source, recurrence summary). Multi-day events shown on all overlapping days. Past events dimmed/hidden per setting. Recurring events marked with read-only indicator. |
-| Reminder display | Implemented | Title, due date/time, list badge, priority indicator (high/medium/low). Completed reminders hidden by default. Overdue reminders visually distinguished (red border + badge + due date). No-date reminders in collapsible section. Display range selector (today / 7 days / all incomplete). Date-only reminders do not display synthetic `00:00` and edit forms preserve date-only shape. Subtask rendering ready (data-dependent — helper parentId not yet populated). Expandable detail panel (click-to-expand, shows due date, priority, list, notes, linked notes, edit/delete/copy). |
+| Reminder display | Implemented | Title, due date/time, list badge, priority indicator (high/medium/low). Completed reminders hidden by default. Overdue reminders visually distinguished (red border + badge + due date). No-date reminders in collapsible section. **Today view**: shows overdue + today's + upcoming N days' reminders (configurable: 3/7/all, default 7). **Other days**: only reminders due on that exact day. Sort order for today: today → future → overdue → completed. Date-only reminders do not display synthetic `00:00` and edit forms preserve date-only shape. Subtask rendering ready (data-dependent — helper parentId not yet populated). Expandable detail panel (click-to-expand, shows due date, priority, list, notes, linked notes, edit/delete/copy). |
 | Source filtering | Implemented | Toggle individual calendars/lists via settings. Filter by stable UUID (EventKit `calendarIdentifier`). In-memory instant apply via `render()`. Persisted in `data.json`. |
 | Permission handling | Implemented | Independent calendar/reminder permission states with recovery guidance and retry buttons. Partial permission support (show available data + banner for denied source). |
 | Error states | Implemented | Error classification (permission_denied, timeout, error). Per-source error banners with retry. Parse-failure isolation. Empty vs error distinction. |
@@ -60,7 +60,9 @@ README may list the following as current behavior:
 - recurring event read-only indicator;
 - overdue reminder styling (red border + badge + due date);
 - no-date reminders in collapsible section;
-- reminder display range selector (today / 7 days / all incomplete);
+- selected-day reminder display with overdue items included;
+- today view shows overdue + today + upcoming N days (configurable 3/7/all); other days show only that day's reminders;
+- sort order for today: today → future → overdue → completed;
 - month cell event dots (calendar-colored, hollow reminder dot, multi-day span);
 - diagnostic export with consent modal and field redaction;
 - event/reminder creation with validation and post-write refresh;
@@ -98,28 +100,18 @@ Everything else must be marked as planned, experimental, or future.
 
 > Updated by AI after every meaningful step. Next session reads this to continue without re-explaining context.
 
-- **Doing:** Review for remaining items.
-- **Just completed:** BUGFIX-007 — widen inline ref body scan regex for opaque EventKit IDs.
+- **Doing:** Reminder date filtering & sort refactor (REQ-REM-007).
+- **Just completed:** Rewrote `getRemindersForDate()` and sort logic in `renderRemindersSection()`. Added `upcomingReminderDays` setting (3/7/all, default 7). Rebuilt main.js. Updated SDD docs.
 - **Completed this session:**
-  - **BUGFIX-001 — source filter fallback (helper/Sources/main.swift):** When configured calendar/reminder IDs don't match any available source, helper was falling back to `calendars = nil` (all calendars) — a privacy leak. Fixed 3 locations to return empty `[]` when `filtered.isEmpty`.
-  - **BUGFIX-002 — execHelper timeout (src/macos/helper-executor.js):** Added 30s timeout with settled guard, SIGTERM kill, and clearTimeout in all paths.
-  - **BUGFIX-003 — manifest version (manifest.json, README, TASKS.md):** Bumped manifest version from 0.1.0 to 0.5.0. Updated README status from "in progress" to "complete" with added notification/note→calendar mentions. Removed duplicate v0.5.5 roadmap row.
-  - **BUGFIX-004 — macOS version compatibility (helper/Sources/main.swift):** Added `isFullAccess(for:)` and `requestFullAccess(for:)` version-safe wrappers with `#available(macOS 14.0, *)` guards. On macOS 14+ uses `.fullAccess` / `requestFullAccessTo*`; on macOS 12-13 falls back to `.authorized` / `requestAccess(to:)` completion-handler API.
-  - **BUGFIX-005 — error JSON via JSONEncoder (helper/Sources/main.swift):** Replaced all 13 string-interpolated `fputs("{\"error\":\"...\"}\n", stderr)` calls with `printError()` function using `ErrorResponse` Codable struct + `JSONEncoder`. Added manual-escaping fallback for encode failures. Special-character-safe error output verified.
-  - **BUGFIX-006 — stale body scan index (src/notes/frontmatter.js):** `ensureAssociationIndex()` was preserving `_bodyScanIndex` on rebuild, carrying stale inline-ref entries forward because `scanBodiesForInlineRefs()` only adds. Now always starts fresh (frontmatter populates sync, body scan populates async). Removed `if (isRebuild && this._bodyScanIndex) { index = this._bodyScanIndex }` carry-over.
-  - **UI/UX refresh — CSS overhaul (`styles.css`):** Added design tokens, event color rail via `box-shadow: inset`, priority color dots replacing `!!!` text, skeleton loading animation, inline chip styling, toolbar icon buttons, `<details>` folding for no-date reminders, codeblock `max-width` cap. All through Obsidian theme variables.
-  - **`render()` method:** Today summary without emoji + overdue in red. Date header simplified. **Toolbar refactored** into separate icon-button row using `obsidian.setIcon`. **Scroll position preserved** across re-renders (no more jump-to-top).
-  - **`renderEventsSection()` rewrite:** Calendar color → left 3px rail via `--cal-event-color`. Badge removed, calendar name as muted subtitle. All-day class + "soon" chip. All detail panel / linked notes / mutation guards preserved.
-  - **`renderRemindersSection()` rewrite:** `obsidian.setIcon` checkboxes with loader spinner feedback. Priority color dots replace text. List badge removed. No-date section → `<details>` CSS-only folding. Simplified detail priority labels.
-  - **`renderLoading()` upgraded** with skeleton pulse rows.
-  - **Inline ref chip mode (`src/notes/codeblock.js`):** Single ref → inline chip with icon. Multiple → table (unchanged). `CalendianInlineChipChild` for live-update.
-  - **Build:** `main.js` (11818 lines). Helper compiles OK. Helper data channel → valid JSON.
+  - **`getRemindersForDate()`** in `src/cache/schedule-cache.js`: Today view now queries from 2000-01-01 to (today + upcomingReminderDays). Other days query only that exact day's date range (midnight to 23:59:59).
+  - **Sort order** in `main-head.js:renderRemindersSection()`: Today view sorts as today → future → overdue → completed. Other days sort by due time with completed at bottom.
+  - **New setting** `upcomingReminderDays` (default 7): dropdown in "Reminder display settings" section with options 3 days / 7 days / All future. Auto re-renders on change.
+  - **`_currentRenderDate`** stored on MacOSIntegration in `render()` so `renderRemindersSection()` can detect isToday without changing its signature.
+  - **Docs updated:** SETTINGS_SCHEMA.md, CURRENT_STATUS.md (reminder display row + allowed list + active session).
+  - **Build:** `main.js` rebuilt (11703 lines).
 - **Decisions:**
-  - External proposal ~90% correct — adjusted for method signatures, `obsidian.setIcon` fallback, and preserving existing detail panel / linked notes / mutation guard functionality.
-  - `<details>` only for no-date section; dated reminder expand/collapse kept JS-based for detail panel rendering.
-  - `renderSelf` renamed to avoid collision with inner `self` references.
-  - BUGFIX-006: Fresh index on every rebuild. The brief async body scan gap (~seconds, capped 200 files) is acceptable — preserving stale entries indefinitely is the greater evil.
-- **Next:** Review for any remaining issues.
-- **BUGFIX-007 — inline ref body scan regex (`src/notes/frontmatter.js:161`):** Widened char class from `[A-Fa-f0-9:-]{20,}` (hex+colon+hyphen only) to `[^\s`]{20,}` (any non-whitespace, non-backtick). This ensures opaque EventKit IDs with non-hex characters are matched by the body scan for inline `cal:ev:ID`/`cal:rem:ID` refs. The inline renderer regex in `src/notes/codeblock.js:165` already used `(.+)` and needed no change. Rebuilt `main.js` (11726 lines). Helper compiles OK, `node --check` clean.
-- **Last action:** 2026-06-09 — BUGFIX-007: widened inline ref body scan regex char class to `[^\s`]`.
-
+  - No-date reminders remain unchanged (shown every day) per user preference.
+  - Completed reminders always at very bottom, even below overdue.
+  - Settings dropdown uses 0/3/7 numeric values stored as number; UI shows "3 days", "7 days", "All future".
+- **Next:** Reload Obsidian and verify: today shows overdue+today+future with correct sort; other day shows only that day's reminders; setting toggle works.
+- **Last action:** 2026-06-09 — design parity audit complete, orphaned CSS cleaned, built and verified.
