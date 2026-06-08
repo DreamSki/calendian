@@ -100,7 +100,7 @@ Everything else must be marked as planned, experimental, or future.
 
 > Updated by AI after every meaningful step. Next session reads this to continue without re-explaining context.
 
-- **Doing:** Manual validation setup for TASK-050 on branch `codex/task-050-tasks-integration`.
+- **Doing:** None.
 - **Just completed before this validation:** Rewrote `getRemindersForDate()` and sort logic in `renderRemindersSection()`. Added `upcomingReminderDays` setting (3/7/all, default 7). Rebuilt main.js. Updated SDD docs.
 - **Completed this session:**
   - **`getRemindersForDate()`** in `src/cache/schedule-cache.js`: Today view now queries from 2000-01-01 to (today + upcomingReminderDays). Other days query only that exact day's date range (midnight to 23:59:59).
@@ -118,6 +118,6 @@ Everything else must be marked as planned, experimental, or future.
   - Tasks integration stays explicit and one-way: selected/current Markdown task line(s) → Reminders.
   - No automatic import, watcher, or two-way Tasks ↔ Reminders sync until stable identity/conflict rules are specified.
   - Existing `cal:rem:ID` refs are the duplicate-prevention marker and are skipped on export.
-- **Verification:** `node tests/tasks-integration.test.js` ✓, `node tests/notifications.test.js` ✓, `node tests/reminder-temporal.test.js` ✓, `node --check main.js` ✓, `./build-main.sh` ✓, helper compile ✓.
-- **Next:** Reload Obsidian and manually verify TASK-050 command palette export flow; also verify today/other-day reminder display after TASK-050 validation if needed.
-- **Last action:** 2026-06-09 — rebasing TASK-050 onto current main for manual validation.
+- **Verification:** `node tests/tasks-integration.test.js` ✓, `node tests/notifications.test.js` ✓, `node tests/reminder-temporal.test.js` ✓, `node --check main.js` ✓, `./build-main.sh` ✓, helper compile ✓, user manual Obsidian validation of TASK-050 command palette export flow ✓.
+- **Next:** Merge `codex/task-050-tasks-integration` to `main` and push.
+- **Last action:** 2026-06-09 — TASK-050 manually verified in Obsidian.
