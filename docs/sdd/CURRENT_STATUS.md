@@ -97,7 +97,9 @@ Everything else must be marked as planned, experimental, or future.
 
 - **Doing:** TASK-046 (note→calendar creation) or TASK-043 (notifications) — whichever is next.
 - **Completed this session:**
-  - TASK-044 (reminder detail panel, REQ-REM-010) implemented. `_expandedReminders` Set tracks expand state. Click handler on reminder items toggles detail panel (checkbox clicks excluded). Detail panel shows: due date (`formatDueDateFull()`), priority, list+account, notes (200-char truncation), linked notes with `+ Note` create button, Edit/Delete/Copy action row. Old inline hover-visible actions removed. CSS mirrors event detail panel pattern. `main.js` rebuilt (10560 lines).
+  - TASK-044 (reminder detail panel, REQ-REM-010) implemented. `_expandedReminders` Set tracks expand state. Click handler on reminder items toggles detail panel (checkbox clicks excluded). Detail panel shows: due date (`formatDueDateFull()`), priority, list+account, notes (200-char truncation), linked notes with `+ Note` create button, Edit/Delete/Copy action row. Old inline hover-visible actions removed. CSS mirrors event detail panel pattern.
+  - Bug fix: event click handler closure — `var evtId` → `let evtId` so each event's click handler toggles itself, not the last event (classic JS closure-in-loop bug, existed since v0.2 TASK-010).
+  - Bug fix: event and reminder detail panels use `itemEl.after(detailEl)` instead of `sectionEl.createDiv()` for explicit DOM placement.
 - **Decisions:**
   - Completion checkbox stays inline (outside detail panel) for fast toggle — per TASK-044 requirement.
   - No inline action buttons when collapsed — clean appearance, consistent with events.
@@ -105,4 +107,4 @@ Everything else must be marked as planned, experimental, or future.
   - Added `formatDueDateFull()` for detail panel — always shows weekday + date + time, unlike `formatDueDate()` which abbreviates for today.
   - Added `+ Note` create button inside detail panel's linked notes section — wires to `createNoteForReminder()` which existed but had no UI trigger.
 - **Next:** TASK-046 (note→calendar creation) → TASK-043 (notifications).
-- **Last action:** 2026-06-08 — TASK-044 implemented (reminder detail panel).
+- **Last action:** 2026-06-08 — TASK-044 + event closure bug fix.
