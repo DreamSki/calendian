@@ -7722,13 +7722,9 @@ class MacOSIntegration {
                             itemElement.removeClass("calendian-reminder-completed");
                         }
 
-                        // Sync to source of truth
+                        // Sync to source of truth (fire-and-forget; periodic refresh handles consistency)
                         self.toggleReminder(rem).then(function(result) {
                             self._togglingReminders[remId] = false;
-                            if (result && result.ok) {
-                                // Background sync: refresh cache quietly, no block
-                                self.init(true);
-                            }
                         }).catch(function(err) {
                             // Revert on failure
                             self._togglingReminders[remId] = false;
@@ -7881,9 +7877,6 @@ class MacOSIntegration {
 
                             self.toggleReminder(nr).then(function(result) {
                                 self._togglingReminders[remId] = false;
-                                if (result && result.ok) {
-                                    self.init(true);
-                                }
                             }).catch(function(err) {
                                 self._togglingReminders[remId] = false;
                                 nr.completed = wasCompleted;
