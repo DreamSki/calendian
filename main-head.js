@@ -8822,6 +8822,13 @@ class CalendarPlugin extends obsidian.Plugin {
             name: "Reveal active note",
             callback: () => this.view.revealActiveNote(),
         });
+        this.addCommand({
+            id: "export-selected-tasks-to-reminders",
+            name: "Export selected Tasks to Reminders",
+            editorCallback: async (editor) => {
+                await exportSelectedTasksToReminders(this, editor);
+            },
+        });
         // v0.5: ```calendian``` code block renderer
         var self = this;
         this.registerMarkdownCodeBlockProcessor("calendian", function(source, el, ctx) {
