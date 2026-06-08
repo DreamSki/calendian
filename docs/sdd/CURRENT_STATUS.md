@@ -100,14 +100,23 @@ Everything else must be marked as planned, experimental, or future.
 
 - **Doing:** None.
 - **Completed this session:**
-  - TASK-046 (create event/reminder from note code block, REQ-WRITE-021/022) implemented. Added `parseCreateFields()`, `resolveCalendarByName()`/`resolveListByName()`, `renderCalendianCreateBlock()`, `replaceBlockWithInlineRef()`, and `createEventFromFields()`/`createReminderFromFields()` to `src/notes/codeblock.js`. Registered `calendian-create` code block processor in `main-head.js`. Added `.calendian-create-*` styles to `styles.css`.
+  - TASK-046 (create event/reminder from note code block, REQ-WRITE-021/022) implemented and verified. Full feature set includes:
+    - `calendian-create` and `cc` code block aliases
+    - Structured `key:value` field parsing (`parseCreateFields`)
+    - Natural language single-line input with `parseNaturalLanguage()`
+    - Background AI parsing upgrade via `callAIForParsing()` (when configured)
+    - "提醒我/remind me" keyword stripping for title cleanup + reminder type inference
+    - Calendar/list name resolution at click time
+    - Note content replacement via `ctx.getSectionInfo()` + `app.vault.modify()`
+    - NL parser bug fix: period words (上午/下午) now parse even when date is present
+  - Diagnosed and fixed stale `calendian-task050` worktree causing Obsidian to load wrong `main.js` (duplicate plugin ID).
 - **Decisions:**
-  - Calendar/list resolution happens at click time (async), not at render time — avoids slow renders and handles field edits between render and click.
-  - Note content replacement uses `ctx.getSectionInfo(el)` for exact line-range replacement via `app.vault.modify()`. Clipboard fallback when section info unavailable (Live Preview edge case).
-  - No YAML library — simple `key: value` line parsing, consistent with the rest of the codebase. Multi-line notes supported via indented continuation.
-  - Type inference: `list`/`priority` fields → reminder, otherwise → event.
-  - Event date inferred from note filename (YYYY-MM-DD basename) when `date` field is missing.
-  - Unknown field names ignored silently for forward compatibility.
-- **Verification:** `node --check main.js` (pass), `./build-main.sh` (11490 lines), `swiftc` helper compile (existing Sendable warning only).
+  - `cc` as short alias — two characters, easy to type.
+  - NL input detected by: single line + no `key:` pattern → try NL parser first, fall back to structured parser.
+  - AI parsing runs in background after regex result shown; updates preview with `✨ AI` badge when ready.
+  - "提醒我" stripped before NL parsing so it doesn't pollute the title; presence triggers reminder type.
+  - Calendar/list resolution at click time (async) — avoids slow renders.
+  - Note replacement uses `getSectionInfo()` line range; clipboard fallback when unavailable.
+- **Verification:** `node --check main.js` ✓, `./build-main.sh` (11592 lines) ✓, manual testing in Obsidian ✓ (event create, reminder create, NL input, AI parsing, error handling, inline ref replacement).
 - **Next:** TASK-050 (Tasks plugin integration) or TASK-090+ (self-direction features).
-- **Last action:** 2026-06-08 — TASK-046 implemented and docs updated.
+- **Last action:** 2026-06-08 — TASK-046 fully complete with enhancements.

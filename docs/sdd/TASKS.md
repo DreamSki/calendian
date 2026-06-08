@@ -375,7 +375,7 @@ Tasks are ordered by dependency and release target. Every task references requir
   - Clicking Create → item appears in Calendar.app / Reminders.app, panel refreshes.
   - Created item ID written back to note, establishing bidirectional link.
   - Error states handled and communicated inline.
-- Evidence: `parseCreateFields()` in `src/notes/codeblock.js` parses key:value fields with type inference, time range parsing, multi-line notes. `renderCalendianCreateBlock()` renders preview card with Create button. `resolveCalendarByName()`/`resolveListByName()` resolve names to IDs at click time. `replaceBlockWithInlineRef()` uses `ctx.getSectionInfo(el)` for line-range replacement via `app.vault.modify()`, with clipboard fallback. Registered in `main-head.js` as `registerMarkdownCodeBlockProcessor("calendian-create", ...)`. Styles in `styles.css`.
+- Evidence: `parseCreateFields()` in `src/notes/codeblock.js` parses key:value fields with type inference, time range parsing, multi-line notes. `renderCalendianCreateBlock()` renders preview card with Create button. `resolveCalendarByName()`/`resolveListByName()` resolve names to IDs at click time. `replaceBlockWithInlineRef()` uses `ctx.getSectionInfo(el)` for line-range replacement via `app.vault.modify()`, with clipboard fallback. Registered as `calendian-create` and `cc` in `main-head.js`. NL single-line input supported with `parseNaturalLanguage()` + optional `callAIForParsing()` background upgrade. "提醒我/remind me" keyword stripping for title cleanup and reminder type inference. NL parser period-word fix (`!date` → removed condition). Styles in `styles.css`.
 
 ### TASK-050 — Tasks plugin import/export experiment
 
