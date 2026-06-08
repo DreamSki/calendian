@@ -139,7 +139,7 @@ Tasks are ordered by dependency and release target. Every task references requir
 - Requirements: `REQ-ARCH-001`
 - Status: Done
 - Priority: P1
-- Evidence: `build-main.sh` produces valid `main.js` by concatenating `main-head.js` plus macOS/cache/writer/notification modules and notes modules. Current order: upstream → MacOSIntegration skeleton → `src/macos/helper-executor.js` → `src/cache/schedule-cache.js` → `src/macos/writer.js` → `src/macos/notifications.js` → `src/notes/*` → CalendarView → CalendarPlugin. Edit source modules, then run `./build-main.sh`.
+- Evidence: `build-main.sh` produces valid `main.js` by concatenating `main-head.js` plus reminder temporal helpers, macOS/cache/writer/notification modules, and notes modules. Current order: upstream → MacOSIntegration skeleton → `src/reminders/temporal.js` → `src/macos/helper-executor.js` → `src/cache/schedule-cache.js` → `src/macos/writer.js` → `src/macos/notifications.js` → `src/notes/*` → CalendarView → CalendarPlugin. Edit source modules, then run `./build-main.sh`.
 
 ### TASK-020 — Event create form
 
@@ -307,6 +307,26 @@ Tasks are ordered by dependency and release target. Every task references requir
 - Status: Done
 - Priority: P1
 - Evidence: `src/macos/notifications.js` implements notification settings normalization, event/reminder candidate selection, session de-duplication, Obsidian Notice delivery, and unavailable/error status. `main-head.js` default settings and Settings tab expose global/event/reminder toggles plus `notificationLeadMinutes`; `init()`/`initBackground()`/`refreshInBackground()` call `notifyDueItems()` after cache/helper data is available. Diagnostics include notification status. `tests/notifications.test.js` covers event lead windows, overdue reminders, de-duplication, disabled state, and conservative defaults.
+
+### TASK-043a — Reminder temporal semantics and classified notifications
+
+- Requirements: `REQ-REM-011`, `REQ-REM-012`, `REQ-NOTIF-006` to `REQ-NOTIF-010`
+- Status: Done
+- Priority: P0
+- Deliverables:
+  - Preserve reminder temporal shape from EventKit: no date, date-only, and date+time.
+  - Display date-only reminders without synthetic `00:00` in the panel, code block renderer, inline renderer, templates, and edit form.
+  - Add previous-day notification settings: `previousDayNotificationsEnabled`, `previousDayNotificationTime`.
+  - Classify notification phases for timed events, all-day events, date-only reminders, and date+time reminders.
+  - De-duplicate notifications by item identity + phase + local date/time.
+- Definition of Done:
+  - Date-only reminder from Reminders.app displays only its date/day label, not `00:00`.
+  - Editing a date-only reminder does not add a time unless the user explicitly enters one.
+  - Date-only reminders can notify once on the due date and once per local overdue day per plugin session.
+  - Date+time reminders can notify previous day, within lead time, and overdue.
+  - Timed events can notify previous day and within lead time; all-day events can notify previous day only.
+  - Tests cover notification phase selection and date-only display semantics.
+- Evidence: `src/reminders/temporal.js` normalizes reminder temporal fields and formats date-only reminders without `00:00`. `helper/Sources/main.swift` only emits `dueTime` when EventKit provides an explicit hour. `src/cache/schedule-cache.js` preserves `dueTime`/`hasDueTime`. `main-head.js`, `src/notes/templates.js`, and `src/notes/codeblock.js` use explicit-time checks for display and edit prefill. `src/macos/notifications.js` classifies previous-day, lead, today, and overdue phases with phase-aware de-duplication. Verification: `node tests/notifications.test.js`, `node tests/reminder-temporal.test.js`, `node --check main.js`, `env CLANG_MODULE_CACHE_PATH=/tmp/calendian-clang-cache swiftc -parse-as-library helper/Sources/main.swift -o /tmp/calendian-helper-check`.
 
 ### TASK-044 — Reminder expandable detail panel
 

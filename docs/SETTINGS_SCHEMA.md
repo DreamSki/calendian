@@ -62,6 +62,8 @@ interface CalendianSettings {
   eventNotificationsEnabled: boolean;       // default: true
   reminderNotificationsEnabled: boolean;    // default: true
   notificationLeadMinutes: number;          // default: 10, min: 1, max: 1440
+  previousDayNotificationsEnabled: boolean; // default: true
+  previousDayNotificationTime: string;      // default: "18:00", HH:mm local time
 
   // ---- Nudges (v0.5.5) ----
   nudgeEnabled: boolean;                    // default: true
@@ -121,6 +123,8 @@ interface CalendianSourceMetadata {
   "eventNotificationsEnabled": true,
   "reminderNotificationsEnabled": true,
   "notificationLeadMinutes": 10,
+  "previousDayNotificationsEnabled": true,
+  "previousDayNotificationTime": "18:00",
   "nudgeEnabled": true,
   "nudgeTone": "gentle",
   "nudgeMorningPrompt": true,
@@ -200,6 +204,7 @@ Personal — Local
 | 2 | 3 | Add notification fields (v0.5). |
 | 3 | 4 | Add nudge and self-direction fields (v0.5.5). |
 | 4 | 5 | Add `showEventFields` customization (v0.6). |
+| 5 | 6 | Add previous-day notification settings (v0.5.1). |
 
 ### Migration testing
 
@@ -267,6 +272,7 @@ See `TESTING.md` → Future automated test targets → Settings migration.
 | `legacyClickBehavior` | `REQ-UX-001`, `REQ-UX-002` |
 | `notificationsEnabled`, `eventNotificationsEnabled`, `notificationLeadMinutes` | `REQ-NOTIF-001`, `REQ-NOTIF-004` |
 | `reminderNotificationsEnabled` | `REQ-NOTIF-002`, `REQ-NOTIF-004` |
+| `previousDayNotificationsEnabled`, `previousDayNotificationTime` | `REQ-NOTIF-006`, `REQ-NOTIF-009` |
 | `nudgeEnabled` | `REQ-NUDGE-006` |
 | `nudgeTone` | `REQ-NUDGE-005` |
 | `nudgeMorningPrompt` | `REQ-NUDGE-001` |

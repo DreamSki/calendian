@@ -116,7 +116,7 @@ The following features are currently implemented in the codebase. All macOS data
 - ✅ Date selection (click selects, shows events/reminders from cache)
 - ✅ Cmd/Ctrl-click preserves daily-note open/create behavior
 - ✅ Events panel: title, time range, calendar badge (colored), location, recurrence indicator
-- ✅ Reminders panel: title, due time, list badge, priority indicator
+- ✅ Reminders panel: title, due date/time when present, list badge, priority indicator
 - ✅ UI states: loading, empty, error, permission-denied, partial-permission, cache-miss
 - ✅ Refresh footer with last refresh time and duration
 - ✅ Month-cell event dots with calendar colors, hollow reminder dots, multi-day spans
@@ -129,6 +129,7 @@ The following features are currently implemented in the codebase. All macOS data
 - ✅ Conservative default: notifications are disabled until the user opts in
 - ✅ Session-level de-duplication prevents repeated notices during refresh loops
 - ✅ Graceful unavailable state when Obsidian Notice API cannot be used
+- ✅ Classified notifications by temporal phase (previous-day, lead-time, same-day date-only, overdue) and distinguishes date-only reminders from date+time reminders so date-only items do not display `00:00`.
 
 #### Write operations (v0.3)
 - ✅ Event creation via `EventCreateModal` with title, calendar, date/time, all-day, location, URL, notes
@@ -326,8 +327,9 @@ interface CalendianReminder {
   listId?: string;
   listName: string;
   title: string;
-  dueDate?: string;
-  dueTime?: string;
+  dueDate?: string;  // calendar date, if the reminder has one
+  dueTime?: string;  // HH:mm only when the source reminder has an explicit time
+  hasDueTime?: boolean; // false for date-only reminders; prevents synthetic 00:00
   priority?: "none" | "low" | "medium" | "high";
   completed: boolean;
   parentId?: string;
@@ -561,6 +563,8 @@ Goal, habit, intention, nudge, and review data SHALL reside exclusively in Obsid
 | REQ-REM-008 | THE SYSTEM SHOULD display reminder priority where available. | P2 | v0.1 | Implemented |
 | REQ-REM-009 | THE SYSTEM SHOULD display reminder subtasks where available. | P2 | v0.3 | Blocked — EKReminder does not expose parent/child hierarchy in public EventKit API; subtask relationship is iCloud-internal |
 | REQ-REM-010 | THE SYSTEM SHALL support click-to-expand detail panel for reminders, consistent with event behavior, showing due date, priority, list, notes, linked notes, and action buttons (edit/delete/copy). | P1 | v0.5.1 | Planned |
+| REQ-REM-011 | THE SYSTEM SHALL distinguish no-date, date-only, and date+time reminders in the read model and UI. Date-only reminders SHALL NOT display a synthetic `00:00` time. | P0 | v0.5.1 | Implemented |
+| REQ-REM-012 | Reminder create/edit forms SHALL preserve date-only reminders without inserting `00:00` unless the user explicitly sets a time. | P0 | v0.5.1 | Implemented |
 
 #### 7.4.1 提醒事项层级边界
 
@@ -917,6 +921,23 @@ All refresh paths go through `init()`, which has a `_refreshRunning` boolean gat
 | REQ-NOTIF-003 | NOTIFICATIONS SHALL work within Obsidian using available notification APIs. | P0 | v0.5 | Implemented — uses `obsidian.Notice` from refresh completion paths |
 | REQ-NOTIF-004 | THE SYSTEM SHALL allow users to configure notification lead time and enable/disable notifications. | P1 | v0.5 | Implemented — settings: `notificationsEnabled`, `eventNotificationsEnabled`, `reminderNotificationsEnabled`, `notificationLeadMinutes` |
 | REQ-NOTIF-005 | IF Obsidian notification APIs are unavailable, THE SYSTEM SHALL document this limitation gracefully. | P2 | v0.5 | Implemented — status becomes `unavailable`; settings/diagnostics describe that panel display still works |
+| REQ-NOTIF-006 | THE SYSTEM SHOULD optionally show a previous-day notification for eligible events and reminders at a configurable local time. | P1 | v0.5.1 | Implemented — settings: `previousDayNotificationsEnabled`, `previousDayNotificationTime` |
+| REQ-NOTIF-007 | Date-only reminders SHALL notify once on the due date when Calendian first loads or refreshes after seeing the item; they SHALL NOT use minute-level lead time. | P1 | v0.5.1 | Implemented |
+| REQ-NOTIF-008 | Incomplete overdue reminders SHALL notify at most once per local day per plugin session until completed. | P1 | v0.5.1 | Implemented — session-level daily phase key |
+| REQ-NOTIF-009 | Date+time reminders SHOULD support previous-day, lead-time-before-due, and overdue notification phases. | P1 | v0.5.1 | Implemented |
+| REQ-NOTIF-010 | Notification de-duplication keys SHALL include item identity, notification phase, and relevant local date/time so one phase does not suppress another. | P0 | v0.5.1 | Implemented |
+
+#### 7.18.1 Notification timing classification
+
+| Item type | Temporal shape | Previous-day phase | Lead-time phase | Same-day phase | Overdue phase |
+|---|---|---|---|---|---|
+| Event | Timed start/end | Optional notice on the previous local day at `previousDayNotificationTime` | Notice when start is within `notificationLeadMinutes` | N/A | N/A |
+| Event | All-day | Optional notice on the previous local day at `previousDayNotificationTime` | N/A | N/A | N/A |
+| Reminder | No due date | N/A | N/A | N/A | N/A |
+| Reminder | Date-only | Optional notice on the previous local day at `previousDayNotificationTime` | N/A | Notice once on the due date after Calendian loads/refreshes | Daily overdue notice after the due date, at most once per local day per plugin session |
+| Reminder | Date+time | Optional notice on the previous local day at `previousDayNotificationTime` | Notice when due time is within `notificationLeadMinutes` | N/A | Daily overdue notice after due time, at most once per local day per plugin session |
+
+Notification delivery is refresh-driven: Calendian checks candidates after initial load, manual refresh, background refresh, timer refresh, window-focus refresh, and EventKit change refresh. It does not run an independent exact alarm scheduler.
 
 ### 7.19 Data export and backup requirements
 
@@ -943,7 +964,7 @@ All refresh paths go through `init()`, which has a `_refreshRunning` boolean gat
 | REQ-DOC-001 | README SHALL distinguish current, planned, experimental, and non-goal features. | P0 | v0.1 | Implemented |
 | REQ-DOC-002 | Roadmap SHALL reference requirement groups or IDs. | P0 | v0.1 | Implemented |
 | REQ-DOC-003 | Target architecture SHALL be labeled as target until code is refactored. | P0 | v0.1 | Implemented |
-| REQ-ARCH-001 | THE SYSTEM SHOULD split into maintainable modules (macOS adapter, domain, cache, UI) before complex write features. | P1 | v0.3 | Implemented — `cat` concatenation via `build-main.sh`: `main-head.js` (skeleton + class bodies) + macOS/cache/writer/notification modules + notes modules → `main.js`. Edit in `src/`, run `./build-main.sh`, reload Obsidian. |
+| REQ-ARCH-001 | THE SYSTEM SHOULD split into maintainable modules (macOS adapter, domain, cache, UI) before complex write features. | P1 | v0.3 | Implemented — `cat` concatenation via `build-main.sh`: `main-head.js` (skeleton + class bodies) + reminder temporal helpers + macOS/cache/writer/notification modules + notes modules → `main.js`. Edit in `src/`, run `./build-main.sh`, reload Obsidian. |
 
 ### 7.22 Goal and focus requirements
 

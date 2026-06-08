@@ -317,7 +317,7 @@ struct CalendianHelper {
         }()
         let dueTimeStr: String? = {
             guard let comps = ek.dueDateComponents else { return nil }
-            let h = comps.hour ?? 0
+            guard let h = comps.hour else { return nil }
             let m = comps.minute ?? 0
             return String(format: "%02d:%02d", h, m)
         }()

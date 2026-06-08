@@ -30,7 +30,7 @@ The repository contains the following implemented features:
 - Multi-day events shown on all overlapping days.
 - Past event display (normal/dimmed/hidden) configurable in settings.
 - Recurring event read-only indicator (⟳).
-- Reminder display: title, due time, list badge, priority indicator (high/medium/low).
+- Reminder display: title, due date/time, list badge, priority indicator (high/medium/low).
 - Overdue reminders visually distinguished (red border + badge + due date).
 - No-date reminders in collapsible section.
 - Reminder display range selector (today / 7 days / all incomplete).
@@ -64,7 +64,7 @@ The repository contains the following implemented features:
 - **Inline reference renderer**: `cal:ev:ID` / `cal:rem:ID` in notes renders as a styled mini-table with event/reminder details.
 - **Highlight navigation**: clicking an inline ref or code block item highlights and scrolls to the item in the Calendian panel.
 - **Auto-link via body scan**: notes containing `cal:ev:ID` / `cal:rem:ID` are automatically associated without frontmatter.
-- **In-app notifications**: optional Obsidian notices for upcoming timed events and overdue reminders, with configurable lead time and enable/disable controls.
+- **In-app notifications**: optional Obsidian notices for upcoming timed events, previous-day event/reminder notices, date-only due-day reminders, timed reminder lead notices, and overdue reminders. Date-only reminders do not show synthetic `00:00`.
 
 For the precise truth table, see [`docs/sdd/CURRENT_STATUS.md`](./docs/sdd/CURRENT_STATUS.md) and [SPEC.md §2](./SPEC.md#2-current-implementation-status).
 

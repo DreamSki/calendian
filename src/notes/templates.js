@@ -103,6 +103,7 @@ MacOSIntegration.prototype.buildEventTemplateVars = function(evt) {
  */
 MacOSIntegration.prototype.buildReminderTemplateVars = function(rem) {
     var dueMoment = (rem.dueDate || rem.due) ? window.moment(rem.dueDate || rem.due) : null;
+    var dueTime = reminderHasDueTime(rem) && dueMoment ? (rem.dueTime || dueMoment.format("HH:mm")) : "";
 
     var priorityLabel = "None";
     if (rem.priority === "high") priorityLabel = "High";
@@ -112,8 +113,8 @@ MacOSIntegration.prototype.buildReminderTemplateVars = function(rem) {
     return {
         title: rem.title || rem.name || "",
         date: formatDate(dueMoment),
-        dueTime: dueMoment ? dueMoment.format("HH:mm") : "",
-        time: dueMoment ? dueMoment.format("HH:mm") : "",
+        dueTime: dueTime,
+        time: dueTime,
         list: rem.listName || rem.list || "",
         priority: priorityLabel,
         notes: rem.notes || ""

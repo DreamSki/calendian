@@ -10,14 +10,25 @@ function getNotificationSettings(options) {
         notificationsEnabled: opts.notificationsEnabled === true,
         eventNotificationsEnabled: opts.eventNotificationsEnabled !== false,
         reminderNotificationsEnabled: opts.reminderNotificationsEnabled !== false,
-        notificationLeadMinutes: lead
+        notificationLeadMinutes: lead,
+        previousDayNotificationsEnabled: opts.previousDayNotificationsEnabled !== false,
+        previousDayNotificationTime: normalizeNotificationClockTime(opts.previousDayNotificationTime || "18:00")
     };
 }
 
-function getNotificationItemId(type, item) {
+function normalizeNotificationClockTime(value) {
+    var raw = String(value || "").trim();
+    var match = raw.match(/^(\d{1,2}):(\d{2})$/);
+    if (!match) return "18:00";
+    var h = Math.max(0, Math.min(23, Number(match[1])));
+    var m = Math.max(0, Math.min(59, Number(match[2])));
+    return String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0");
+}
+
+function getNotificationItemId(type, item, phase, key) {
     var rawId = item && item.id ? String(item.id) : "";
     if (!rawId) return "";
-    return type + ":" + rawId;
+    return type + ":" + rawId + ":" + phase + ":" + key;
 }
 
 function notificationWasDelivered(delivered, id) {
@@ -38,6 +49,50 @@ function pruneNotificationDelivery(delivered, now) {
     });
 }
 
+function getLocalDateKey(date) {
+    if (!date) return "";
+    return date.getFullYear() + "-" +
+        String(date.getMonth() + 1).padStart(2, "0") + "-" +
+        String(date.getDate()).padStart(2, "0");
+}
+
+function getLocalDayStart(date) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+}
+
+function getPreviousDayTriggerTime(targetDate, clockTime) {
+    var parts = normalizeNotificationClockTime(clockTime).split(":");
+    return new Date(
+        targetDate.getFullYear(),
+        targetDate.getMonth(),
+        targetDate.getDate() - 1,
+        Number(parts[0]),
+        Number(parts[1]),
+        0,
+        0
+    );
+}
+
+function shouldNotifyPreviousDay(now, targetDate, options) {
+    if (!options.previousDayNotificationsEnabled || !targetDate) return false;
+    var targetDayStart = getLocalDayStart(targetDate);
+    var trigger = getPreviousDayTriggerTime(targetDate, options.previousDayNotificationTime);
+    return now.getTime() >= trigger.getTime() && now.getTime() < targetDayStart.getTime();
+}
+
+function notificationReminderHasDueTime(rem) {
+    if (typeof reminderHasDueTime === "function") return reminderHasDueTime(rem);
+    if (!rem) return false;
+    if (rem.hasDueTime === true) return true;
+    if (rem.hasDueTime === false) return false;
+    return !!(rem.dueTime && String(rem.dueTime).trim());
+}
+
+function pushNotificationCandidate(candidates, delivered, candidate) {
+    if (!candidate || !candidate.id || notificationWasDelivered(delivered, candidate.id)) return;
+    candidates.push(candidate);
+}
+
 function buildNotificationCandidates(input) {
     var now = input && input.now ? input.now : new Date();
     var options = getNotificationSettings(input && input.options);
@@ -53,17 +108,28 @@ function buildNotificationCandidates(input) {
         events.forEach(function(evt) {
             if (!evt || !evt.start) return;
             var isAllDay = evt.isAllDay !== undefined ? evt.isAllDay : evt.allday;
-            if (isAllDay) return;
             var start = evt.start instanceof Date ? evt.start : new Date(evt.start);
+            if (!isFinite(start.getTime())) return;
+            var title = evt.title || evt.summary || "Event";
+            var targetKey = getLocalDateKey(start);
+            if (shouldNotifyPreviousDay(now, start, options)) {
+                pushNotificationCandidate(candidates, delivered, {
+                    id: getNotificationItemId("event", evt, "previous-day", targetKey),
+                    type: "event",
+                    phase: "previous-day",
+                    itemId: evt.id,
+                    title: title,
+                    message: title + " is tomorrow"
+                });
+            }
+            if (isAllDay) return;
             var diff = start.getTime() - now.getTime();
             if (!isFinite(diff) || diff <= 0 || diff > leadMs) return;
-            var id = getNotificationItemId("event", evt);
-            if (!id || notificationWasDelivered(delivered, id)) return;
             var minutes = Math.max(1, Math.ceil(diff / 60000));
-            var title = evt.title || evt.summary || "Event";
-            candidates.push({
-                id: id,
+            pushNotificationCandidate(candidates, delivered, {
+                id: getNotificationItemId("event", evt, "lead", start.toISOString()),
                 type: "event",
+                phase: "lead",
                 itemId: evt.id,
                 title: title,
                 message: title + " starts in " + minutes + " minute" + (minutes === 1 ? "" : "s")
@@ -75,18 +141,65 @@ function buildNotificationCandidates(input) {
         reminders.forEach(function(rem) {
             if (!rem || !rem.due || rem.completed) return;
             var due = rem.due instanceof Date ? rem.due : new Date(rem.due);
-            var diff = due.getTime() - now.getTime();
-            if (!isFinite(diff) || diff > 0) return;
-            var id = getNotificationItemId("reminder", rem);
-            if (!id || notificationWasDelivered(delivered, id)) return;
+            if (!isFinite(due.getTime())) return;
             var title = rem.title || rem.name || "Reminder";
-            candidates.push({
-                id: id,
-                type: "reminder",
-                itemId: rem.id,
-                title: title,
-                message: title + " is overdue"
-            });
+            var dueDateKey = getLocalDateKey(due);
+            var hasDueTime = notificationReminderHasDueTime(rem);
+            if (shouldNotifyPreviousDay(now, due, options)) {
+                pushNotificationCandidate(candidates, delivered, {
+                    id: getNotificationItemId("reminder", rem, "previous-day", dueDateKey),
+                    type: "reminder",
+                    phase: "previous-day",
+                    itemId: rem.id,
+                    title: title,
+                    message: title + " is due tomorrow"
+                });
+            }
+            if (!hasDueTime) {
+                var nowDay = getLocalDayStart(now);
+                var dueDay = getLocalDayStart(due);
+                if (dueDay.getTime() === nowDay.getTime()) {
+                    pushNotificationCandidate(candidates, delivered, {
+                        id: getNotificationItemId("reminder", rem, "today", dueDateKey),
+                        type: "reminder",
+                        phase: "today",
+                        itemId: rem.id,
+                        title: title,
+                        message: title + " is due today"
+                    });
+                } else if (dueDay.getTime() < nowDay.getTime()) {
+                    pushNotificationCandidate(candidates, delivered, {
+                        id: getNotificationItemId("reminder", rem, "overdue", getLocalDateKey(now)),
+                        type: "reminder",
+                        phase: "overdue",
+                        itemId: rem.id,
+                        title: title,
+                        message: title + " is overdue"
+                    });
+                }
+                return;
+            }
+            var diff = due.getTime() - now.getTime();
+            if (!isFinite(diff)) return;
+            if (diff > 0 && diff <= (options.notificationLeadMinutes * 60 * 1000)) {
+                pushNotificationCandidate(candidates, delivered, {
+                    id: getNotificationItemId("reminder", rem, "lead", due.toISOString()),
+                    type: "reminder",
+                    phase: "lead",
+                    itemId: rem.id,
+                    title: title,
+                    message: title + " is due in " + Math.max(1, Math.ceil(diff / 60000)) + " minute" + (Math.ceil(diff / 60000) === 1 ? "" : "s")
+                });
+            } else if (diff <= 0) {
+                pushNotificationCandidate(candidates, delivered, {
+                    id: getNotificationItemId("reminder", rem, "overdue", getLocalDateKey(now)),
+                    type: "reminder",
+                    phase: "overdue",
+                    itemId: rem.id,
+                    title: title,
+                    message: title + " is overdue"
+                });
+            }
         });
     }
 

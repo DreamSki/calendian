@@ -103,7 +103,7 @@ function renderEventItem(container, evt, integ, plugin) {
 function renderReminderItem(container, rem, integ, plugin) {
     var dm = (rem.dueDate || rem.due) ? window.moment(rem.dueDate || rem.due) : null;
     var dateStr = dm ? dm.format("MM-DD") : "";
-    var dueStr = dm ? dm.format("HH:mm") : "";
+    var dueStr = reminderHasDueTime(rem) && dm ? (rem.dueTime || dm.format("HH:mm")) : "";
 
     // Unified column order: date → icon → title → time → badge → indicators
     var item = container.createDiv("calendian-block-item calendian-block-reminder");
@@ -244,7 +244,7 @@ function buildInlineRow(tr, item, itemType, plugin) {
         }
     } else {
         var d = item.due || item.dueDate;
-        tdTime.textContent = d ? window.moment(d).format("HH:mm") : "";
+        tdTime.textContent = d && reminderHasDueTime(item) ? (item.dueTime || window.moment(d).format("HH:mm")) : "";
     }
 
     // Badge

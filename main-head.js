@@ -755,6 +755,8 @@ const defaultSettings = Object.freeze({
     eventNotificationsEnabled: true,
     reminderNotificationsEnabled: true,
     notificationLeadMinutes: 10,
+    previousDayNotificationsEnabled: true,
+    previousDayNotificationTime: "18:00",
     // Reminder display settings (v0.2 schema)
     showNoDateReminders: true,
     reminderDisplayRange: 'today',
@@ -1338,7 +1340,7 @@ class CalendarSettingsTab extends obsidian.PluginSettingTab {
         });
         new obsidian.Setting(this.containerEl)
             .setName("Event-start notifications")
-            .setDesc("Notify shortly before timed events begin. All-day events are skipped.")
+            .setDesc("Notify shortly before timed events begin. All-day events use previous-day notifications only.")
             .addToggle((toggle) => {
             toggle.setValue(this.plugin.options.eventNotificationsEnabled !== false);
             toggle.onChange(async (value) => {
@@ -1346,8 +1348,8 @@ class CalendarSettingsTab extends obsidian.PluginSettingTab {
             });
         });
         new obsidian.Setting(this.containerEl)
-            .setName("Overdue reminder notifications")
-            .setDesc("Notify when incomplete reminders become overdue.")
+            .setName("Reminder notifications")
+            .setDesc("Notify for date-only due days, timed reminder lead times, and overdue reminders.")
             .addToggle((toggle) => {
             toggle.setValue(this.plugin.options.reminderNotificationsEnabled !== false);
             toggle.onChange(async (value) => {
@@ -1364,6 +1366,29 @@ class CalendarSettingsTab extends obsidian.PluginSettingTab {
             textfield.onChange(async (value) => {
                 var num = Math.max(1, Math.min(1440, Number(value) || 10));
                 await this.plugin.writeOptions(() => ({ notificationLeadMinutes: num }));
+            });
+        });
+        new obsidian.Setting(this.containerEl)
+            .setName("Previous-day notifications")
+            .setDesc("Notify for eligible events and reminders on the previous local day.")
+            .addToggle((toggle) => {
+            toggle.setValue(this.plugin.options.previousDayNotificationsEnabled !== false);
+            toggle.onChange(async (value) => {
+                await this.plugin.writeOptions(() => ({ previousDayNotificationsEnabled: value }));
+            });
+        });
+        new obsidian.Setting(this.containerEl)
+            .setName("Previous-day notification time")
+            .setDesc("Local HH:MM time for previous-day notices.")
+            .addText((textfield) => {
+            textfield.setPlaceholder("18:00");
+            textfield.setValue(this.plugin.options.previousDayNotificationTime || "18:00");
+            textfield.onChange(async (value) => {
+                var match = String(value || "").trim().match(/^(\d{1,2}):(\d{2})$/);
+                var normalized = match
+                    ? (String(Math.max(0, Math.min(23, Number(match[1])))).padStart(2, "0") + ":" + String(Math.max(0, Math.min(59, Number(match[2])))).padStart(2, "0"))
+                    : "18:00";
+                await this.plugin.writeOptions(() => ({ previousDayNotificationTime: normalized }));
             });
         });
     }
@@ -3647,8 +3672,8 @@ class ReminderEditModal extends obsidian.Modal {
             .setDesc("HH:MM (optional)")
             .addText(function(cmp) {
                 dueTimeInput = cmp.inputEl;
-                if (dueMoment && dueMoment.isValid()) {
-                    cmp.setValue(dueMoment.format("HH:mm"));
+                if (dueMoment && dueMoment.isValid() && reminderHasDueTime(rem)) {
+                    cmp.setValue(rem.dueTime || dueMoment.format("HH:mm"));
                 }
             });
 
@@ -7956,7 +7981,7 @@ class MacOSIntegration {
             // Due time — with overdue date styling
             if (rem.due) {
                 const timeEl = itemEl.createDiv("macos-item-time calendian-reminder-due");
-                timeEl.textContent = this.formatDueDate(rem.due);
+                timeEl.textContent = this.formatReminderDue(rem);
                 if (isOverdue) {
                     timeEl.addClass("calendian-reminder-overdue-due");
                 }
@@ -8228,6 +8253,10 @@ class MacOSIntegration {
         var dateStr = (date.getMonth() + 1) + "/" + date.getDate();
         var timeStr = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
         return dateStr + " " + timeStr;
+    }
+
+    formatReminderDue(rem) {
+        return formatReminderDueText(rem, new Date());
     }
 
     // --- Discover available calendars ---

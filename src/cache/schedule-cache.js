@@ -87,6 +87,8 @@ MacOSIntegration.prototype.saveRemindersToCache = async function() {
                     title: r.title || r.name || "",
                     _due: r.due ? r.due.toISOString() : null,
                     dueDate: r.dueDate || "",
+                    dueTime: reminderHasDueTime(r) ? (r.dueTime || "") : "",
+                    hasDueTime: reminderHasDueTime(r),
                     listName: r.listName || r.list || "",
                     listId: r.listId || "",
                     priority: r.priority || "none",
@@ -116,7 +118,7 @@ MacOSIntegration.prototype.loadRemindersFromCache = async function() {
                     // Backward compat: migrate old field names
                     if (!r.title && r.name) r.title = r.name;
                     if (!r.listName && r.list) r.listName = r.list;
-                    reminders.push(r);
+                    reminders.push(normalizeReminderTemporalFields(r));
                 }
                 this.allReminders = reminders;
                 this._itemLookupCache = null;  // invalidate reverse index
@@ -208,12 +210,14 @@ MacOSIntegration.prototype.preloadReminders = async function() {
             var reminders = [];
             for (var i = 0; i < rawReminders.length; i++) {
                 var r = rawReminders[i];
-                reminders.push({
+                reminders.push(normalizeReminderTemporalFields({
                     id: r.id || "",
                     source: "macos-reminders",
                     title: r.title || "",
                     dueDate: r.dueDate || "",
                     due: r.dueDate ? new Date(r.dueDate) : null,
+                    dueTime: r.dueTime || "",
+                    hasDueTime: !!r.dueTime,
                     listName: r.listName || "",
                     listId: r.listId || "",
                     priority: r.priority || "none",
@@ -221,7 +225,7 @@ MacOSIntegration.prototype.preloadReminders = async function() {
                     notes: r.notes || "",
                     parentId: r.parentId || "",
                     isDisplayOnly: !r.id
-                });
+                }));
             }
             // Fetch no-due-date reminders and merge
             try {
@@ -230,12 +234,14 @@ MacOSIntegration.prototype.preloadReminders = async function() {
                 var rawNoDate = await this.execHelper(nodateArgs);
                 for (var j = 0; j < rawNoDate.length; j++) {
                     var nd = rawNoDate[j];
-                    reminders.push({
+                    reminders.push(normalizeReminderTemporalFields({
                         id: nd.id || "",
                         source: "macos-reminders",
                         title: nd.title || "",
                         dueDate: "",
                         due: null,
+                        dueTime: "",
+                        hasDueTime: false,
                         listName: nd.listName || "",
                         listId: nd.listId || "",
                         priority: nd.priority || "none",
@@ -243,7 +249,7 @@ MacOSIntegration.prototype.preloadReminders = async function() {
                         notes: nd.notes || "",
                         parentId: nd.parentId || "",
                         isDisplayOnly: !nd.id
-                    });
+                    }));
                 }
             } catch (nodateErr) {
                 console.warn("[Calendian] No-date reminders fetch failed:", nodateErr.stderr || nodateErr.message);
@@ -399,19 +405,21 @@ MacOSIntegration.prototype.parseReminders = function(raw) {
                         else priority = "low";
                     }
                 }
-                var rem = {
+                var rem = normalizeReminderTemporalFields({
                     id: parts[3] || ("rem-" + (parts[0] || "unknown") + "-" + (parts[2] || "n/a")),
                     source: "macos-reminders",
                     title: parts[0] || "",
                     dueDate: parts[1] || "",
                     due: parts[1] ? new Date(parts[1]) : null,
+                    dueTime: "",
+                    hasDueTime: false,
                     listName: listName,
                     listId: listName,
                     priority: priority,
                     completed: parts[5] === "1",
                     notes: parts[6] || "",
                     parentId: ""
-                };
+                });
                 if (rem.title) {
                     acc.push(rem);
                 }
@@ -431,4 +439,3 @@ MacOSIntegration.prototype.countReminderLists = function(reminders) {
         }
         return Object.keys(lists).length;
     }
-
