@@ -750,6 +750,11 @@ const defaultSettings = Object.freeze({
     selectedReminderListIds: [],
     refreshIntervalMinutes: 5,
     pastEventDisplay: 'dimmed',
+    // v0.5: In-app notifications (REQ-NOTIF-001..005)
+    notificationsEnabled: false,
+    eventNotificationsEnabled: true,
+    reminderNotificationsEnabled: true,
+    notificationLeadMinutes: 10,
     // Reminder display settings (v0.2 schema)
     showNoDateReminders: true,
     reminderDisplayRange: 'today',
@@ -831,6 +836,7 @@ class CalendarSettingsTab extends obsidian.PluginSettingTab {
         this.addReminderDisplaySettings();
         this.addMacOSRefreshIntervalSetting();
         this.addMacOSPastEventDisplaySetting();
+        this.addNotificationSettings();
         this.addDefaultCalendarSetting();
         this.addDefaultReminderListSetting();
 
@@ -904,6 +910,9 @@ class CalendarSettingsTab extends obsidian.PluginSettingTab {
             'Last refresh: ' + (integ && integ.lastRefreshTime
                 ? integ.lastRefreshTime + ' (' + (integ.lastRefreshDurationMs != null ? integ.lastRefreshDurationMs + 'ms' : '?') + ')'
                 : 'never'),
+            'Notifications: ' + (integ
+                ? (integ._notificationStatus || 'not checked') + (integ._lastNotificationCheckTime ? ' (last check ' + integ._lastNotificationCheckTime + ')' : '')
+                : 'not checked'),
             'Last error (calendar): ' + (integ ? errorLabel(integ.lastError.calendar) : '—'),
             'Last error (reminders): ' + (integ ? errorLabel(integ.lastError.reminders) : '—'),
         ];
@@ -1305,6 +1314,56 @@ class CalendarSettingsTab extends obsidian.PluginSettingTab {
                 if (view && view.macosIntegration) {
                     view.macosIntegration.render();
                 }
+            });
+        });
+    }
+    addNotificationSettings() {
+        var integ = this.plugin.view && this.plugin.view.macosIntegration;
+        var status = integ ? (integ._notificationStatus || "not checked") : "not checked";
+        if (status === "unavailable") {
+            this.containerEl.createEl("p", {
+                cls: "setting-item-description",
+                text: "In-app notifications are unavailable in this Obsidian environment. Calendian will continue showing events and reminders in the panel."
+            });
+        }
+        new obsidian.Setting(this.containerEl)
+            .setName("In-app notifications")
+            .setDesc("Show Obsidian notices for upcoming events and overdue reminders. Disabled by default.")
+            .addToggle((toggle) => {
+            toggle.setValue(this.plugin.options.notificationsEnabled === true);
+            toggle.onChange(async (value) => {
+                await this.plugin.writeOptions(() => ({ notificationsEnabled: value }));
+                this.display();
+            });
+        });
+        new obsidian.Setting(this.containerEl)
+            .setName("Event-start notifications")
+            .setDesc("Notify shortly before timed events begin. All-day events are skipped.")
+            .addToggle((toggle) => {
+            toggle.setValue(this.plugin.options.eventNotificationsEnabled !== false);
+            toggle.onChange(async (value) => {
+                await this.plugin.writeOptions(() => ({ eventNotificationsEnabled: value }));
+            });
+        });
+        new obsidian.Setting(this.containerEl)
+            .setName("Overdue reminder notifications")
+            .setDesc("Notify when incomplete reminders become overdue.")
+            .addToggle((toggle) => {
+            toggle.setValue(this.plugin.options.reminderNotificationsEnabled !== false);
+            toggle.onChange(async (value) => {
+                await this.plugin.writeOptions(() => ({ reminderNotificationsEnabled: value }));
+            });
+        });
+        new obsidian.Setting(this.containerEl)
+            .setName("Notification lead time (minutes)")
+            .setDesc("How many minutes before an event start to show an in-app notice.")
+            .addText((textfield) => {
+            textfield.setPlaceholder("10");
+            textfield.inputEl.type = "number";
+            textfield.setValue(String(this.plugin.options.notificationLeadMinutes || 10));
+            textfield.onChange(async (value) => {
+                var num = Math.max(1, Math.min(1440, Number(value) || 10));
+                await this.plugin.writeOptions(() => ({ notificationLeadMinutes: num }));
             });
         });
     }
@@ -6924,6 +6983,11 @@ class MacOSIntegration {
         this._highlightedItemId = null;      // item ID to highlight on next render
         this._highlightTimer = null;         // auto-clear timer
         this._fileChangeDebounceTimer = null; // REQ-NOTE-011: debounce for file-change → index invalidation
+        // v0.5: In-app notification de-duplication state (REQ-NOTIF-001..005)
+        this._deliveredNotifications = {};
+        this._notificationStatus = "not checked";
+        this._lastNotificationCheckTime = null;
+        this._lastNotificationError = "";
     }
 
     // --- Execute native helper (EventKit, fast) ---
@@ -7016,6 +7080,7 @@ class MacOSIntegration {
             this.lastRefreshTime = new Date().toISOString();
             this.lastRefreshDurationMs = Date.now() - initStart;
             this.render();
+            this.notifyDueItems();
 
             // Phase 2: Only background refresh if cache is stale
             if (this.isCacheFresh()) {
@@ -7049,6 +7114,7 @@ class MacOSIntegration {
         this._refreshRunning = false;
         this.lastRefreshTime = new Date().toISOString();
         this.lastRefreshDurationMs = Date.now() - initStart;
+        this.notifyDueItems();
         this.render();
     }
 
@@ -7069,6 +7135,7 @@ class MacOSIntegration {
         this._refreshRunning = false;
         this.lastRefreshTime = new Date().toISOString();
         this.lastRefreshDurationMs = Date.now() - start;
+        this.notifyDueItems();
         this.render();
     }
 

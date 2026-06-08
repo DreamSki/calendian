@@ -750,6 +750,11 @@ const defaultSettings = Object.freeze({
     selectedReminderListIds: [],
     refreshIntervalMinutes: 5,
     pastEventDisplay: 'dimmed',
+    // v0.5: In-app notifications (REQ-NOTIF-001..005)
+    notificationsEnabled: false,
+    eventNotificationsEnabled: true,
+    reminderNotificationsEnabled: true,
+    notificationLeadMinutes: 10,
     // Reminder display settings (v0.2 schema)
     showNoDateReminders: true,
     reminderDisplayRange: 'today',
@@ -831,6 +836,7 @@ class CalendarSettingsTab extends obsidian.PluginSettingTab {
         this.addReminderDisplaySettings();
         this.addMacOSRefreshIntervalSetting();
         this.addMacOSPastEventDisplaySetting();
+        this.addNotificationSettings();
         this.addDefaultCalendarSetting();
         this.addDefaultReminderListSetting();
 
@@ -904,6 +910,9 @@ class CalendarSettingsTab extends obsidian.PluginSettingTab {
             'Last refresh: ' + (integ && integ.lastRefreshTime
                 ? integ.lastRefreshTime + ' (' + (integ.lastRefreshDurationMs != null ? integ.lastRefreshDurationMs + 'ms' : '?') + ')'
                 : 'never'),
+            'Notifications: ' + (integ
+                ? (integ._notificationStatus || 'not checked') + (integ._lastNotificationCheckTime ? ' (last check ' + integ._lastNotificationCheckTime + ')' : '')
+                : 'not checked'),
             'Last error (calendar): ' + (integ ? errorLabel(integ.lastError.calendar) : '—'),
             'Last error (reminders): ' + (integ ? errorLabel(integ.lastError.reminders) : '—'),
         ];
@@ -1305,6 +1314,56 @@ class CalendarSettingsTab extends obsidian.PluginSettingTab {
                 if (view && view.macosIntegration) {
                     view.macosIntegration.render();
                 }
+            });
+        });
+    }
+    addNotificationSettings() {
+        var integ = this.plugin.view && this.plugin.view.macosIntegration;
+        var status = integ ? (integ._notificationStatus || "not checked") : "not checked";
+        if (status === "unavailable") {
+            this.containerEl.createEl("p", {
+                cls: "setting-item-description",
+                text: "In-app notifications are unavailable in this Obsidian environment. Calendian will continue showing events and reminders in the panel."
+            });
+        }
+        new obsidian.Setting(this.containerEl)
+            .setName("In-app notifications")
+            .setDesc("Show Obsidian notices for upcoming events and overdue reminders. Disabled by default.")
+            .addToggle((toggle) => {
+            toggle.setValue(this.plugin.options.notificationsEnabled === true);
+            toggle.onChange(async (value) => {
+                await this.plugin.writeOptions(() => ({ notificationsEnabled: value }));
+                this.display();
+            });
+        });
+        new obsidian.Setting(this.containerEl)
+            .setName("Event-start notifications")
+            .setDesc("Notify shortly before timed events begin. All-day events are skipped.")
+            .addToggle((toggle) => {
+            toggle.setValue(this.plugin.options.eventNotificationsEnabled !== false);
+            toggle.onChange(async (value) => {
+                await this.plugin.writeOptions(() => ({ eventNotificationsEnabled: value }));
+            });
+        });
+        new obsidian.Setting(this.containerEl)
+            .setName("Overdue reminder notifications")
+            .setDesc("Notify when incomplete reminders become overdue.")
+            .addToggle((toggle) => {
+            toggle.setValue(this.plugin.options.reminderNotificationsEnabled !== false);
+            toggle.onChange(async (value) => {
+                await this.plugin.writeOptions(() => ({ reminderNotificationsEnabled: value }));
+            });
+        });
+        new obsidian.Setting(this.containerEl)
+            .setName("Notification lead time (minutes)")
+            .setDesc("How many minutes before an event start to show an in-app notice.")
+            .addText((textfield) => {
+            textfield.setPlaceholder("10");
+            textfield.inputEl.type = "number";
+            textfield.setValue(String(this.plugin.options.notificationLeadMinutes || 10));
+            textfield.onChange(async (value) => {
+                var num = Math.max(1, Math.min(1440, Number(value) || 10));
+                await this.plugin.writeOptions(() => ({ notificationLeadMinutes: num }));
             });
         });
     }
@@ -6924,6 +6983,11 @@ class MacOSIntegration {
         this._highlightedItemId = null;      // item ID to highlight on next render
         this._highlightTimer = null;         // auto-clear timer
         this._fileChangeDebounceTimer = null; // REQ-NOTE-011: debounce for file-change → index invalidation
+        // v0.5: In-app notification de-duplication state (REQ-NOTIF-001..005)
+        this._deliveredNotifications = {};
+        this._notificationStatus = "not checked";
+        this._lastNotificationCheckTime = null;
+        this._lastNotificationError = "";
     }
 
     // --- Execute native helper (EventKit, fast) ---
@@ -7016,6 +7080,7 @@ class MacOSIntegration {
             this.lastRefreshTime = new Date().toISOString();
             this.lastRefreshDurationMs = Date.now() - initStart;
             this.render();
+            this.notifyDueItems();
 
             // Phase 2: Only background refresh if cache is stale
             if (this.isCacheFresh()) {
@@ -7049,6 +7114,7 @@ class MacOSIntegration {
         this._refreshRunning = false;
         this.lastRefreshTime = new Date().toISOString();
         this.lastRefreshDurationMs = Date.now() - initStart;
+        this.notifyDueItems();
         this.render();
     }
 
@@ -7069,6 +7135,7 @@ class MacOSIntegration {
         this._refreshRunning = false;
         this.lastRefreshTime = new Date().toISOString();
         this.lastRefreshDurationMs = Date.now() - start;
+        this.notifyDueItems();
         this.render();
     }
 
@@ -9052,6 +9119,155 @@ MacOSIntegration.prototype.confirmDeleteReminder = function(rem) {
         }
     }).open();
 };
+// src/macos/notifications.js — In-app notification helpers and MacOSIntegration prototype methods
+// Auto-generated by split script. Edit here, then run ./build-main.sh
+
+function getNotificationSettings(options) {
+    var opts = options || {};
+    var lead = Number(opts.notificationLeadMinutes);
+    if (!isFinite(lead) || lead < 1) lead = 10;
+    if (lead > 1440) lead = 1440;
+    return {
+        notificationsEnabled: opts.notificationsEnabled === true,
+        eventNotificationsEnabled: opts.eventNotificationsEnabled !== false,
+        reminderNotificationsEnabled: opts.reminderNotificationsEnabled !== false,
+        notificationLeadMinutes: lead
+    };
+}
+
+function getNotificationItemId(type, item) {
+    var rawId = item && item.id ? String(item.id) : "";
+    if (!rawId) return "";
+    return type + ":" + rawId;
+}
+
+function notificationWasDelivered(delivered, id) {
+    return !!(delivered && id && delivered[id]);
+}
+
+function recordNotificationDelivery(delivered, id, now) {
+    if (!delivered || !id) return;
+    delivered[id] = (now || new Date()).toISOString();
+}
+
+function pruneNotificationDelivery(delivered, now) {
+    if (!delivered) return;
+    var cutoff = (now || new Date()).getTime() - 48 * 60 * 60 * 1000;
+    Object.keys(delivered).forEach(function(id) {
+        var t = new Date(delivered[id]).getTime();
+        if (!isFinite(t) || t < cutoff) delete delivered[id];
+    });
+}
+
+function buildNotificationCandidates(input) {
+    var now = input && input.now ? input.now : new Date();
+    var options = getNotificationSettings(input && input.options);
+    var delivered = (input && input.delivered) || {};
+    var events = (input && input.events) || [];
+    var reminders = (input && input.reminders) || [];
+    var candidates = [];
+
+    if (!options.notificationsEnabled) return candidates;
+
+    if (options.eventNotificationsEnabled) {
+        var leadMs = options.notificationLeadMinutes * 60 * 1000;
+        events.forEach(function(evt) {
+            if (!evt || !evt.start) return;
+            var isAllDay = evt.isAllDay !== undefined ? evt.isAllDay : evt.allday;
+            if (isAllDay) return;
+            var start = evt.start instanceof Date ? evt.start : new Date(evt.start);
+            var diff = start.getTime() - now.getTime();
+            if (!isFinite(diff) || diff <= 0 || diff > leadMs) return;
+            var id = getNotificationItemId("event", evt);
+            if (!id || notificationWasDelivered(delivered, id)) return;
+            var minutes = Math.max(1, Math.ceil(diff / 60000));
+            var title = evt.title || evt.summary || "Event";
+            candidates.push({
+                id: id,
+                type: "event",
+                itemId: evt.id,
+                title: title,
+                message: title + " starts in " + minutes + " minute" + (minutes === 1 ? "" : "s")
+            });
+        });
+    }
+
+    if (options.reminderNotificationsEnabled) {
+        reminders.forEach(function(rem) {
+            if (!rem || !rem.due || rem.completed) return;
+            var due = rem.due instanceof Date ? rem.due : new Date(rem.due);
+            var diff = due.getTime() - now.getTime();
+            if (!isFinite(diff) || diff > 0) return;
+            var id = getNotificationItemId("reminder", rem);
+            if (!id || notificationWasDelivered(delivered, id)) return;
+            var title = rem.title || rem.name || "Reminder";
+            candidates.push({
+                id: id,
+                type: "reminder",
+                itemId: rem.id,
+                title: title,
+                message: title + " is overdue"
+            });
+        });
+    }
+
+    return candidates;
+}
+
+function canUseObsidianNotice(obsidianRef) {
+    return !!(obsidianRef && typeof obsidianRef.Notice === "function");
+}
+
+if (typeof MacOSIntegration !== "undefined") {
+    MacOSIntegration.prototype.notifyDueItems = function(now) {
+        var settings = getNotificationSettings(this.plugin.options || {});
+        if (!settings.notificationsEnabled) {
+            this._notificationStatus = "disabled";
+            return [];
+        }
+        if (!canUseObsidianNotice(typeof obsidian !== "undefined" ? obsidian : null)) {
+            this._notificationStatus = "unavailable";
+            this._lastNotificationError = "Obsidian Notice API is unavailable";
+            return [];
+        }
+
+        var checkedAt = now || new Date();
+        pruneNotificationDelivery(this._deliveredNotifications, checkedAt);
+        var candidates = buildNotificationCandidates({
+            now: checkedAt,
+            options: this.plugin.options || {},
+            events: this.allEvents || [],
+            reminders: this.allReminders || [],
+            delivered: this._deliveredNotifications || {}
+        });
+
+        for (var i = 0; i < candidates.length; i++) {
+            try {
+                new obsidian.Notice(candidates[i].message, 8000);
+                recordNotificationDelivery(this._deliveredNotifications, candidates[i].id, checkedAt);
+            } catch (err) {
+                this._notificationStatus = "error";
+                this._lastNotificationError = err && err.message ? err.message : String(err);
+                return candidates.slice(0, i);
+            }
+        }
+
+        this._notificationStatus = "ok";
+        this._lastNotificationError = "";
+        this._lastNotificationCheckTime = checkedAt.toISOString();
+        return candidates;
+    }
+}
+
+if (typeof module !== "undefined" && module.exports) {
+    module.exports = {
+        buildNotificationCandidates: buildNotificationCandidates,
+        canUseObsidianNotice: canUseObsidianNotice,
+        getNotificationSettings: getNotificationSettings,
+        recordNotificationDelivery: recordNotificationDelivery,
+        pruneNotificationDelivery: pruneNotificationDelivery
+    };
+}
 // src/notes/frontmatter.js — note association model (v0.5)
 // REQ-NOTE-001: Associate events with notes via stable frontmatter metadata
 // REQ-NOTE-002: Associate reminders with notes via stable frontmatter metadata

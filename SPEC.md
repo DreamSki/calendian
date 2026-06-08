@@ -48,7 +48,7 @@ Primary goals:
 
 ### 1.3 Current release posture
 
-The current repository must be treated as **v0.2 / read-only polish — complete**. Feature claims in README and release notes must match `docs/sdd/CURRENT_STATUS.md`.
+The current repository must be treated as **v0.5 complete, with v0.5.1 polish in progress**. Feature claims in README and release notes must match `docs/sdd/CURRENT_STATUS.md`.
 
 ---
 
@@ -121,6 +121,14 @@ The following features are currently implemented in the codebase. All macOS data
 - ✅ Refresh footer with last refresh time and duration
 - ✅ Month-cell event dots with calendar colors, hollow reminder dots, multi-day spans
 - ✅ Diagnostic panel with permission/source/error overview and export with consent-based redaction
+
+#### In-app notifications (v0.5)
+- ✅ Obsidian Notice notifications for timed events starting within a configurable lead window
+- ✅ Obsidian Notice notifications for incomplete overdue reminders
+- ✅ Notification settings: global enable/disable, event enable/disable, reminder enable/disable, lead time
+- ✅ Conservative default: notifications are disabled until the user opts in
+- ✅ Session-level de-duplication prevents repeated notices during refresh loops
+- ✅ Graceful unavailable state when Obsidian Notice API cannot be used
 
 #### Write operations (v0.3)
 - ✅ Event creation via `EventCreateModal` with title, calendar, date/time, all-day, location, URL, notes
@@ -904,11 +912,11 @@ All refresh paths go through `init()`, which has a `_refreshRunning` boolean gat
 
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
-| REQ-NOTIF-001 | THE SYSTEM SHOULD show in-app notifications for events starting soon (configurable lead time). | P1 | v0.5 | Planned |
-| REQ-NOTIF-002 | THE SYSTEM SHOULD show notifications for overdue reminders. | P1 | v0.5 | Planned |
-| REQ-NOTIF-003 | NOTIFICATIONS SHALL work within Obsidian using available notification APIs. | P0 | v0.5 | Planned |
-| REQ-NOTIF-004 | THE SYSTEM SHALL allow users to configure notification lead time and enable/disable notifications. | P1 | v0.5 | Planned |
-| REQ-NOTIF-005 | IF Obsidian notification APIs are unavailable, THE SYSTEM SHALL document this limitation gracefully. | P2 | v0.5 | Planned |
+| REQ-NOTIF-001 | THE SYSTEM SHOULD show in-app notifications for events starting soon (configurable lead time). | P1 | v0.5 | Implemented — `notifyDueItems()` emits Obsidian Notice messages for timed events within `notificationLeadMinutes`; all-day events are skipped |
+| REQ-NOTIF-002 | THE SYSTEM SHOULD show notifications for overdue reminders. | P1 | v0.5 | Implemented — incomplete reminders with due date/time at or before now emit overdue notices |
+| REQ-NOTIF-003 | NOTIFICATIONS SHALL work within Obsidian using available notification APIs. | P0 | v0.5 | Implemented — uses `obsidian.Notice` from refresh completion paths |
+| REQ-NOTIF-004 | THE SYSTEM SHALL allow users to configure notification lead time and enable/disable notifications. | P1 | v0.5 | Implemented — settings: `notificationsEnabled`, `eventNotificationsEnabled`, `reminderNotificationsEnabled`, `notificationLeadMinutes` |
+| REQ-NOTIF-005 | IF Obsidian notification APIs are unavailable, THE SYSTEM SHALL document this limitation gracefully. | P2 | v0.5 | Implemented — status becomes `unavailable`; settings/diagnostics describe that panel display still works |
 
 ### 7.19 Data export and backup requirements
 
@@ -935,7 +943,7 @@ All refresh paths go through `init()`, which has a `_refreshRunning` boolean gat
 | REQ-DOC-001 | README SHALL distinguish current, planned, experimental, and non-goal features. | P0 | v0.1 | Implemented |
 | REQ-DOC-002 | Roadmap SHALL reference requirement groups or IDs. | P0 | v0.1 | Implemented |
 | REQ-DOC-003 | Target architecture SHALL be labeled as target until code is refactored. | P0 | v0.1 | Implemented |
-| REQ-ARCH-001 | THE SYSTEM SHOULD split into maintainable modules (macOS adapter, domain, cache, UI) before complex write features. | P1 | v0.3 | Implemented — `cat` concatenation via `build-main.sh`: `main-head.js` (skeleton + class bodies) + `src/macos/helper-executor.js` (7 methods) + `src/cache/schedule-cache.js` (13 methods) → `main.js`. Edit in `src/`, run `./build-main.sh`, reload Obsidian. |
+| REQ-ARCH-001 | THE SYSTEM SHOULD split into maintainable modules (macOS adapter, domain, cache, UI) before complex write features. | P1 | v0.3 | Implemented — `cat` concatenation via `build-main.sh`: `main-head.js` (skeleton + class bodies) + macOS/cache/writer/notification modules + notes modules → `main.js`. Edit in `src/`, run `./build-main.sh`, reload Obsidian. |
 
 ### 7.22 Goal and focus requirements
 
@@ -1044,7 +1052,7 @@ Current key classes within `main-head.js`:
 - `CalendarPlugin` (extends `Plugin`) — lifecycle, settings, helper path discovery
 - `CalendarSettingsTab` (extends `PluginSettingTab`) — settings UI, source discovery
 - `CalendarView` (extends `ItemView`) — sidebar panel, owns calendar grid + `MacOSIntegration`
-- `MacOSIntegration` — EventKit helper execution, cache, render logic. Methods split across `src/macos/helper-executor.js`, `src/cache/schedule-cache.js`, `src/macos/writer.js`
+- `MacOSIntegration` — EventKit helper execution, cache, write operations, notifications, render logic. Methods split across `src/macos/helper-executor.js`, `src/cache/schedule-cache.js`, `src/macos/writer.js`, `src/macos/notifications.js`, and `src/notes/*`
 
 Data flow: `calendian-helper` (EventKit) → JSON stdout → `execHelper()` → `allEvents[]`/`allReminders[]` → `render()` → DOM
 

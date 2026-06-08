@@ -28,6 +28,7 @@ All code in `main.js` (concatenated from `main-head.js` + `src/*.js` modules). T
 | src/macos/helper-executor.js | `MacOSIntegration` (prototype) | Spawns native Swift helper (`execHelper`), caches events/reminders, renders sidebar panel. Contains legacy `execJXA`/`parseEvents` — not used by primary data paths. |
 | src/cache/schedule-cache.js | `MacOSIntegration` (prototype) | Cache save/load, preload, date queries |
 | src/macos/writer.js | `MacOSIntegration` (prototype) | Event/reminder create, edit, delete via helper. Mutation safety guards (`canMutateEvent`, `canMutateReminder`). Completion toggle. Node.js-only code guarded with `typeof module` check. |
+| src/macos/notifications.js | `MacOSIntegration` (prototype + testable helpers) | In-app notification candidate selection, Obsidian Notice delivery, settings normalization, session de-duplication. Node.js tests import the pure helpers. |
 | src/notes/frontmatter.js | `MacOSIntegration` (prototype) | Frontmatter read/write for `calendian:` YAML. Association index (frontmatter scan + body scan for inline refs). `createNoteForEvent()`/`createNoteForReminder()`. Filename sanitization. |
 | src/notes/templates.js | `MacOSIntegration` (prototype) | `expandTemplate()` with `{{var}}` + `{{#key}}...{{/key}}` conditional blocks. `buildEventTemplateVars()`/`buildReminderTemplateVars()`. `copyItemText()` for inline ref copy. |
 | src/notes/note-link-resolver.js | `MacOSIntegration` (prototype) | `resolveNotePath()` — resolve/repair note links when files are renamed or moved. |
@@ -78,6 +79,7 @@ cat \
   src/macos/helper-executor.js \
   src/cache/schedule-cache.js \
   src/macos/writer.js \
+  src/macos/notifications.js \
   src/notes/frontmatter.js \
   src/notes/note-link-resolver.js \
   src/notes/templates.js \

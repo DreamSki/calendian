@@ -139,7 +139,7 @@ Tasks are ordered by dependency and release target. Every task references requir
 - Requirements: `REQ-ARCH-001`
 - Status: Done
 - Priority: P1
-- Evidence: `build-main.sh` produces valid `main.js` (8451 lines). Concatenation order verified: upstream → MacOSIntegration skeleton → `src/macos/helper-executor.js` (7 prototype methods: execHelper, classifyError, execJXA, isPermissionError, startAutoRefresh, stopAutoRefresh, destroy) → `src/cache/schedule-cache.js` (13 prototype methods: cache I/O, preload, date queries) → CalendarView → CalendarPlugin. 20/20 EXTRACTED markers match 20/20 prototype methods. No duplicate definitions. All key non-extracted methods (init, render, discoverCalendars, startWatch, etc.) remain in class body.
+- Evidence: `build-main.sh` produces valid `main.js` by concatenating `main-head.js` plus macOS/cache/writer/notification modules and notes modules. Current order: upstream → MacOSIntegration skeleton → `src/macos/helper-executor.js` → `src/cache/schedule-cache.js` → `src/macos/writer.js` → `src/macos/notifications.js` → `src/notes/*` → CalendarView → CalendarPlugin. Edit source modules, then run `./build-main.sh`.
 
 ### TASK-020 — Event create form
 
@@ -304,13 +304,9 @@ Tasks are ordered by dependency and release target. Every task references requir
 ### TASK-043 — In-app notifications
 
 - Requirements: `REQ-NOTIF-001` to `REQ-NOTIF-005`
-- Status: Todo
+- Status: Done
 - Priority: P1
-- Deliverables:
-  - Event-start notifications with configurable lead time.
-  - Overdue reminder notifications.
-  - Notification enable/disable settings.
-  - Graceful degradation when Obsidian notification APIs are unavailable.
+- Evidence: `src/macos/notifications.js` implements notification settings normalization, event/reminder candidate selection, session de-duplication, Obsidian Notice delivery, and unavailable/error status. `main-head.js` default settings and Settings tab expose global/event/reminder toggles plus `notificationLeadMinutes`; `init()`/`initBackground()`/`refreshInBackground()` call `notifyDueItems()` after cache/helper data is available. Diagnostics include notification status. `tests/notifications.test.js` covers event lead windows, overdue reminders, de-duplication, disabled state, and conservative defaults.
 
 ### TASK-044 — Reminder expandable detail panel
 

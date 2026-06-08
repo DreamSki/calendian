@@ -25,6 +25,7 @@ This document records the actual repository state. It intentionally separates im
 | Error states | Implemented | Error classification (permission_denied, timeout, error). Per-source error banners with retry. Parse-failure isolation. Empty vs error distinction. |
 | Month cell event dots | Implemented | Calendar-colored dots on month cells showing event presence per calendar. Hollow reminder dot. Multi-day event span support. Uses in-memory cache only (no helper calls). Respects source filters. Dynamic CSS injection for per-calendar colors. |
 | Refresh / sync | Implemented | Timer-driven refresh (configurable interval, default 5min). Manual refresh button. Window focus refresh (REQ-SYNC-004). `_refreshRunning` concurrency guard. EKEventStoreChanged notification watch (REQ-SYNC-005). Post-write refresh (REQ-SYNC-006). Watch fallback to timer (REQ-SYNC-007). See SPEC.md §7.6.1. |
+| In-app notifications | Implemented | Optional Obsidian Notice notifications for timed events starting within the configured lead window and incomplete overdue reminders. Disabled by default. Settings expose global/event/reminder toggles and lead time. Session-level de-duplication prevents refresh-loop repeats. Unavailable Notice API is reported in settings/diagnostics. |
 | Right-click actions | Planned | Current day/week context menu is inherited from calendar note behavior; Calendian event/reminder actions are not complete. |
 | Write operations | **Implemented (v0.4)** | Event/reminder creation, edit, and delete. Edit/delete for simple non-recurring events and all reminders. Completion toggle for reminders. Recurring event mutations blocked with Calendar.app redirect. `ConfirmActionModal` for destructive operations. Mutation safety guards (`canMutateEvent`, `canMutateReminder`). Post-write refresh. Write error handling. Default calendar/list. NL quick-create with English + Chinese regex + optional AI backend. |
 | Note association | **Implemented (v0.5)** | Frontmatter schema per SPEC §5.3. `ensureAssociationIndex()` scans vault for `calendian.associations` frontmatter + body scan for inline `cal:ev:ID`/`cal:rem:ID` refs. `createNoteForEvent()`/`createNoteForReminder()` with template engine (`expandTemplate()`). Event detail panel shows "Linked Notes" + "+ Note" button. Reminder items show expandable linked notes list + "+📝" create button. Copy inline ref via `copyItemText()`. `calendian-event` code block renders events/reminders in notes. Inline ref renderer (`cal:ev:ID`/`cal:rem:ID`) renders styled mini-table. Highlight navigation from note → panel. Renamed/missing notes handled gracefully. |
@@ -38,7 +39,7 @@ This document records the actual repository state. It intentionally separates im
 
 ## Current release label
 
-Current repository state: **v0.5 complete — note association + rendering done. v0.5.1 planned: reminder detail panel, file-change live sync, note→calendar reverse write**. TASK-040 (frontmatter schema) done. TASK-041 (create/open notes with templates) done. TASK-042 (template variables) done. Next: TASK-044 (reminder detail panel), TASK-045 (file-change live sync), TASK-046 (note→calendar creation), or TASK-043 (notifications).
+Current repository state: **v0.5 complete — note association, rendering, live association sync, and notifications done. v0.5.1 planned: reminder detail panel and note→calendar reverse write**. TASK-040 (frontmatter schema) done. TASK-041 (create/open notes with templates) done. TASK-042 (template variables) done. TASK-043 (notifications) done. TASK-045 (file-change live sync) done. Next: TASK-044 (reminder detail panel) or TASK-046 (note→calendar creation).
 
 ## README policy
 
@@ -77,6 +78,7 @@ README may list the following as current behavior:
 - inline `cal:ev:ID` / `cal:rem:ID` reference renderer;
 - highlight navigation from note → panel item;
 - auto-link via body scan for inline refs.
+- optional in-app notifications for upcoming timed events and overdue reminders;
 
 Everything else must be marked as planned, experimental, or future.
 
@@ -89,17 +91,19 @@ Everything else must be marked as planned, experimental, or future.
 5. ~~Add stable event/reminder IDs before any write, delete, or note-association feature is considered release-ready.~~ ✅ EventKit provides stable UUIDs.
 6. ~~Rename plugin folder from `calendar-macos-sync` to `calendian`~~ ✅ Done (2026-06-08). Folder renamed, VIEW_TYPE_CALENDAR and helper path updated in main.js.
 7. ~~Update ARCHITECTURE.md to document the native Swift EventKit helper module.~~ ✅ Done (2026-06-08).
-8. ~~Split `main.js` into multiple `.js` modules per target architecture (REQ-ARCH-001).~~ ✅ Done — `build-main.sh` concatenates `main-head.js` + 7 `src/` modules (4 macos/cache/writer + 3 notes) into `main.js`.
+8. ~~Split `main.js` into multiple `.js` modules per target architecture (REQ-ARCH-001).~~ ✅ Done — `build-main.sh` concatenates `main-head.js` + macOS/cache/writer/notification modules + notes modules into `main.js`.
 
 ## Active session
 
 > Updated by AI after every meaningful step. Next session reads this to continue without re-explaining context.
 
-- **Doing:** TASK-044 (reminder detail panel) or TASK-046 (note→calendar creation) — whichever is next.
+- **Doing:** None in this worktree. Another session is working on TASK-044; next independent candidate is TASK-046 (note→calendar creation).
 - **Completed this session:**
-  - TASK-045 (file-change live sync, REQ-NOTE-011) implemented. `_invalidateAssociationDebounced()` with 500ms debounce added to CalendarView. All three vault event handlers (`onFileCreated`/`onFileModified`/`onFileDeleted`) now invalidate association index on `.md` file changes. Fresh rebuild by nulling `_bodyScanIndex` ensures stale entries are cleaned.
+  - TASK-043 (in-app notifications, REQ-NOTIF-001..005) implemented. Added `src/macos/notifications.js`, notification settings, refresh-path delivery, session de-duplication, unavailable status handling, diagnostics status, and focused Node tests.
+- **Recent prior handoff:**
+  - TASK-045 (file-change live sync, REQ-NOTE-011) was already implemented before this worktree picked up TASK-043.
 - **Decisions:**
-  - Fresh rebuild (null `_bodyScanIndex` + `_associationIndex`) on every live-sync invalidation to ensure correct cleanup of stale frontmatter/inline refs. The body scan caps at 200 files so performance is acceptable.
-  - 60s periodic rebuild kept as safety net alongside live sync.
-- **Next:** TASK-044 (reminder detail panel) → TASK-046 (note→calendar creation).
-- **Last action:** 2026-06-08 — TASK-045 implemented (file-change live sync).
+  - Notifications are disabled by default to avoid surprise notices; event/reminder notification sub-toggles default enabled so the global switch is the main opt-in.
+  - Notification de-duplication is session-local (`_deliveredNotifications`) and pruned after 48h; it prevents repeated notices during refresh loops without writing notification history into `data.json`.
+- **Next:** TASK-046 (note→calendar creation) after confirming TASK-044 is still owned by the other session.
+- **Last action:** 2026-06-08 — TASK-043 implemented (in-app notifications).

@@ -64,6 +64,7 @@ The repository contains the following implemented features:
 - **Inline reference renderer**: `cal:ev:ID` / `cal:rem:ID` in notes renders as a styled mini-table with event/reminder details.
 - **Highlight navigation**: clicking an inline ref or code block item highlights and scrolls to the item in the Calendian panel.
 - **Auto-link via body scan**: notes containing `cal:ev:ID` / `cal:rem:ID` are automatically associated without frontmatter.
+- **In-app notifications**: optional Obsidian notices for upcoming timed events and overdue reminders, with configurable lead time and enable/disable controls.
 
 For the precise truth table, see [`docs/sdd/CURRENT_STATUS.md`](./docs/sdd/CURRENT_STATUS.md) and [SPEC.md §2](./SPEC.md#2-current-implementation-status).
 
@@ -74,7 +75,6 @@ For the precise truth table, see [`docs/sdd/CURRENT_STATUS.md`](./docs/sdd/CURRE
 These are planned, but should not be treated as current behavior until their requirements and release gates pass:
 
 - Recurring event scope selection (this-only / future / all) for edit/delete.
-- In-app notifications for upcoming events and overdue reminders.
 - Goals and focus tracking (define goals, break into steps, declare weekly focus).
 - Habit tracking with consistency rate (not streaks), minimum-viable versions, and rest periods.
 - Encouragement nudges (daily intention prompt, re-engagement prompts, configurable tone).
@@ -167,7 +167,7 @@ Then re-enable Obsidian's access.
 | Click Today / month navigation | Moves the calendar view. |
 | Click ↻ button | Manually refreshes from macOS Calendar/Reminders. |
 | Reminder range selector | Filter reminders: selected day / next 7 days / all incomplete. |
-| Open settings → macOS Integration | Toggle Calendar/Reminders display, source filtering, past event display, refresh interval, default calendar/list for create form, note templates, note folder, AI NL parsing config. |
+| Open settings → macOS Integration | Toggle Calendar/Reminders display, source filtering, past event display, refresh interval, in-app notifications, default calendar/list for create form, note templates, note folder, AI NL parsing config. |
 | Open settings → Diagnostics | View permission status, source counts, cache stats. Export via consent modal. |
 | Click ⚡ button | Open natural language quick-create for events/reminders. |
 | Click +Event / +Remind | Open manual create forms for events/reminders. |

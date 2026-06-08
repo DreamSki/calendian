@@ -17,7 +17,7 @@ fi
 # Part 1: before sentinel
 head -n $((SENTINEL_LINE - 1)) main-head.js > main.js
 # Part 2: src/ modules (prototype methods)
-cat src/macos/helper-executor.js src/cache/schedule-cache.js src/macos/writer.js src/notes/frontmatter.js src/notes/note-link-resolver.js src/notes/templates.js src/notes/codeblock.js >> main.js
+cat src/macos/helper-executor.js src/cache/schedule-cache.js src/macos/writer.js src/macos/notifications.js src/notes/frontmatter.js src/notes/note-link-resolver.js src/notes/templates.js src/notes/codeblock.js >> main.js
 # Part 3: after sentinel (skip sentinel line itself)
 tail -n +$((SENTINEL_LINE + 1)) main-head.js >> main.js
 

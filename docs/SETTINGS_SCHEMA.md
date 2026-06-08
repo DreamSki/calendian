@@ -58,9 +58,10 @@ interface CalendianSettings {
   aiModel: string;                  // default: "deepseek-chat"
 
   // ---- Notifications (v0.5) ----
-  notificationsEnabled: boolean;            // default: true
-  eventNotificationLeadMinutes: number;     // default: 5, min: 0, max: 60
-  overdueReminderNotifications: boolean;    // default: true
+  notificationsEnabled: boolean;            // default: false
+  eventNotificationsEnabled: boolean;       // default: true
+  reminderNotificationsEnabled: boolean;    // default: true
+  notificationLeadMinutes: number;          // default: 10, min: 1, max: 1440
 
   // ---- Nudges (v0.5.5) ----
   nudgeEnabled: boolean;                    // default: true
@@ -116,9 +117,10 @@ interface CalendianSourceMetadata {
   "aiEndpoint": "https://api.deepseek.com/v1/chat/completions",
   "aiApiKey": "",
   "aiModel": "deepseek-chat",
-  "notificationsEnabled": true,
-  "eventNotificationLeadMinutes": 5,
-  "overdueReminderNotifications": true,
+  "notificationsEnabled": false,
+  "eventNotificationsEnabled": true,
+  "reminderNotificationsEnabled": true,
+  "notificationLeadMinutes": 10,
   "nudgeEnabled": true,
   "nudgeTone": "gentle",
   "nudgeMorningPrompt": true,
@@ -263,8 +265,8 @@ See `TESTING.md` → Future automated test targets → Settings migration.
 | `showCompletedReminders` | `REQ-REM-004` |
 | `noDateReminderSection` | `REQ-REM-006` |
 | `legacyClickBehavior` | `REQ-UX-001`, `REQ-UX-002` |
-| `notificationsEnabled`, `eventNotificationLeadMinutes` | `REQ-NOTIF-001`, `REQ-NOTIF-004` |
-| `overdueReminderNotifications` | `REQ-NOTIF-002` |
+| `notificationsEnabled`, `eventNotificationsEnabled`, `notificationLeadMinutes` | `REQ-NOTIF-001`, `REQ-NOTIF-004` |
+| `reminderNotificationsEnabled` | `REQ-NOTIF-002`, `REQ-NOTIF-004` |
 | `nudgeEnabled` | `REQ-NUDGE-006` |
 | `nudgeTone` | `REQ-NUDGE-005` |
 | `nudgeMorningPrompt` | `REQ-NUDGE-001` |
