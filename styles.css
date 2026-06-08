@@ -684,3 +684,295 @@
 .macos-item:hover .calendian-item-actions {
     display: flex;
 }
+
+/* v0.5: Note association styles (REQ-NOTE-003) */
+.calendian-note-link {
+    margin: 2px 0;
+}
+.calendian-note-link a {
+    color: var(--text-accent);
+    text-decoration: none;
+}
+.calendian-note-link a:hover {
+    text-decoration: underline;
+}
+.calendian-action-create-note {
+    margin-top: 4px;
+    display: inline-block;
+    cursor: pointer;
+}
+.calendian-note-indicator {
+    cursor: pointer;
+    margin-left: 2px;
+    opacity: 0.7;
+    font-size: 0.85em;
+}
+.calendian-note-badge {
+    cursor: pointer;
+    margin-left: 4px;
+    font-size: 0.8em;
+    opacity: 0.8;
+    color: var(--text-accent);
+}
+.calendian-note-badge:hover {
+    opacity: 1;
+}
+.calendian-note-indicator:hover {
+    opacity: 1;
+}
+.calendian-note-create {
+    opacity: 0.5;
+}
+.calendian-note-create:hover {
+    opacity: 0.9;
+}
+
+/* v0.5: Linked notes list dropdown below reminder items */
+.calendian-notes-list {
+    margin: -4px 0 4px 24px;
+    padding: 4px 8px;
+    border-left: 2px solid var(--interactive-accent);
+    background: var(--background-secondary);
+    border-radius: 0 4px 4px 0;
+}
+.calendian-notes-list-item {
+    padding: 2px 4px;
+    cursor: pointer;
+    font-size: 0.85em;
+    color: var(--text-accent);
+    border-radius: 3px;
+}
+.calendian-notes-list-item:hover {
+    background: var(--background-modifier-hover);
+    text-decoration: underline;
+}
+
+/* v0.5: Copy action in event detail */
+.calendian-action-copy {
+    margin-top: 4px;
+    display: inline-block;
+    cursor: pointer;
+    opacity: 0.8;
+}
+.calendian-action-copy:hover {
+    opacity: 1;
+}
+/* Copy hint button in reminder hover actions */
+.calendian-action-copy-hint {
+    cursor: pointer;
+    margin-left: 4px;
+    font-size: 0.85em;
+}
+
+/* v0.5: ```calendian``` code block in notes */
+.calendian-block {
+    padding: 8px 0;
+    font-size: 0.9em;
+}
+.calendian-block-header {
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: var(--text-muted);
+    font-size: 0.85em;
+}
+.calendian-block-label {
+    font-weight: 600;
+    margin: 8px 0 4px;
+    font-size: 0.8em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    letter-spacing: 0.05em;
+}
+.calendian-block-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+.calendian-block-item:hover {
+    background-color: var(--background-modifier-hover);
+}
+.calendian-block-date {
+    flex-shrink: 0;
+    width: 52px;
+    text-align: right;
+    font-size: 0.8em;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    font-family: var(--font-monospace);
+}
+/* Unified column order for both events & reminders:
+   date → icon → title → time → badge → indicator */
+.calendian-block-icon {
+    flex-shrink: 0;
+    width: 18px;
+    text-align: center;
+    font-size: 0.85em;
+}
+.calendian-block-icon-done {
+    color: var(--text-success);
+}
+.calendian-block-time {
+    flex-shrink: 0;
+    width: 95px;
+    text-align: right;
+    font-size: 0.8em;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    font-family: var(--font-monospace);
+}
+.calendian-block-time-allday {
+    font-family: inherit;
+    font-style: normal;
+}
+.calendian-block-title {
+    flex: 1;
+    min-width: 60px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.calendian-block-badge {
+    flex-shrink: 0;
+    width: 80px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 0.75em;
+    background-color: var(--background-modifier-border);
+    color: var(--text-muted);
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    box-sizing: border-box;
+}
+.calendian-block-indicator {
+    flex-shrink: 0;
+    width: 28px;
+    text-align: center;
+    font-size: 0.8em;
+    font-weight: 700;
+    color: var(--text-error);
+}
+.calendian-block-event .calendian-block-indicator {
+    color: var(--text-muted);
+    font-weight: normal;
+}
+.calendian-block-empty {
+    padding: 12px 6px;
+    color: var(--text-faint);
+    font-style: italic;
+    font-size: 0.85em;
+}
+
+/* v0.5: Inline cal:ev:ID / cal:rem:ID reference table */
+/* v0.5: Inline cal:ev:ID / cal:rem:ID reference table
+   Use high-specificity selectors to beat Obsidian's global table styles */
+.markdown-rendered table.calendian-inline-table,
+.markdown-preview-view table.calendian-inline-table,
+.markdown-reading-view table.calendian-inline-table,
+.markdown-source-view table.calendian-inline-table,
+.cm-content table.calendian-inline-table {
+    border-collapse: collapse !important;
+    table-layout: fixed !important;
+    margin: 4px 0 !important;
+    font-size: 0.8em !important;
+    border: none !important;
+    background: transparent !important;
+    width: auto !important;
+}
+.markdown-rendered .calendian-inline-table td,
+.markdown-preview-view .calendian-inline-table td,
+.markdown-reading-view .calendian-inline-table td,
+.markdown-source-view .calendian-inline-table td,
+.cm-content .calendian-inline-table td {
+    border: none !important;
+    vertical-align: baseline !important;
+    padding: 2px 8px !important;
+    background: transparent !important;
+    font-size: inherit !important;
+}
+.calendian-inline-row td {
+    background: var(--background-secondary) !important;
+    padding-top: 5px !important;
+    padding-bottom: 5px !important;
+    border-bottom: 1px solid var(--color-base-50) !important;
+}
+.calendian-inline-row:last-child td {
+    border-bottom: none !important;
+}
+.calendian-inline-row td:nth-child(2) {
+    border-left: 4px solid var(--interactive-accent) !important;
+    padding-left: 6px !important;
+}
+.calendian-inline-row.calendian-inline-reminder td:nth-child(2) {
+    border-left: 4px solid var(--color-orange) !important;
+}
+.calendian-inline-row:hover td {
+    filter: brightness(0.97) !important;
+}
+
+/* Type icon */
+.calendian-inline-type {
+    text-align: center !important;
+    white-space: nowrap !important;
+    font-size: 1em !important;
+}
+
+.calendian-inline-date {
+    text-align: right !important;
+    font-family: var(--font-monospace) !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    color: var(--text-muted) !important;
+    font-weight: 500 !important;
+}
+.calendian-inline-time {
+    text-align: right !important;
+    font-family: var(--font-monospace) !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    letter-spacing: -0.03em !important;
+    color: var(--text-muted) !important;
+}
+.calendian-inline-time-allday {
+    font-family: var(--font-interface) !important;
+    font-style: normal !important;
+    letter-spacing: 0 !important;
+}
+.calendian-inline-title {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    font-weight: 600 !important;
+    color: var(--text-accent) !important;
+}
+.calendian-inline-badge {
+    text-align: center !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    font-size: 0.8em !important;
+    font-weight: 500 !important;
+    color: var(--text-muted) !important;
+    border: 1px solid var(--text-faint) !important;
+    border-radius: 10px !important;
+    padding: 1px 8px !important;
+}
+/* v0.5: Highlight for items navigated-to from notes */
+.macos-item.calendian-item-highlight {
+    border-left: 4px solid var(--interactive-accent) !important;
+    padding-left: 8px;
+    border-radius: 0 4px 4px 0;
+    background: transparent !important;
+}
+
+.calendian-inline-indicators {
+    text-align: center !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    color: var(--text-error) !important;
+    font-weight: 700 !important;
+}
