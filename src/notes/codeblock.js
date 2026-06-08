@@ -334,3 +334,471 @@ function navigateToDate(date, plugin, itemId) {
         console.warn("[Calendian] Failed to navigate:", e.message);
     }
 }
+
+// ── calendian-create code block ────────────────────────────────────
+
+/**
+ * Parse key:value fields from a calendian-create code block.
+ * Returns { type, title, date, startTime, endTime, isAllDay, calendar,
+ *           list, location, notes, priority, url, errors[] }.
+ */
+function parseCreateFields(source) {
+    var fields = {
+        type: "",
+        title: "",
+        date: "",
+        startTime: "",
+        endTime: "",
+        isAllDay: false,
+        calendar: "",
+        list: "",
+        location: "",
+        notes: "",
+        priority: "",
+        url: "",
+        errors: []
+    };
+
+    var lines = (source || "").split("\n");
+    var currentKey = null;
+
+    for (var i = 0; i < lines.length; i++) {
+        var line = lines[i];
+
+        // Multi-line notes: indented continuation lines after a notes: line
+        if (currentKey === "notes" && /^\s/.test(line) && fields.notes.length > 0) {
+            fields.notes += "\n" + line.trim();
+            continue;
+        }
+        currentKey = null;
+
+        // Skip empty and comment lines
+        var trimmed = line.trim();
+        if (!trimmed || trimmed.charAt(0) === "#") continue;
+
+        // Match key: value
+        var m = trimmed.match(/^(\w+)\s*:\s*(.*)/);
+        if (!m) continue;
+
+        var key = m[1].toLowerCase();
+        var val = m[2].trim();
+
+        switch (key) {
+            case "type":
+                fields.type = val.toLowerCase();
+                break;
+            case "title":
+                fields.title = val;
+                currentKey = "title";
+                break;
+            case "date":
+                fields.date = val;
+                break;
+            case "time":
+                // Parse time variants: "14:00-15:30", "allday", "HH:mm"
+                var tl = val.toLowerCase();
+                if (tl === "allday" || tl === "all day") {
+                    fields.isAllDay = true;
+                } else {
+                    var tr = tl.match(/^(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})$/);
+                    if (tr) {
+                        fields.startTime = tr[1];
+                        fields.endTime = tr[2];
+                    } else if (/^\d{1,2}:\d{2}$/.test(tl)) {
+                        fields.startTime = tl;
+                    }
+                }
+                break;
+            case "starttime":
+                fields.startTime = val;
+                break;
+            case "endtime":
+                fields.endTime = val;
+                break;
+            case "allday":
+                fields.isAllDay = val.toLowerCase() === "true" || val === "1";
+                break;
+            case "calendar":
+                fields.calendar = val;
+                break;
+            case "list":
+                fields.list = val;
+                break;
+            case "location":
+                fields.location = val;
+                break;
+            case "notes":
+                fields.notes = val;
+                currentKey = "notes";
+                break;
+            case "priority":
+                var p = val.toLowerCase();
+                if (p === "none" || p === "low" || p === "medium" || p === "high") {
+                    fields.priority = p;
+                } else {
+                    fields.errors.push("Unknown priority: " + val + " (use none/low/medium/high)");
+                }
+                break;
+            case "url":
+                fields.url = val;
+                break;
+            default:
+                // Unknown field — ignore silently (forward-compatible)
+                break;
+        }
+    }
+
+    // Type inference when not specified
+    if (!fields.type) {
+        if (fields.list || fields.priority) {
+            fields.type = "reminder";
+        } else {
+            fields.type = "event";
+        }
+    }
+
+    // Validation
+    if (!fields.title) {
+        fields.errors.push("title is required");
+    }
+    if (fields.type === "event" && !fields.date) {
+        // Date may be inferred from note filename later
+        fields._needsDateInference = true;
+    }
+    if (fields.type === "reminder" && fields.priority && ["none", "low", "medium", "high"].indexOf(fields.priority) === -1) {
+        fields.errors.push("Invalid priority: " + fields.priority);
+    }
+
+    return fields;
+}
+
+/**
+ * Resolve a calendar name (or UUID) to a calendar ID.
+ * Returns the ID string, or null if not found.
+ */
+async function resolveCalendarByName(integ, nameOrId) {
+    if (!nameOrId) return null;
+    // UUID-like: pass through
+    if (/^[A-F0-9-]{20,}$/i.test(nameOrId)) return nameOrId;
+
+    try {
+        var cals = await integ.discoverCalendars();
+        for (var i = 0; i < cals.length; i++) {
+            if (cals[i].rawName.toLowerCase() === nameOrId.toLowerCase()) return cals[i].id;
+            // Also match display name (includes account suffix)
+            if (cals[i].name.toLowerCase().indexOf(nameOrId.toLowerCase()) !== -1) return cals[i].id;
+        }
+    } catch (e) {
+        console.warn("[Calendian] Calendar discovery failed:", e.message);
+    }
+    return null;
+}
+
+/**
+ * Resolve a reminder list name (or UUID) to a list ID.
+ * Returns the ID string, or null if not found.
+ */
+async function resolveListByName(integ, nameOrId) {
+    if (!nameOrId) return null;
+    if (/^[A-F0-9-]{20,}$/i.test(nameOrId)) return nameOrId;
+
+    try {
+        var lists = await integ.discoverReminderLists();
+        for (var i = 0; i < lists.length; i++) {
+            if (lists[i].rawName.toLowerCase() === nameOrId.toLowerCase()) return lists[i].id;
+            if (lists[i].name.toLowerCase().indexOf(nameOrId.toLowerCase()) !== -1) return lists[i].id;
+        }
+    } catch (e) {
+        console.warn("[Calendian] List discovery failed:", e.message);
+    }
+    return null;
+}
+
+/**
+ * Replace the calendian-create code block in the note with an inline ref.
+ * Uses ctx.getSectionInfo(el) for exact line range.
+ */
+async function replaceBlockWithInlineRef(plugin, ctx, el, itemId, itemType) {
+    var ref = itemType === "event" ? "cal:ev:" + itemId : "cal:rem:" + itemId;
+    var inlineRef = "`" + ref + "`";
+
+    // Try section-info based replacement
+    var sectionInfo = ctx && ctx.getSectionInfo ? ctx.getSectionInfo(el) : null;
+    if (sectionInfo) {
+        try {
+            var file = plugin.app.vault.getAbstractFileByPath(ctx.sourcePath);
+            if (!file) throw new Error("File not found: " + ctx.sourcePath);
+            var content = await plugin.app.vault.cachedRead(file);
+            var lines = content.split("\n");
+            var start = sectionInfo.lineStart;
+            var end = sectionInfo.lineEnd;
+
+            // Replace the code block lines (including the ``` fences) with the inline ref
+            var newLines = lines.slice(0, start).concat([inlineRef]).concat(lines.slice(end + 1));
+            await plugin.app.vault.modify(file, newLines.join("\n"));
+
+            console.log("[Calendian] Replaced calendian-create block with " + ref);
+            return;
+        } catch (err) {
+            console.warn("[Calendian] Failed to replace block in note:", err.message);
+            // Fall through to clipboard fallback
+        }
+    }
+
+    // Fallback: copy to clipboard + notice
+    try {
+        await navigator.clipboard.writeText(inlineRef);
+        new obsidian.Notice("Created! Inline ref copied to clipboard — paste it in your note:\n" + ref);
+    } catch (e) {
+        new obsidian.Notice("Created! Add this ref to your note: " + ref);
+    }
+}
+
+/**
+ * Render a ```calendian-create``` code block.
+ * Shows a preview of the parsed fields with a Create button.
+ */
+function renderCalendianCreateBlock(plugin, source, el, ctx) {
+    var view = plugin.view;
+    if (!view || !view.macosIntegration) {
+        el.createDiv("calendian-block-empty").textContent =
+            "Calendian panel not loaded. Open the calendar sidebar first.";
+        return;
+    }
+
+    var sourceText = (source || "").trim();
+    if (!sourceText) {
+        var help = el.createDiv("calendian-create-block calendian-create-empty");
+        help.createDiv("calendian-create-help").innerHTML =
+            "Add fields to create an event or reminder:<br>" +
+            "<code>type: event</code> or <code>type: reminder</code><br>" +
+            "<code>title: My title</code> (required)<br>" +
+            "<code>date: 2024-03-15</code> (required for events)<br>" +
+            "<code>time: 09:00-10:00</code> or <code>time: allday</code><br>" +
+            "<code>calendar: CalendarName</code> or <code>list: ListName</code>";
+        return;
+    }
+
+    var fields = parseCreateFields(sourceText);
+    var integ = view.macosIntegration;
+
+    // Date inference from note filename (for events)
+    if (fields._needsDateInference && ctx && ctx.sourcePath) {
+        try {
+            var basename = ctx.sourcePath.replace(/\.md$/, "").split("/").pop();
+            var fromFile = window.moment(basename, "YYYY-MM-DD", true);
+            if (fromFile.isValid()) {
+                fields.date = fromFile.format("YYYY-MM-DD");
+                fields._needsDateInference = false;
+            }
+        } catch (e) {}
+    }
+    // Clear the flag — if still true, it's a real error
+    delete fields._needsDateInference;
+    if (fields.type === "event" && !fields.date) {
+        fields.errors.push("date is required for events (or use a YYYY-MM-DD dated note)");
+    }
+
+    // Build preview container
+    var container = el.createDiv("calendian-create-block");
+
+    // Header
+    var header = container.createDiv("calendian-create-header");
+    var icon = fields.type === "reminder" ? "🔔" : "📅";
+    var label = fields.type === "reminder" ? "Reminder" : "Event";
+    header.textContent = icon + " New " + label;
+
+    // Field preview rows
+    var preview = container.createDiv("calendian-create-preview");
+
+    function addFieldRow(key, value, cls) {
+        if (!value && value !== false) return;
+        var row = preview.createDiv("calendian-create-field");
+        row.createDiv("calendian-create-field-key").textContent = key;
+        row.createDiv("calendian-create-field-val" + (cls ? " " + cls : "")).textContent =
+            (typeof value === "boolean") ? (value ? "Yes" : "No") : String(value);
+    }
+
+    addFieldRow("Title", fields.title, "calendian-create-title");
+    if (fields.type === "event") {
+        addFieldRow("Date", fields.date);
+        if (fields.isAllDay) {
+            addFieldRow("Time", "All day", "calendian-create-time-allday");
+        } else if (fields.startTime) {
+            var timeDisplay = fields.startTime;
+            if (fields.endTime) timeDisplay += " – " + fields.endTime;
+            addFieldRow("Time", timeDisplay);
+        }
+        addFieldRow("Calendar", fields.calendar || "(default)");
+    } else {
+        addFieldRow("Due", fields.date || "(no date)");
+        if (fields.startTime) addFieldRow("Time", fields.startTime);
+        addFieldRow("List", fields.list || "(default)");
+        if (fields.priority && fields.priority !== "none") addFieldRow("Priority", fields.priority);
+    }
+    if (fields.location) addFieldRow("Location", fields.location);
+    if (fields.notes) {
+        var notesPreview = fields.notes.split("\n")[0];
+        if (notesPreview.length > 60) notesPreview = notesPreview.substring(0, 57) + "...";
+        addFieldRow("Notes", notesPreview);
+    }
+
+    // Error display area (hidden initially)
+    var errorEl = container.createDiv("calendian-create-error");
+    errorEl.style.display = "none";
+
+    // If validation errors exist, show them without a Create button
+    if (fields.errors.length > 0) {
+        errorEl.textContent = fields.errors.join("; ");
+        errorEl.style.display = "block";
+        return;
+    }
+
+    // Create button
+    var btn = container.createEl("button", {
+        cls: "calendian-create-btn",
+        text: fields.type === "reminder" ? "Create Reminder" : "Create Event"
+    });
+
+    btn.addEventListener("click", async function() {
+        btn.disabled = true;
+        btn.textContent = "Creating...";
+        errorEl.style.display = "none";
+
+        try {
+            if (fields.type === "event") {
+                await createEventFromFields(integ, plugin, fields, ctx, el, btn, errorEl);
+            } else {
+                await createReminderFromFields(integ, plugin, fields, ctx, el, btn, errorEl);
+            }
+        } catch (err) {
+            var errMsg = err.stderr || (err.error && err.error.message) || err.message || JSON.stringify(err);
+            console.error("[Calendian] Create-from-block failed:", errMsg);
+            errorEl.textContent = "Error: " + errMsg;
+            errorEl.style.display = "block";
+            btn.disabled = false;
+            btn.textContent = fields.type === "reminder" ? "Create Reminder" : "Create Event";
+        }
+    });
+}
+
+/**
+ * Create an event from parsed fields.
+ */
+async function createEventFromFields(integ, plugin, fields, ctx, el, btn, errorEl) {
+    // Resolve calendar name → ID
+    var calendarId = null;
+    if (fields.calendar) {
+        calendarId = await resolveCalendarByName(integ, fields.calendar);
+        if (!calendarId) {
+            errorEl.textContent = "Calendar '" + fields.calendar + "' not found. Check the name in settings.";
+            errorEl.style.display = "block";
+            btn.disabled = false;
+            btn.textContent = "Create Event";
+            return;
+        }
+    }
+    if (!calendarId) {
+        calendarId = (integ.plugin && integ.plugin.options && integ.plugin.options.defaultCalendarId) || "";
+    }
+
+    // Build start/end moments
+    var startMoment;
+    if (fields.startTime) {
+        startMoment = window.moment(fields.date + " " + fields.startTime, "YYYY-MM-DD HH:mm");
+    } else {
+        startMoment = window.moment(fields.date, "YYYY-MM-DD");
+    }
+
+    var endMoment;
+    if (fields.endTime) {
+        endMoment = window.moment(fields.date + " " + fields.endTime, "YYYY-MM-DD HH:mm");
+    } else if (fields.startTime) {
+        endMoment = startMoment.clone().add(1, "hour");
+    } else {
+        endMoment = startMoment.clone().endOf("day");
+    }
+
+    if (!startMoment.isValid()) {
+        errorEl.textContent = "Invalid date/time: " + fields.date;
+        errorEl.style.display = "block";
+        btn.disabled = false;
+        btn.textContent = "Create Event";
+        return;
+    }
+
+    var startISO = startMoment.toISOString().replace(/\.\d{3}Z$/, 'Z');
+    var endISO = (endMoment.isValid() ? endMoment : startMoment.clone().add(1, "hour")).toISOString().replace(/\.\d{3}Z$/, 'Z');
+
+    var args = [
+        "create-event", fields.title, startISO, endISO,
+        calendarId, fields.isAllDay ? "true" : "false",
+        fields.location || "", fields.notes || "", fields.url || ""
+    ];
+
+    var result = await integ.execHelper(args);
+    if (result && result.ok) {
+        new obsidian.Notice("Event created: " + fields.title);
+        console.log("[Calendian] Created event from note block: " + fields.title + " (id=" + result.id + ")");
+        integ._itemLookupCache = null;
+        integ._associationIndexDirty = true;
+        await replaceBlockWithInlineRef(plugin, ctx, el, result.id, "event");
+        integ.init(true);
+    } else {
+        errorEl.textContent = "Failed to create event.";
+        errorEl.style.display = "block";
+        btn.disabled = false;
+        btn.textContent = "Create Event";
+    }
+}
+
+/**
+ * Create a reminder from parsed fields.
+ */
+async function createReminderFromFields(integ, plugin, fields, ctx, el, btn, errorEl) {
+    // Resolve list name → ID
+    var listId = null;
+    if (fields.list) {
+        listId = await resolveListByName(integ, fields.list);
+        if (!listId) {
+            errorEl.textContent = "List '" + fields.list + "' not found. Check the name in settings.";
+            errorEl.style.display = "block";
+            btn.disabled = false;
+            btn.textContent = "Create Reminder";
+            return;
+        }
+    }
+    if (!listId) {
+        listId = (integ.plugin && integ.plugin.options && integ.plugin.options.defaultReminderListId) || "";
+    }
+
+    // Build due date ISO
+    var dueDateISO = "";
+    if (fields.date) {
+        var dueMoment = window.moment(fields.date, "YYYY-MM-DD");
+        if (dueMoment.isValid()) {
+            dueDateISO = dueMoment.toISOString().replace(/\.\d{3}Z$/, 'Z');
+        }
+    }
+
+    var args = [
+        "create-reminder", fields.title, listId,
+        dueDateISO, fields.startTime || "",
+        fields.priority || "none", fields.notes || ""
+    ];
+
+    var result = await integ.execHelper(args);
+    if (result && result.ok) {
+        new obsidian.Notice("Reminder created: " + fields.title);
+        console.log("[Calendian] Created reminder from note block: " + fields.title + " (id=" + result.id + ")");
+        integ._itemLookupCache = null;
+        integ._associationIndexDirty = true;
+        await replaceBlockWithInlineRef(plugin, ctx, el, result.id, "reminder");
+        integ.init(true);
+    } else {
+        errorEl.textContent = "Failed to create reminder.";
+        errorEl.style.display = "block";
+        btn.disabled = false;
+        btn.textContent = "Create Reminder";
+    }
+}

@@ -8861,6 +8861,10 @@ class CalendarPlugin extends obsidian.Plugin {
         this.registerMarkdownPostProcessor(function(el, ctx) {
             renderCalendianInline(self, el, ctx);
         });
+        // v0.5.1: ```calendian-create``` code block for in-note event/reminder creation
+        this.registerMarkdownCodeBlockProcessor("calendian-create", function(source, el, ctx) {
+            renderCalendianCreateBlock(self, source, el, ctx);
+        });
         await this.loadOptions();
         this.addSettingTab(new CalendarSettingsTab(this.app, this));
         if (this.app.workspace.layoutReady) {

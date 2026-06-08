@@ -886,6 +886,94 @@
     font-size: 0.85em;
 }
 
+/* ── calendian-create code block ── */
+.calendian-create-block {
+    padding: 10px 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    background: var(--background-secondary);
+    margin: 4px 0;
+}
+.calendian-create-empty {
+    text-align: center;
+}
+.calendian-create-help {
+    font-size: 0.82em;
+    color: var(--text-muted);
+    line-height: 1.6;
+}
+.calendian-create-help code {
+    background: var(--background-primary);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+.calendian-create-header {
+    font-size: 0.9em;
+    font-weight: 600;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+.calendian-create-preview {
+    margin-bottom: 8px;
+}
+.calendian-create-field {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 2px 0;
+    font-size: 0.82em;
+}
+.calendian-create-field-key {
+    flex-shrink: 0;
+    width: 60px;
+    color: var(--text-muted);
+    font-size: 0.9em;
+    text-align: right;
+}
+.calendian-create-field-val {
+    flex: 1;
+    color: var(--text-normal);
+}
+.calendian-create-field-val.calendian-create-title {
+    font-weight: 600;
+    font-size: 1.05em;
+}
+.calendian-create-time-allday {
+    font-style: italic;
+    color: var(--text-muted);
+}
+.calendian-create-error {
+    color: var(--text-error);
+    background: var(--background-modifier-error);
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: 0.82em;
+    margin-top: 6px;
+}
+.calendian-create-btn {
+    display: block;
+    width: 100%;
+    padding: 6px 12px;
+    margin-top: 6px;
+    border: none;
+    border-radius: 4px;
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    font-size: 0.85em;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+.calendian-create-btn:hover {
+    opacity: 0.9;
+}
+.calendian-create-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 /* v0.5: Inline cal:ev:ID / cal:rem:ID reference table */
 /* v0.5: Inline cal:ev:ID / cal:rem:ID reference table
    Use high-specificity selectors to beat Obsidian's global table styles */
