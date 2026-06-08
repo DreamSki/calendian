@@ -7,7 +7,7 @@
 
 This roadmap is not an independent wish list. Every release is derived from requirement groups in [`SPEC.md`](./SPEC.md), acceptance gates in [`docs/sdd/ACCEPTANCE.md`](./docs/sdd/ACCEPTANCE.md), tasks in [`docs/sdd/TASKS.md`](./docs/sdd/TASKS.md), and risks in [`docs/sdd/RISKS.md`](./docs/sdd/RISKS.md).
 
-Current repository status: **v0.3 safe create — complete**. Event/reminder creation (10/10 REQ-WRITE), NL parsing with AI (5/5 REQ-NL), default settings (1/1), post-write refresh + write error handling, window focus + EK notification watch + concurrent safety, display-only marking + stable ID guard, today summary panel (REQ-UX-010), code split via `cat` concatenation (REQ-ARCH-001). 8/8 v0.3 acceptance gates passed. 11/11 deferred v0.2 items resolved.
+Current repository status: **v0.5 note association — complete**. Event/reminder create/edit/delete, NL parsing with AI, note association frontmatter + templates + inline refs + code blocks, association index rebuild, reminder display polish. v0.5.1 planned: reminder detail panel, file-change live sync, note→calendar reverse write.
 
 ---
 
@@ -30,7 +30,8 @@ Current repository status: **v0.3 safe create — complete**. Event/reminder cre
 | v0.2 | Read-only polish | expandable details, overdue/no-date reminders, multi-day events, month-cell dots, full diagnostic panel | Complete |
 | v0.3 | Safe create | simple event/reminder creation, natural language (regex + AI), validation, write verification, refresh system, code split | **Complete** |
 | v0.4 | Safe edit/delete | simple event/reminder edit/delete, reminder completion, recurring safety | **Complete** |
-| v0.5 | Note association & notifications | frontmatter association, meeting notes, templates, in-app notifications, limited Tasks integration | Planned |
+| v0.5 | Note association & rendering | frontmatter association (REQ-NOTE-001..009), meeting notes, templates, inline ref rendering, code blocks | **Complete** |
+| v0.5.1 | Note association polish | reminder detail panel (REQ-REM-010), file-change live sync (REQ-NOTE-011), note→calendar creation (REQ-WRITE-021/022) | Planned |
 | v0.5.5 | Self-direction | goals, habits, nudges, reflections, encouragement statistics | Planned |
 | v0.6 | Advanced views/search | timeline, week view, search, data export, UI customization | Planned |
 | v1.x | Platform expansion | cross-platform architecture, Microsoft Graph/Android investigation | Deferred |

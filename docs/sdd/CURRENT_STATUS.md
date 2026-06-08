@@ -38,7 +38,7 @@ This document records the actual repository state. It intentionally separates im
 
 ## Current release label
 
-Current repository state: **v0.5 WIP — note association + rendering complete, notifications pending**. TASK-040 (frontmatter schema) done. TASK-041 (create/open notes with templates) done. TASK-042 (template variables) done. Next: TASK-043 (notifications), TASK-050 (Tasks integration experiment).
+Current repository state: **v0.5 complete — note association + rendering done. v0.5.1 planned: reminder detail panel, file-change live sync, note→calendar reverse write**. TASK-040 (frontmatter schema) done. TASK-041 (create/open notes with templates) done. TASK-042 (template variables) done. Next: TASK-044 (reminder detail panel), TASK-045 (file-change live sync), TASK-046 (note→calendar creation), or TASK-043 (notifications).
 
 ## README policy
 
@@ -95,17 +95,15 @@ Everything else must be marked as planned, experimental, or future.
 
 > Updated by AI after every meaningful step. Next session reads this to continue without re-explaining context.
 
-- **Doing:** TASK-040/041 code quality fixes — all phases complete.
+- **Doing:** SDD document update — integrating v0.5.1 planned features into SPEC/TASKS/CURRENT_STATUS.
 - **Completed this session:**
-  - Phase 1 critical bugs fixed: race condition (dirty flag now set only after body scan completes), body scan data loss (30s timer no longer nulls `_bodyScanIndex`), duplicate `getAssociatedNotes` call removed, `escapeYAMLValue` now actually called in `buildCompactFrontmatterYAML`.
-  - Phase 2 correctness/perf: `getAssociatedNotes` now accepts explicit `itemType` param, O(1) reverse index (`_itemLookupCache`) for inline ref resolution with invalidation hooks, rebuild interval aligned to SPEC (60s), gate render behind dirty check.
-  - Phase 3 code quality: `createNoteForEvent`/`createNoteForReminder` ~90% dedup via shared `createNoteForItem()`; `resolveAvailablePath` extracted from duplicated file collision logic; broken JSDoc fixed (`addToIndex` JSDoc moved, orphaned fragment removed); error boundary try/catch added to `renderCalendianBlock`; `document.createElement` replaced with Obsidian `createEl` API in `renderCalendianInline` + `buildInlineRow`; body scan errors now logged via `console.debug`.
-  - Files changed: `src/notes/frontmatter.js` (major), `src/notes/codeblock.js` (major), `src/cache/schedule-cache.js` (minor — `_itemLookupCache` invalidation at 6 cache update points), `main-head.js` (minor — timer fix, duplicate call removal, explicit itemType params).
-  - `build-main.sh` ran successfully; helper binary compiled successfully.
+  - Phase 1–3 code quality fixes for TASK-040/041 (committed: c86259f).
+  - Analyzed 4 user-requested features, created SPEC REQ entries and TASK entries.
+  - v0.5.1 scope defined: REQ-REM-010 (reminder detail panel), REQ-NOTE-011 (file-change live sync), REQ-WRITE-021/022 (note→calendar reverse write).
 - **Decisions:**
-  - All fixes from the code audit (15 issues) applied.
-  - `escapeYAMLValue` kept and wired in (not removed) since it's now used.
-  - Reverse lookup cache (`_itemLookupCache`) is lazily built and invalidated at every `allEvents`/`allReminders` assignment.
-  - Body scan results now survive rebuild cycles — `_bodyScanIndex` is only nulled at construction, preserved across `ensureAssociationIndex` rebuilds.
-- **Next:** TASK-043 (notifications) or TASK-050 (Tasks integration experiment).
-- **Last action:** 2026-06-08 — TASK-040/041 code quality fixes applied and verified.
+  - Reminder detail panel follows event click-to-expand pattern exactly (REQ-REM-010). Completion checkbox stays inline for fast toggle.
+  - File-change live sync hooks into existing `app.vault.on("modify"/"create")` handlers already registered in CalendarView (REQ-NOTE-011). Debounced at 500ms to avoid per-keystroke re-scan.
+  - Note→calendar creation uses new `` ```calendian-create `` code block with YAML-style fields; helper already supports `create-event`/`create-reminder` commands (REQ-WRITE-021/022).
+  - All three features targeted at v0.5.1 (not v0.5.5 self-direction).
+- **Next:** TASK-045 (file-change live sync — P0, highest impact, smallest effort) → TASK-044 (reminder detail panel) → TASK-046 (note→calendar creation).
+- **Last action:** 2026-06-08 — SDD documents updated with v0.5.1 planned features.

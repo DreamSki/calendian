@@ -194,6 +194,9 @@ The following features are currently implemented in the codebase. All macOS data
 - ✅ Reminder items: 📝 note indicator (clickable), "+📝" create button
 - ✅ Lazy index rebuild via `metadataCache.on("changed"/"resolved")` listeners
 - ✅ Build: `src/notes/frontmatter.js` + `src/notes/note-link-resolver.js` concatenated by `build-main.sh`
+- ⬜ Reminder expandable detail panel: click-to-expand consistent with event behavior (REQ-REM-010, v0.5.1)
+- ⬜ File-change → association index live invalidation: vault `modify`/`create` hooks trigger index rebuild + re-render within 1s (REQ-NOTE-011, v0.5.1)
+- ⬜ Create event/reminder from note code block: parse structured block, call helper, write back ID to note (REQ-WRITE-021/022, v0.5.1)
 
 ---
 
@@ -549,6 +552,7 @@ Goal, habit, intention, nudge, and review data SHALL reside exclusively in Obsid
 | REQ-REM-007 | THE SYSTEM SHALL support display ranges: selected day, next 7 days, all incomplete. | P1 | v0.2 | Implemented |
 | REQ-REM-008 | THE SYSTEM SHOULD display reminder priority where available. | P2 | v0.1 | Implemented |
 | REQ-REM-009 | THE SYSTEM SHOULD display reminder subtasks where available. | P2 | v0.3 | Blocked — EKReminder does not expose parent/child hierarchy in public EventKit API; subtask relationship is iCloud-internal |
+| REQ-REM-010 | THE SYSTEM SHALL support click-to-expand detail panel for reminders, consistent with event behavior, showing due date, priority, list, notes, linked notes, and action buttons (edit/delete/copy). | P1 | v0.5.1 | Planned |
 
 #### 7.4.1 提醒事项层级边界
 
@@ -749,6 +753,8 @@ All refresh paths go through `init()`, which has a `_refreshRunning` boolean gat
 | REQ-WRITE-018 | THE SYSTEM SHALL delete reminders only after confirmation. | P0 | v0.4 | Implemented — ConfirmActionModal; delete-reminder helper command; post-delete refresh |
 | REQ-WRITE-019 | THE SYSTEM SHALL not mutate reminders without a stable source identity. | P0 | v0.4 | Implemented — canMutateReminder() guard checks isDisplayOnly flag; edit/delete/checkbox hidden for display-only items |
 | REQ-WRITE-020 | THE SYSTEM SHOULD expose write operation result feedback. | P1 | v0.4 | Implemented — obsidian.Notice on success/failure for all write operations; console.error logging on failure |
+| REQ-WRITE-021 | THE SYSTEM SHOULD support creating a macOS Calendar event from a structured code block in a note, parsing title, date, time, calendar, location, and notes from the block content. | P2 | v0.5.1 | Planned |
+| REQ-WRITE-022 | THE SYSTEM SHOULD support creating a macOS Reminder from a structured code block in a note, parsing title, list, due date, priority, and notes from the block content. | P2 | v0.5.1 | Planned |
 
 ### 7.11 Recurring event safety requirements
 
@@ -832,6 +838,7 @@ All refresh paths go through `init()`, which has a `_refreshRunning` boolean gat
 | REQ-NOTE-008 | THE SYSTEM SHOULD repair stale associations where possible. | P2 | v0.5 | Deferred — `resolveNotePath()` handles renames at read time; full repair deferred to future iteration |
 | REQ-NOTE-009 | THE SYSTEM SHOULD support copy-as-Markdown for events/reminders. | P2 | v0.5 | Implemented — `copyItemText()` copies `cal:ev:ID`/`cal:rem:ID` inline reference text to clipboard; 📋 button in event detail and reminder hover actions; renders as styled mini-table when pasted in notes |
 | REQ-NOTE-010 | THE SYSTEM SHOULD support meeting-note templates. | P1 | v0.5 | Planned |
+| REQ-NOTE-011 | WHEN a markdown file is created or modified, THE SYSTEM SHALL invalidate the association index and re-render the panel within 1 second, so that frontmatter and inline ref changes are reflected without waiting for the periodic rebuild timer. | P0 | v0.5.1 | Planned |
 
 ### 7.13 Tasks integration requirements
 

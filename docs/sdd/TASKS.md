@@ -312,6 +312,54 @@ Tasks are ordered by dependency and release target. Every task references requir
   - Notification enable/disable settings.
   - Graceful degradation when Obsidian notification APIs are unavailable.
 
+### TASK-044 — Reminder expandable detail panel
+
+- Requirements: `REQ-REM-010`
+- Status: Todo
+- Priority: P1
+- Deliverables:
+  - Click-to-expand detail panel for reminders, matching event click behavior.
+  - Detail panel shows: due date, priority, list name, notes, linked notes, edit/delete/copy buttons.
+  - Completion checkbox stays inline (outside detail panel) for fast toggle.
+  - `_expandedReminders` Set to manage expand state (mirrors `_expandedEvents`).
+- Definition of Done:
+  - Clicking a reminder item toggles an expanded detail panel below it.
+  - Detail panel content matches event detail panel structure and styling.
+  - Edit/Delete/Copy actions work from within the detail panel.
+  - Linked notes display inside the detail panel, consistent with events.
+
+### TASK-045 — File-change → association index live sync
+
+- Requirements: `REQ-NOTE-011`
+- Status: Todo
+- Priority: P0
+- Deliverables:
+  - Hook `app.vault.on("modify")` and `app.vault.on("create")` to detect `.md` file changes.
+  - On change: set `_associationIndexDirty = true`, clear `_itemLookupCache`, call `integ.render()` (debounced 500ms).
+  - Avoid full re-scan: only invalidate the affected file's entries (stretch: incremental index update).
+  - Integration with existing `onFileModified` / `onFileCreated` handlers in CalendarView.
+- Definition of Done:
+  - Adding `cal:ev:ID` inline ref to a note → panel shows linked note within ~1s.
+  - Removing frontmatter `calendian:` from a note → panel removes linked note within ~1s.
+  - Performance: does not re-scan entire vault on every keystroke (debounced).
+
+### TASK-046 — Create event/reminder from note code block
+
+- Requirements: `REQ-WRITE-021`, `REQ-WRITE-022`
+- Status: Todo
+- Priority: P2
+- Deliverables:
+  - New `` ```calendian-create `` code block processor.
+  - Block content parsed as YAML frontmatter-style fields: `type`, `title`, `date`, `time`/`startTime`/`endTime`, `calendar`/`list`, `location`, `notes`, `priority`.
+  - Click "Create" button in rendered block → calls `execHelper(["create-event", ...])` or `execHelper(["create-reminder", ...])`.
+  - On success: replace code block with created item's `cal:ev:ID` / `cal:rem:ID` inline ref, establish association.
+  - On failure: show inline error message with retry.
+- Definition of Done:
+  - User writes `` ```calendian-create `` block with event/reminder fields → block renders with "Create Event" or "Create Reminder" button.
+  - Clicking Create → item appears in Calendar.app / Reminders.app, panel refreshes.
+  - Created item ID written back to note, establishing bidirectional link.
+  - Error states handled and communicated inline.
+
 ### TASK-050 — Tasks plugin import/export experiment
 
 - Requirements: `REQ-TASK-001` to `REQ-TASK-004`
