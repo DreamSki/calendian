@@ -6911,6 +6911,8 @@ class MacOSIntegration {
         this.sourceCounts = { calendars: 0, reminderLists: 0 };
         // REQ-CAL-008: Expandable event detail state
         this._expandedEvents = new Set();
+        // REQ-REM-010: Expandable reminder detail state
+        this._expandedReminders = new Set();
         // v0.4: In-flight toggle guard — prevents race on rapid checkbox clicks
         this._togglingReminders = {};
         // REQ-UX-006: Dot color CSS management for month cell event dots
@@ -7902,77 +7904,113 @@ class MacOSIntegration {
                 badgeEl.textContent = listName;
             }
 
-            // v0.4: Edit/Delete action buttons (REQ-WRITE-017, REQ-WRITE-018)
-            if (!rem.isDisplayOnly && rem.id) {
-                var remActionsEl = itemEl.createDiv("calendian-item-actions");
-                var remEditBtn = remActionsEl.createDiv("macos-refresh-btn");
-                remEditBtn.textContent = "Edit";
-                remEditBtn.addEventListener("click", function(e) {
-                    e.stopPropagation();
-                    new ReminderEditModal(self.plugin.app, self, rem).open();
-                });
-                var remDeleteBtn = remActionsEl.createDiv("macos-refresh-btn calendian-action-danger");
-                remDeleteBtn.textContent = "Delete";
-                remDeleteBtn.addEventListener("click", function(e) {
-                    e.stopPropagation();
-                    self.confirmDeleteReminder(rem);
-                });
-            }
+            // REQ-REM-010: Click-to-expand detail panel
+            itemEl.addEventListener("click", function(e) {
+                // Don't toggle expand when clicking checkbox
+                if (e.target.closest(".calendian-reminder-checkbox")) return;
+                var remId = rem.id;
+                if (self._expandedReminders.has(remId)) {
+                    self._expandedReminders.delete(remId);
+                } else {
+                    self._expandedReminders.add(remId);
+                }
+                self.render();
+            });
 
-            // v0.5: Associated notes indicator (REQ-NOTE-002, REQ-NOTE-003)
-            if (!rem.isDisplayOnly && rem.id) {
-                var remNotes = self.getAssociatedNotes(rem, "reminder");
-                if (remNotes.length > 0) {
-                    var remNoteBtn = remActionsEl.createDiv("calendian-note-indicator");
-                    remNoteBtn.textContent = "📝" + remNotes.length;
-                    remNoteBtn.setAttribute("title", remNotes.length + " linked note(s)");
-                    // DOM back-references to avoid var closure issues
-                    remNoteBtn._reminder = rem;
-                    remNoteBtn._notes = remNotes;
-                    remNoteBtn._self = self;
-                    remNoteBtn.addEventListener("click", function(e) {
+            // REQ-REM-010: Expanded detail panel
+            if (this._expandedReminders.has(rem.id)) {
+                itemEl.addClass("calendian-reminder-expanded");
+                var detailEl = sectionEl.createDiv("calendian-reminder-detail");
+
+                // Due date (full format)
+                if (rem.due) {
+                    var dueField = detailEl.createDiv("calendian-event-detail-field");
+                    dueField.createEl("strong").textContent = "Due";
+                    dueField.appendText(": " + this.formatDueDateFull(rem.due));
+                }
+
+                // Priority label
+                if (rem.priority && rem.priority !== "none") {
+                    var prioField = detailEl.createDiv("calendian-event-detail-field");
+                    prioField.createEl("strong").textContent = "Priority";
+                    var prioLabel = rem.priority === "high" ? "High (!!!)"
+                        : rem.priority === "medium" ? "Medium (!!)" : "Low (!)";
+                    prioField.appendText(": " + prioLabel);
+                }
+
+                // List name + account
+                var listInfo = rem.listName || rem.list || "";
+                if (listInfo) {
+                    var listField = detailEl.createDiv("calendian-event-detail-field");
+                    listField.createEl("strong").textContent = "List";
+                    listField.appendText(": " + listInfo);
+                    if (rem.accountName) {
+                        listField.appendText(" (" + rem.accountName + ")");
+                    }
+                }
+
+                // Notes
+                if (rem.notes) {
+                    var notesField = detailEl.createDiv("calendian-event-detail-field");
+                    notesField.createEl("strong").textContent = "Notes";
+                    var notesText = rem.notes.length > 200 ? rem.notes.substring(0, 197) + "..." : rem.notes;
+                    notesField.createEl("div", { cls: "calendian-event-detail-notes" }).textContent = notesText;
+                }
+
+                // Linked Notes
+                var remAssocNotes = self.getAssociatedNotes(rem, "reminder");
+                if (remAssocNotes.length > 0 || (!rem.isDisplayOnly && rem.id)) {
+                    var lnField = detailEl.createDiv("calendian-event-detail-field");
+                    lnField.createEl("strong").textContent = "Linked Notes";
+                    for (var rni = 0; rni < remAssocNotes.length; rni++) {
+                        var rnInfo = remAssocNotes[rni];
+                        var rnLinkDiv = lnField.createDiv("calendian-note-link");
+                        var rnLinkEl = rnLinkDiv.createEl("a", { cls: "internal-link", attr: { "data-href": rnInfo.path } });
+                        rnLinkEl.textContent = "📝 " + rnInfo.title;
+                        rnLinkEl.style.cursor = "pointer";
+                        rnLinkEl.addEventListener("click", (function(rnP) {
+                            return function(e) {
+                                e.stopPropagation();
+                                self.plugin.app.workspace.openLinkText(rnP, "", false);
+                            };
+                        })(rnInfo.path));
+                    }
+                    // + Note create button
+                    if (!rem.isDisplayOnly && rem.id) {
+                        var rnCreateBtn = lnField.createDiv("macos-refresh-btn calendian-note-create-btn");
+                        rnCreateBtn.textContent = "+ Note";
+                        rnCreateBtn.addEventListener("click", function(e) {
+                            e.stopPropagation();
+                            self.createNoteForReminder(rem);
+                        });
+                    }
+                }
+
+                // Action row: Edit / Delete / Copy ref
+                if (!rem.isDisplayOnly && rem.id) {
+                    var remActionsEl = detailEl.createDiv("calendian-detail-actions");
+
+                    var remEditBtn = remActionsEl.createDiv("macos-refresh-btn");
+                    remEditBtn.textContent = "Edit";
+                    remEditBtn.addEventListener("click", function(e) {
                         e.stopPropagation();
-                        var me = e.currentTarget;
-                        var meRem = me._reminder;
-                        var meNotes = me._notes;
-                        var meSelf = me._self;
-                        // Find the itemEl from the button's position
-                        var targetItem = me;
-                        while (targetItem && !targetItem.classList.contains("macos-item")) {
-                            targetItem = targetItem.parentElement;
-                        }
-                        if (!targetItem) return;
-                        var sectionEl = targetItem.parentElement;
-                        // Toggle notes list below this item
-                        var existing = sectionEl.querySelector(".calendian-notes-list[data-rem-id='" + meRem.id + "']");
-                        if (existing) {
-                            existing.remove();
-                            return;
-                        }
-                        var notesList = document.createElement("div");
-                        notesList.className = "calendian-notes-list";
-                        notesList.setAttribute("data-rem-id", meRem.id);
-                        for (var ni = 0; ni < meNotes.length; ni++) {
-                            var noteLink = notesList.createDiv("calendian-notes-list-item");
-                            noteLink.textContent = "📄 " + meNotes[ni].title;
-                            noteLink.addEventListener("click", (function(np) {
-                                return function(ev) {
-                                    ev.stopPropagation();
-                                    meSelf.plugin.app.workspace.openLinkText(np, "", false);
-                                };
-                            })(meNotes[ni].path));
-                        }
-                        targetItem.parentElement.insertBefore(notesList, targetItem.nextSibling);
+                        new ReminderEditModal(self.plugin.app, self, rem).open();
+                    });
+
+                    var remDeleteBtn = remActionsEl.createDiv("macos-refresh-btn calendian-action-danger");
+                    remDeleteBtn.textContent = "Delete";
+                    remDeleteBtn.addEventListener("click", function(e) {
+                        e.stopPropagation();
+                        self.confirmDeleteReminder(rem);
+                    });
+
+                    var remCopyBtn = remActionsEl.createDiv("macos-refresh-btn calendian-action-copy");
+                    remCopyBtn.textContent = "📋 Copy ref";
+                    remCopyBtn.addEventListener("click", function(e) {
+                        e.stopPropagation();
+                        self.copyItemText(rem, "reminder");
                     });
                 }
-                // v0.5: Copy inline ref (REQ-NOTE-009)
-                var remCopyBtn = remActionsEl.createDiv("calendian-note-indicator calendian-action-copy-hint");
-                remCopyBtn.textContent = "📋";
-                remCopyBtn.setAttribute("title", "Copy");
-                remCopyBtn.addEventListener("click", function(e) {
-                    e.stopPropagation();
-                    self.copyItemText(rem, "reminder");
-                });
             }
 
             // REQ-REM-009: Subtasks — render child reminders indented under parent
@@ -8161,6 +8199,25 @@ class MacOSIntegration {
         var dateStr = (date.getMonth() + 1) + "/" + date.getDate();
         var timeStr = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
         return dateStr + " " + timeStr;
+    }
+
+    // REQ-REM-010: Full due date for detail panel (always shows weekday + date + time)
+    formatDueDateFull(date) {
+        if (!date) return "";
+        var weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        var weekday = weekdays[date.getDay()];
+        var month = date.getMonth() + 1;
+        var day = date.getDate();
+        var year = date.getFullYear();
+        var now = new Date();
+        var dateStr = year === now.getFullYear()
+            ? (weekday + ", " + month + "/" + day)
+            : (weekday + ", " + year + "/" + month + "/" + day);
+        var hasTime = date.getHours() !== 0 || date.getMinutes() !== 0;
+        if (hasTime) {
+            dateStr += " " + date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        }
+        return dateStr;
     }
 
     // --- Discover available calendars ---
