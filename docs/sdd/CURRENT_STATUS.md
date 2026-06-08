@@ -100,23 +100,14 @@ Everything else must be marked as planned, experimental, or future.
 
 - **Doing:** None.
 - **Completed this session:**
-  - TASK-046 (create event/reminder from note code block, REQ-WRITE-021/022) implemented and verified. Full feature set includes:
-    - `calendian-create` and `cc` code block aliases
-    - Structured `key:value` field parsing (`parseCreateFields`)
-    - Natural language single-line input with `parseNaturalLanguage()`
-    - Background AI parsing upgrade via `callAIForParsing()` (when configured)
-    - "提醒我/remind me" keyword stripping for title cleanup + reminder type inference
-    - Calendar/list name resolution at click time
-    - Note content replacement via `ctx.getSectionInfo()` + `app.vault.modify()`
-    - NL parser bug fix: period words (上午/下午) now parse even when date is present
-  - Diagnosed and fixed stale `calendian-task050` worktree causing Obsidian to load wrong `main.js` (duplicate plugin ID).
+  - Fixed inline ref live re-rendering bug — two related issues:
+    1. `cc` code block: after creation, inline ref showed as raw text until navigation away/back. Root cause: `replaceBlockWithInlineRef` ran before `init(true)`, so the item wasn't in cache when the post-processor re-ran. Fix: await `init(true)` first, then modify file, then call `triggerNoteRerender`.
+    2. Sidebar data changes (edit/delete) didn't update inline refs in open notes. Fix: `triggerNoteRerender()` called at end of `render()` in MacOSIntegration, re-runs post-processors on all open MarkdownViews after every data refresh.
+  - Added `triggerNoteRerender(plugin)` helper in `codeblock.js` — iterates all markdown leaves, calls `previewMode.rerender()`.
 - **Decisions:**
-  - `cc` as short alias — two characters, easy to type.
-  - NL input detected by: single line + no `key:` pattern → try NL parser first, fall back to structured parser.
-  - AI parsing runs in background after regex result shown; updates preview with `✨ AI` badge when ready.
-  - "提醒我" stripped before NL parsing so it doesn't pollute the title; presence triggers reminder type.
-  - Calendar/list resolution at click time (async) — avoids slow renders.
-  - Note replacement uses `getSectionInfo()` line range; clipboard fallback when unavailable.
-- **Verification:** `node --check main.js` ✓, `./build-main.sh` (11592 lines) ✓, manual testing in Obsidian ✓ (event create, reminder create, NL input, AI parsing, error handling, inline ref replacement).
+  - Fix the init→modify order (data before file change) rather than debouncing — simpler, more reliable.
+  - `triggerNoteRerender` uses `previewMode.rerender()` for Reading mode; Live Preview relies on Obsidian's built-in file-change detection.
+  - Note re-render runs at end of every `render()` call — lightweight since it only re-runs post-processors, no DOM rebuild.
+- **Verification:** `node --check main.js` ✓, `./build-main.sh` (11625 lines) ✓.
 - **Next:** TASK-050 (Tasks plugin integration) or TASK-090+ (self-direction features).
-- **Last action:** 2026-06-08 — TASK-046 fully complete with enhancements.
+- **Last action:** 2026-06-08 — inline ref live re-rendering fix.

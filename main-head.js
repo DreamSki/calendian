@@ -7571,6 +7571,11 @@ class MacOSIntegration {
                 self._highlightedItemId = null;
             }, 3000);
         }
+
+        // Re-render open notes so inline cal:ev:ID / cal:rem:ID refs update with fresh data
+        if (typeof triggerNoteRerender === "function") {
+            triggerNoteRerender(this.plugin);
+        }
     }
 
     // REQ-PERM-001, REQ-PERM-002: Actionable permission recovery guidance

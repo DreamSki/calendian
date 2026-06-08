@@ -7571,6 +7571,11 @@ class MacOSIntegration {
                 self._highlightedItemId = null;
             }, 3000);
         }
+
+        // Re-render open notes so inline cal:ev:ID / cal:rem:ID refs update with fresh data
+        if (typeof triggerNoteRerender === "function") {
+            triggerNoteRerender(this.plugin);
+        }
     }
 
     // REQ-PERM-001, REQ-PERM-002: Actionable permission recovery guidance
@@ -10555,6 +10560,28 @@ function navigateToDate(date, plugin, itemId) {
     }
 }
 
+// ── Note re-render helper ───────────────────────────────────────────
+
+/**
+ * Force re-render of all open MarkdownViews so that inline `cal:ev:ID` /
+ * `cal:rem:ID` post-processors re-run with fresh cache data.
+ * Called after data changes (init/render) and after cc block creation.
+ */
+function triggerNoteRerender(plugin) {
+    try {
+        plugin.app.workspace.iterateAllLeaves(function(leaf) {
+            if (leaf.view && leaf.view.getViewType && leaf.view.getViewType() === "markdown") {
+                try {
+                    // Reading mode: rerender the preview
+                    if (leaf.view.previewMode && leaf.view.previewMode.rerender) {
+                        leaf.view.previewMode.rerender();
+                    }
+                } catch (e) {}
+            }
+        });
+    } catch (e) {}
+}
+
 // ── calendian-create code block ────────────────────────────────────
 
 /**
@@ -11062,8 +11089,11 @@ async function createEventFromFields(integ, plugin, fields, ctx, el, btn, errorE
         console.log("[Calendian] Created event from note block: " + fields.title + " (id=" + result.id + ")");
         integ._itemLookupCache = null;
         integ._associationIndexDirty = true;
+        // Refresh data FIRST so the item is in cache when the post-processor re-runs
+        await integ.init(true);
         await replaceBlockWithInlineRef(plugin, ctx, el, result.id, "event");
-        integ.init(true);
+        // Force note re-render so the inline ref renders immediately
+        triggerNoteRerender(plugin);
     } else {
         errorEl.textContent = "Failed to create event.";
         errorEl.style.display = "block";
@@ -11113,8 +11143,11 @@ async function createReminderFromFields(integ, plugin, fields, ctx, el, btn, err
         console.log("[Calendian] Created reminder from note block: " + fields.title + " (id=" + result.id + ")");
         integ._itemLookupCache = null;
         integ._associationIndexDirty = true;
+        // Refresh data FIRST so the item is in cache when the post-processor re-runs
+        await integ.init(true);
         await replaceBlockWithInlineRef(plugin, ctx, el, result.id, "reminder");
-        integ.init(true);
+        // Force note re-render so the inline ref renders immediately
+        triggerNoteRerender(plugin);
     } else {
         errorEl.textContent = "Failed to create reminder.";
         errorEl.style.display = "block";
