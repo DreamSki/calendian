@@ -134,6 +134,20 @@ The following features are currently implemented in the codebase. All macOS data
 - ✅ EventCreateModal and ReminderCreateModal accept optional `prefill` parameter from NL parsing
 - ✅ Positional arg placeholders in create command builders prevent field misalignment
 
+#### Write operations — edit/delete (v0.4)
+- ✅ Event editing via `EventEditModal` with all fields pre-filled from cached event
+- ✅ Event deletion with `ConfirmActionModal` confirmation dialog and post-delete refresh
+- ✅ Recurring event edit/delete blocked: `canMutateEvent()` guard → `RecurringBlockModal` → Calendar.app redirect
+- ✅ Reminder completion toggle via clickable ○/☑ checkbox; inline DOM update without full `render()`
+- ✅ Completed reminders shown with strikethrough, sorted to bottom
+- ✅ Reminder editing via `ReminderEditModal` with all fields pre-filled
+- ✅ Reminder deletion with `ConfirmActionModal` confirmation
+- ✅ Helper commands: `edit-event`, `delete-event`, `edit-reminder`, `delete-reminder`
+- ✅ `_togglingReminders` flight guard prevents race on rapid checkbox clicks
+- ✅ Stable identity required: `canMutateEvent()`/`canMutateReminder()` guard checks `isDisplayOnly`
+- ✅ No-date reminders section default expanded, arrow toggle logic corrected
+- ✅ `predicateForReminders(in:)` includes completed reminders (was `predicateForIncompleteReminders`)
+
 #### Natural language event creation (v0.3)
 - ✅ `parseNaturalLanguage()` regex parser with English + expanded Chinese locale
 - ✅ Chinese: 明早/明晚/今早/今晚, 周末/下周周末, 下下周, X天后/周后/月后, 下个月/明年
@@ -165,8 +179,8 @@ The following features are currently implemented in the codebase. All macOS data
 - Performance targets (cache switch <100ms, init <3s) have not been benchmarked
 
 **Explicitly not yet done (v0.3+)**:
-- Code split into multiple JS modules (REQ-ARCH-001, target v0.3) — modules extracted to `src/` but require() wiring blocked by Obsidian plugin loading constraints
-- Recurring event safety UX (REQ-REC-002/003/007, target v0.3): blocking recurring edits, explaining why, documenting limitations — see §7.11.1 for full classification model
+- ✅ Code split into multiple JS modules (REQ-ARCH-001) — cat-based concatenation via build-main.sh; modules in src/
+- ✅ Recurring event safety UX (REQ-REC-002/003/007) — RecurringBlockModal, canMutateEvent() guard, done in v0.4 — see §7.11.1 for full classification model
 - Remaining v0.2 deferred items (0): ✅ All resolved（REQ-TIME-005 用户排除，REQ-REM-009 Apple API 阻塞除外）
 
 ---
