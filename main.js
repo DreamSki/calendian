@@ -7714,8 +7714,7 @@ class MacOSIntegration {
                     var meRem = me._reminder;
                     var meItemEl = me._itemEl;
                     var rid = meRem.id;
-                    console.log("[Calendian] Toggle click — id=" + rid + ", completed=" + meRem.completed + ", inFlight=" + !!meSelf._togglingReminders[rid]);
-                    if (meSelf._togglingReminders[rid]) { console.log("[Calendian] Toggle blocked — already in flight"); return; }
+                    if (meSelf._togglingReminders[rid]) return;
                     meSelf._togglingReminders[rid] = true;
 
                     me.textContent = "◌";
@@ -7724,7 +7723,6 @@ class MacOSIntegration {
                     meSelf.toggleReminder(meRem).then(function(result) {
                         meSelf._togglingReminders[rid] = false;
                         var newCompleted = !!(result && result.completed);
-                        console.log("[Calendian] Toggle success — id=" + rid + ", newCompleted=" + newCompleted);
                         meRem.completed = newCompleted;
                         me.textContent = newCompleted ? "☑" : "○";
                         me.style.opacity = "1";
@@ -7869,8 +7867,7 @@ class MacOSIntegration {
                         var meRem = me._reminder;
                         var meItemEl = me._itemEl;
                         var rid = meRem.id;
-                        console.log("[Calendian] Toggle click (no-date) — id=" + rid + ", completed=" + meRem.completed + ", inFlight=" + !!meSelf._togglingReminders[rid]);
-                        if (meSelf._togglingReminders[rid]) { console.log("[Calendian] Toggle blocked — already in flight"); return; }
+                        if (meSelf._togglingReminders[rid]) return;
                         meSelf._togglingReminders[rid] = true;
 
                         me.textContent = "◌";
@@ -7879,7 +7876,6 @@ class MacOSIntegration {
                         meSelf.toggleReminder(meRem).then(function(result) {
                             meSelf._togglingReminders[rid] = false;
                             var newCompleted = !!(result && result.completed);
-                            console.log("[Calendian] Toggle success (no-date) — id=" + rid + ", newCompleted=" + newCompleted);
                             meRem.completed = newCompleted;
                             me.textContent = newCompleted ? "☑" : "○";
                             me.style.opacity = "1";
@@ -8475,7 +8471,7 @@ MacOSIntegration.prototype.preloadReminders = async function() {
                         listName: nd.listName || "",
                         listId: nd.listId || "",
                         priority: nd.priority || "none",
-                        completed: false,
+                        completed: nd.completed || false,
                         notes: nd.notes || "",
                         parentId: nd.parentId || "",
                         isDisplayOnly: !nd.id

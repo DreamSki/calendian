@@ -236,7 +236,7 @@ MacOSIntegration.prototype.preloadReminders = async function() {
                         listName: nd.listName || "",
                         listId: nd.listId || "",
                         priority: nd.priority || "none",
-                        completed: false,
+                        completed: nd.completed || false,
                         notes: nd.notes || "",
                         parentId: nd.parentId || "",
                         isDisplayOnly: !nd.id
