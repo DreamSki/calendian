@@ -205,7 +205,7 @@ The following features are currently implemented in the codebase. All macOS data
 - ✅ Build: `src/notes/frontmatter.js` + `src/notes/note-link-resolver.js` concatenated by `build-main.sh`
 - ✅ Reminder expandable detail panel: click-to-expand consistent with event behavior (REQ-REM-010, v0.5.1)
 - ✅ File-change → association index live sync: vault `modify`/`create`/`delete` hooks trigger index rebuild + re-render within 500ms debounce (REQ-NOTE-011, v0.5.1)
-- ⬜ Create event/reminder from note code block: parse structured block, call helper, write back ID to note (REQ-WRITE-021/022, v0.5.1)
+- ✅ Create event/reminder from note code block: parse structured block, call helper, write back ID to note (REQ-WRITE-021/022, v0.5.1)
 
 ---
 
@@ -764,8 +764,8 @@ All refresh paths go through `init()`, which has a `_refreshRunning` boolean gat
 | REQ-WRITE-018 | THE SYSTEM SHALL delete reminders only after confirmation. | P0 | v0.4 | Implemented — ConfirmActionModal; delete-reminder helper command; post-delete refresh |
 | REQ-WRITE-019 | THE SYSTEM SHALL not mutate reminders without a stable source identity. | P0 | v0.4 | Implemented — canMutateReminder() guard checks isDisplayOnly flag; edit/delete/checkbox hidden for display-only items |
 | REQ-WRITE-020 | THE SYSTEM SHOULD expose write operation result feedback. | P1 | v0.4 | Implemented — obsidian.Notice on success/failure for all write operations; console.error logging on failure |
-| REQ-WRITE-021 | THE SYSTEM SHOULD support creating a macOS Calendar event from a structured code block in a note, parsing title, date, time, calendar, location, and notes from the block content. | P2 | v0.5.1 | Planned |
-| REQ-WRITE-022 | THE SYSTEM SHOULD support creating a macOS Reminder from a structured code block in a note, parsing title, list, due date, priority, and notes from the block content. | P2 | v0.5.1 | Planned |
+| REQ-WRITE-021 | THE SYSTEM SHOULD support creating a macOS Calendar event from a structured code block in a note, parsing title, date, time, calendar, location, and notes from the block content. | P2 | v0.5.1 | Implemented — `calendian-create` code block processor with key:value field parsing, calendar name resolution, and inline ref replacement |
+| REQ-WRITE-022 | THE SYSTEM SHOULD support creating a macOS Reminder from a structured code block in a note, parsing title, list, due date, priority, and notes from the block content. | P2 | v0.5.1 | Implemented — `calendian-create` code block processor with list name resolution, priority, and inline ref replacement |
 
 ### 7.11 Recurring event safety requirements
 

@@ -39,7 +39,7 @@ This document records the actual repository state. It intentionally separates im
 
 ## Current release label
 
-Current repository state: **v0.5 complete — note association, rendering, live association sync, baseline notifications, reminder temporal semantics, classified notifications, and reminder detail panel done**. TASK-040 (frontmatter schema) done. TASK-041 (create/open notes with templates) done. TASK-042 (template variables) done. TASK-043 (baseline notifications) done. TASK-043a (temporal semantics/classified notifications) done. TASK-044 (reminder detail panel) done. TASK-045 (file-change live sync) done. Next: TASK-046 (note→calendar creation).
+Current repository state: **v0.5 complete — note association, rendering, live association sync, baseline notifications, reminder temporal semantics, classified notifications, reminder detail panel, and note→calendar creation done**. TASK-040 (frontmatter schema) done. TASK-041 (create/open notes with templates) done. TASK-042 (template variables) done. TASK-043 (baseline notifications) done. TASK-043a (temporal semantics/classified notifications) done. TASK-044 (reminder detail panel) done. TASK-045 (file-change live sync) done. TASK-046 (note→calendar creation) done. Next: TASK-050 (Tasks plugin integration) or TASK-090+ (self-direction features).
 
 ## README policy
 
@@ -79,6 +79,7 @@ README may list the following as current behavior:
 - highlight navigation from note → panel item;
 - auto-link via body scan for inline refs.
 - optional in-app notifications for upcoming timed events, previous-day event/reminder notices, date-only due-day reminders, timed reminder lead notices, and overdue reminders;
+- `calendian-create` code block for creating events/reminders from notes with automatic inline ref replacement;
 
 Everything else must be marked as planned, experimental, or future.
 
@@ -99,15 +100,14 @@ Everything else must be marked as planned, experimental, or future.
 
 - **Doing:** None.
 - **Completed this session:**
-  - TASK-043 (in-app notifications, REQ-NOTIF-001..005) implemented. Added `src/macos/notifications.js`, notification settings, refresh-path delivery, session de-duplication, unavailable status handling, diagnostics status, and focused Node tests.
-  - TASK-043a (reminder temporal semantics and classified notifications, REQ-REM-011/012 and REQ-NOTIF-006..010) implemented. Added `src/reminders/temporal.js`, preserved `dueTime`/`hasDueTime` through helper/cache/UI/note renderers, added previous-day settings, and made notification de-duplication phase-aware.
-  - Merged with main after TASK-044 (reminder detail panel), TASK-045 (file-change live sync), and event detail panel bug fixes.
+  - TASK-046 (create event/reminder from note code block, REQ-WRITE-021/022) implemented. Added `parseCreateFields()`, `resolveCalendarByName()`/`resolveListByName()`, `renderCalendianCreateBlock()`, `replaceBlockWithInlineRef()`, and `createEventFromFields()`/`createReminderFromFields()` to `src/notes/codeblock.js`. Registered `calendian-create` code block processor in `main-head.js`. Added `.calendian-create-*` styles to `styles.css`.
 - **Decisions:**
-  - Notifications are disabled by default to avoid surprise notices; event/reminder notification sub-toggles default enabled so the global switch is the main opt-in.
-  - Notification de-duplication is session-local (`_deliveredNotifications`) and pruned after 48h; it prevents repeated notices during refresh loops without writing notification history into `data.json`.
-  - Date-only reminders must keep their date-only shape end-to-end; UI/templates/edit forms should not synthesize `00:00`.
-  - Previous-day notifications are refresh-driven, not exact OS alarms: they fire after Calendian loads/refreshes on the previous local day at or after the configured local time.
-  - Completion checkbox stays inline outside reminder detail panels for fast toggle.
-- **Verification:** `node tests/notifications.test.js`, `node tests/reminder-temporal.test.js`, `node --check main.js`, `env CLANG_MODULE_CACHE_PATH=/tmp/calendian-clang-cache swiftc -parse-as-library helper/Sources/main.swift -o /tmp/calendian-helper-check` (existing EventKit `Sendable` warning only).
-- **Next:** TASK-046 (note→calendar creation).
-- **Last action:** 2026-06-08 — TASK-043a merged with main.
+  - Calendar/list resolution happens at click time (async), not at render time — avoids slow renders and handles field edits between render and click.
+  - Note content replacement uses `ctx.getSectionInfo(el)` for exact line-range replacement via `app.vault.modify()`. Clipboard fallback when section info unavailable (Live Preview edge case).
+  - No YAML library — simple `key: value` line parsing, consistent with the rest of the codebase. Multi-line notes supported via indented continuation.
+  - Type inference: `list`/`priority` fields → reminder, otherwise → event.
+  - Event date inferred from note filename (YYYY-MM-DD basename) when `date` field is missing.
+  - Unknown field names ignored silently for forward compatibility.
+- **Verification:** `node --check main.js` (pass), `./build-main.sh` (11490 lines), `swiftc` helper compile (existing Sendable warning only).
+- **Next:** TASK-050 (Tasks plugin integration) or TASK-090+ (self-direction features).
+- **Last action:** 2026-06-08 — TASK-046 implemented and docs updated.

@@ -362,11 +362,11 @@ Tasks are ordered by dependency and release target. Every task references requir
 ### TASK-046 — Create event/reminder from note code block
 
 - Requirements: `REQ-WRITE-021`, `REQ-WRITE-022`
-- Status: Todo
+- Status: Done
 - Priority: P2
 - Deliverables:
   - New `` ```calendian-create `` code block processor.
-  - Block content parsed as YAML frontmatter-style fields: `type`, `title`, `date`, `time`/`startTime`/`endTime`, `calendar`/`list`, `location`, `notes`, `priority`.
+  - Block content parsed as key:value fields: `type`, `title`, `date`, `time`/`startTime`/`endTime`, `calendar`/`list`, `location`, `notes`, `priority`, `url`, `allday`.
   - Click "Create" button in rendered block → calls `execHelper(["create-event", ...])` or `execHelper(["create-reminder", ...])`.
   - On success: replace code block with created item's `cal:ev:ID` / `cal:rem:ID` inline ref, establish association.
   - On failure: show inline error message with retry.
@@ -375,11 +375,12 @@ Tasks are ordered by dependency and release target. Every task references requir
   - Clicking Create → item appears in Calendar.app / Reminders.app, panel refreshes.
   - Created item ID written back to note, establishing bidirectional link.
   - Error states handled and communicated inline.
+- Evidence: `parseCreateFields()` in `src/notes/codeblock.js` parses key:value fields with type inference, time range parsing, multi-line notes. `renderCalendianCreateBlock()` renders preview card with Create button. `resolveCalendarByName()`/`resolveListByName()` resolve names to IDs at click time. `replaceBlockWithInlineRef()` uses `ctx.getSectionInfo(el)` for line-range replacement via `app.vault.modify()`, with clipboard fallback. Registered in `main-head.js` as `registerMarkdownCodeBlockProcessor("calendian-create", ...)`. Styles in `styles.css`.
 
 ### TASK-050 — Tasks plugin import/export experiment
 
 - Requirements: `REQ-TASK-001` to `REQ-TASK-004`
-- Status: Todo
+- Status: In progress (branch: `codex/task-050-tasks-integration`)
 - Priority: P2
 
 ## v0.5.5 — Self-direction
