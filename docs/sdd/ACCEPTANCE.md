@@ -106,6 +106,8 @@ Required P0 acceptance:
 - Overdue reminder notifications fire within Obsidian.
 - Users can configure notification lead time and enable/disable notifications.
 - Notification unavailability degrades gracefully with documented limitation.
+- Manual Tasks export is an explicit user action only; no automatic two-way sync path is enabled.
+- Tasks export skips Markdown task lines that already contain `cal:rem:ID`.
 
 ## v0.5.5 — Self-direction
 

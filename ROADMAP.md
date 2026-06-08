@@ -7,7 +7,7 @@
 
 This roadmap is not an independent wish list. Every release is derived from requirement groups in [`SPEC.md`](./SPEC.md), acceptance gates in [`docs/sdd/ACCEPTANCE.md`](./docs/sdd/ACCEPTANCE.md), tasks in [`docs/sdd/TASKS.md`](./docs/sdd/TASKS.md), and risks in [`docs/sdd/RISKS.md`](./docs/sdd/RISKS.md).
 
-Current repository status: **v0.5 note association — complete**. Event/reminder create/edit/delete, NL parsing with AI, note association frontmatter + templates + inline refs + code blocks, association index rebuild, reminder display polish. v0.5.1 planned: reminder detail panel, file-change live sync, note→calendar reverse write.
+Current repository status: **v0.5 complete**. Event/reminder create/edit/delete, NL parsing with AI, note association frontmatter + templates + inline refs + code blocks, association index rebuild, reminder display polish, notifications, note→calendar creation, and manual Tasks export.
 
 ---
 
@@ -31,7 +31,7 @@ Current repository status: **v0.5 note association — complete**. Event/reminde
 | v0.3 | Safe create | simple event/reminder creation, natural language (regex + AI), validation, write verification, refresh system, code split | **Complete** |
 | v0.4 | Safe edit/delete | simple event/reminder edit/delete, reminder completion, recurring safety | **Complete** |
 | v0.5 | Note association & rendering | frontmatter association (REQ-NOTE-001..009), meeting notes, templates, inline ref rendering, code blocks | **Complete** |
-| v0.5.1 | Note association polish | reminder detail panel (REQ-REM-010), file-change live sync (REQ-NOTE-011), note→calendar creation (REQ-WRITE-021/022) | Planned |
+| v0.5.1 | Note association polish | reminder detail panel (REQ-REM-010), file-change live sync (REQ-NOTE-011), note→calendar creation (REQ-WRITE-021/022) | **Complete** |
 | v0.5.5 | Self-direction | goals, habits, nudges, reflections, encouragement statistics | Planned |
 | v0.6 | Advanced views/search | timeline, week view, search, data export, UI customization | Planned |
 | v1.x | Platform expansion | cross-platform architecture, Microsoft Graph/Android investigation | Deferred |
@@ -220,8 +220,8 @@ Connect calendar/reminder items to Obsidian notes using stable metadata and usef
 ### Required requirements
 
 - Note association: `REQ-NOTE-001` to `REQ-NOTE-010` (7 of 10 implemented, REQ-NOTE-008 deferred, REQ-NOTE-010 planned)
-- Tasks integration: `REQ-TASK-001` to `REQ-TASK-004` (not started)
-- In-app notifications: `REQ-NOTIF-001` to `REQ-NOTIF-005` (not started)
+- Tasks integration: `REQ-TASK-001` to `REQ-TASK-004` (implemented as manual one-way export)
+- In-app notifications: `REQ-NOTIF-001` to `REQ-NOTIF-005` (implemented, disabled by default)
 - Privacy: `REQ-PRIV-003`
 
 ### Deliverables
@@ -236,10 +236,10 @@ Connect calendar/reminder items to Obsidian notes using stable metadata and usef
 - ✅ `calendian-event` code block — render events/reminders for a date in notes.
 - ✅ Inline `cal:ev:ID`/`cal:rem:ID` renderer — styled mini-table when pasted in notes.
 - ✅ Highlight navigation — click inline ref/codeblock → panel highlight + scroll.
-- ❌ Manual, non-automatic Tasks integration experiment.
-- ❌ Event start notifications (configurable lead time).
-- ❌ Overdue reminder notifications.
-- ❌ Notification enable/disable settings.
+- ✅ Manual, non-automatic Tasks integration experiment — selected/current Markdown task lines can be exported to Reminders and tagged with `cal:rem:ID`.
+- ✅ Event start notifications (configurable lead time).
+- ✅ Overdue reminder notifications.
+- ✅ Notification enable/disable settings.
 
 ### Explicit exclusions
 

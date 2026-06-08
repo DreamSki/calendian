@@ -855,10 +855,10 @@ All refresh paths go through `init()`, which has a `_refreshRunning` boolean gat
 
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
-| REQ-TASK-001 | THE SYSTEM SHOULD parse Obsidian Tasks-compatible dates in notes. | P2 | v0.5 | Planned |
-| REQ-TASK-002 | THE SYSTEM SHOULD support manual export of selected tasks to Reminders. | P2 | v0.5 | Planned |
-| REQ-TASK-003 | THE SYSTEM SHALL NOT enable automatic two-way Tasks/Reminders sync until identity and conflict strategy are specified. | P0 | v0.5 | Planned |
-| REQ-TASK-004 | THE SYSTEM SHALL avoid duplicate reminder creation during task export. | P0 | v0.5 | Planned |
+| REQ-TASK-001 | THE SYSTEM SHOULD parse Obsidian Tasks-compatible dates in notes. | P2 | v0.5 | Implemented — `parseObsidianTaskLine()` recognizes Markdown task checkboxes and Tasks date markers (`📅`, `⏳`, `🛫`) plus priority markers (`🔺`, `⏫`, `🔼`, `🔽`, `⏬`) |
+| REQ-TASK-002 | THE SYSTEM SHOULD support manual export of selected tasks to Reminders. | P2 | v0.5 | Implemented — command palette action `Export selected Tasks to Reminders` exports selected/current incomplete task lines via `create-reminder` helper |
+| REQ-TASK-003 | THE SYSTEM SHALL NOT enable automatic two-way Tasks/Reminders sync until identity and conflict strategy are specified. | P0 | v0.5 | Implemented — integration is explicit one-way manual export only; no watcher, import loop, or automatic two-way sync path is registered |
+| REQ-TASK-004 | THE SYSTEM SHALL avoid duplicate reminder creation during task export. | P0 | v0.5 | Implemented — exported lines are tagged with `cal:rem:ID`; lines already containing `cal:rem:` are skipped by `buildTaskExportPlan()` |
 
 ### 7.14 Advanced view/search/statistics requirements
 

@@ -4,7 +4,7 @@
 
 Calendian is an Obsidian desktop plugin that integrates macOS Calendar events and macOS Reminders into the Obsidian sidebar. It is being developed with a Specification-Driven Development process: requirements, roadmap, tasks, tests, and release gates are tracked explicitly before features are claimed as complete.
 
-Current status: **v0.5 note association — complete** (v0.4 safe edit/delete complete; note frontmatter, templates, codeblock/inline ref rendering, linked notes in panel, in-app notifications, note→calendar creation working).
+Current status: **v0.5 complete** (v0.4 safe edit/delete complete; note frontmatter, templates, codeblock/inline ref rendering, linked notes, notifications, note→calendar creation, and manual Tasks export working).
 
 ---
 
@@ -65,6 +65,7 @@ The repository contains the following implemented features:
 - **Highlight navigation**: clicking an inline ref or code block item highlights and scrolls to the item in the Calendian panel.
 - **Auto-link via body scan**: notes containing `cal:ev:ID` / `cal:rem:ID` are automatically associated without frontmatter.
 - **In-app notifications**: optional Obsidian notices for upcoming timed events, previous-day event/reminder notices, date-only due-day reminders, timed reminder lead notices, and overdue reminders. Date-only reminders do not show synthetic `00:00`.
+- **Manual Tasks export**: selected/current Obsidian Tasks-compatible Markdown task lines can be exported to Reminders from the command palette; successful exports append `cal:rem:ID` and repeat export skips existing refs.
 
 For the precise truth table, see [`docs/sdd/CURRENT_STATUS.md`](./docs/sdd/CURRENT_STATUS.md) and [SPEC.md §2](./SPEC.md#2-current-implementation-status).
 
@@ -175,8 +176,9 @@ Then re-enable Obsidian's access.
 | Click 📝 on reminder | Expand linked notes list; "+📝" creates an associated note. |
 | Write `cal:ev:ID` or `cal:rem:ID` in a note | Renders inline event/reminder details table; clicking navigates to panel. |
 | Write ` ```calendian ` in a note | Renders events/reminders for that date as a styled table. |
+| Command: Export selected Tasks to Reminders | Exports selected/current incomplete Markdown task lines to Reminders and appends `cal:rem:ID`. |
 
-Event/reminder creation, editing, and deletion (with recurring event safety) are available in v0.4. Note association and rendering features are available in v0.5.
+Event/reminder creation, editing, and deletion (with recurring event safety) are available in v0.4. Note association, rendering, notifications, note→calendar creation, and manual Tasks export features are available in v0.5.
 
 ---
 
@@ -219,7 +221,7 @@ Future external API integrations, if any, must be opt-in and specified separatel
 | v0.2 | Read-only polish | Complete |
 | v0.3 | Safe create + natural language | Complete |
 | v0.4 | Safe edit/delete | Complete |
-| v0.5 | Note association | In progress |
+| v0.5 | Note association, notifications, and manual Tasks export | Complete |
 | v0.5.5 | Self-direction (goals, habits, nudges, reviews) | Planned |
 | v0.6 | Advanced views, search, export | Planned |
 | v1.x | Cross-platform architecture track | Deferred |

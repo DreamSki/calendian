@@ -105,8 +105,9 @@ Risks are reviewed before roadmap changes and before releases. Severity combines
 - Related requirements: `REQ-TASK-*`, `REQ-WRITE-*`
 - Description: Syncing Obsidian Tasks to macOS Reminders can duplicate or overwrite tasks if identity and sync direction are unclear.
 - Mitigation:
-  - Start as manual one-way export/import.
-  - Require stable mapping metadata before two-way sync.
+  - Start as manual one-way export only; no automatic import or two-way sync path.
+  - Append `cal:rem:ID` after successful export and skip task lines with existing refs.
+  - Require stable mapping metadata and conflict rules before any future two-way sync.
 
 ### RISK-010 — Cross-platform support is a separate product architecture
 

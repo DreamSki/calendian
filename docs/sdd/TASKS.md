@@ -381,8 +381,15 @@ Tasks are ordered by dependency and release target. Every task references requir
 ### TASK-050 — Tasks plugin import/export experiment
 
 - Requirements: `REQ-TASK-001` to `REQ-TASK-004`
-- Status: In progress (branch: `codex/task-050-tasks-integration`)
+- Status: Done
 - Priority: P2
+- Deliverables:
+  - Parse Markdown task lines with Obsidian Tasks-compatible date markers (`📅`, `⏳`, `🛫`) and priority markers.
+  - Command palette export for selected/current task lines to macOS Reminders.
+  - Append `cal:rem:ID` after successful creation so repeat export skips the line.
+  - Keep integration manual and one-way; no automatic Tasks ↔ Reminders sync.
+- Evidence: `src/notes/tasks-integration.js`, `tests/tasks-integration.test.js`, command registration in `main-head.js`, and generated `main.js`.
+- Verification: `node tests/tasks-integration.test.js`; `node tests/notifications.test.js`; `node tests/reminder-temporal.test.js`; `node --check main.js`; `./build-main.sh`; helper compile.
 
 ## v0.5.5 — Self-direction
 

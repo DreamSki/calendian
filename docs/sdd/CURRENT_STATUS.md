@@ -29,7 +29,7 @@ This document records the actual repository state. It intentionally separates im
 | Right-click actions | Planned | Current day/week context menu is inherited from calendar note behavior; Calendian event/reminder actions are not complete. |
 | Write operations | **Implemented (v0.4)** | Event/reminder creation, edit, and delete. Edit/delete for simple non-recurring events and all reminders. Completion toggle for reminders. Recurring event mutations blocked with Calendar.app redirect. `ConfirmActionModal` for destructive operations. Mutation safety guards (`canMutateEvent`, `canMutateReminder`). Post-write refresh. Write error handling. Default calendar/list. NL quick-create with English + Chinese regex + optional AI backend. |
 | Note association | **Implemented (v0.5)** | Frontmatter schema per SPEC §5.3. `ensureAssociationIndex()` scans vault for `calendian.associations` frontmatter + body scan for inline `cal:ev:ID`/`cal:rem:ID` refs. `createNoteForEvent()`/`createNoteForReminder()` with template engine (`expandTemplate()`). Event detail panel shows "Linked Notes" + "+ Note" button. Reminder items show expandable linked notes list + "+📝" create button. Copy inline ref via `copyItemText()`. `calendian-event` code block renders events/reminders in notes. Inline ref renderer (`cal:ev:ID`/`cal:rem:ID`) renders styled mini-table. Highlight navigation from note → panel. Renamed/missing notes handled gracefully. |
-| Tasks integration | Planned | Current task dots for daily notes exist from base plugin behavior; macOS Reminders sync with Obsidian Tasks is not implemented. |
+| Tasks integration | Implemented | Manual one-way export from selected/current Obsidian Tasks-compatible Markdown task lines to macOS Reminders. Successful export appends `cal:rem:ID`; existing refs are skipped. No automatic two-way sync. |
 | Timeline / week / statistics views | Planned | Not current behavior. |
 | Goals and focus tracking | Planned | Requires note association and frontmatter infrastructure (v0.5 dependency). |
 | Habit tracking and consistency | Planned | Requires note association and frontmatter infrastructure (v0.5 dependency). |
@@ -39,7 +39,7 @@ This document records the actual repository state. It intentionally separates im
 
 ## Current release label
 
-Current repository state: **v0.5 complete — note association, rendering, live association sync, baseline notifications, reminder temporal semantics, classified notifications, reminder detail panel, and note→calendar creation done**. TASK-040 (frontmatter schema) done. TASK-041 (create/open notes with templates) done. TASK-042 (template variables) done. TASK-043 (baseline notifications) done. TASK-043a (temporal semantics/classified notifications) done. TASK-044 (reminder detail panel) done. TASK-045 (file-change live sync) done. TASK-046 (note→calendar creation) done. Next: TASK-050 (Tasks plugin integration) or TASK-090+ (self-direction features).
+Current repository state: **v0.5 complete — note association, rendering, live association sync, baseline notifications, reminder temporal semantics, classified notifications, reminder detail panel, note→calendar creation, and manual Tasks export done**. TASK-040 (frontmatter schema) done. TASK-041 (create/open notes with templates) done. TASK-042 (template variables) done. TASK-043 (baseline notifications) done. TASK-043a (temporal semantics/classified notifications) done. TASK-044 (reminder detail panel) done. TASK-045 (file-change live sync) done. TASK-046 (note→calendar creation) done. TASK-050 (Tasks plugin integration) done. Next: TASK-090+ (self-direction features).
 
 ## README policy
 
@@ -100,8 +100,8 @@ Everything else must be marked as planned, experimental, or future.
 
 > Updated by AI after every meaningful step. Next session reads this to continue without re-explaining context.
 
-- **Doing:** Reminder date filtering & sort refactor (REQ-REM-007).
-- **Just completed:** Rewrote `getRemindersForDate()` and sort logic in `renderRemindersSection()`. Added `upcomingReminderDays` setting (3/7/all, default 7). Rebuilt main.js. Updated SDD docs.
+- **Doing:** Manual validation setup for TASK-050 on branch `codex/task-050-tasks-integration`.
+- **Just completed before this validation:** Rewrote `getRemindersForDate()` and sort logic in `renderRemindersSection()`. Added `upcomingReminderDays` setting (3/7/all, default 7). Rebuilt main.js. Updated SDD docs.
 - **Completed this session:**
   - **`getRemindersForDate()`** in `src/cache/schedule-cache.js`: Today view now queries from 2000-01-01 to (today + upcomingReminderDays). Other days query only that exact day's date range (midnight to 23:59:59).
   - **Sort order** in `main-head.js:renderRemindersSection()`: Today view sorts as today → future → overdue → completed. Other days sort by due time with completed at bottom.
@@ -113,5 +113,11 @@ Everything else must be marked as planned, experimental, or future.
   - No-date reminders remain unchanged (shown every day) per user preference.
   - Completed reminders always at very bottom, even below overdue.
   - Settings dropdown uses 0/3/7 numeric values stored as number; UI shows "3 days", "7 days", "All future".
-- **Next:** Reload Obsidian and verify: today shows overdue+today+future with correct sort; other day shows only that day's reminders; setting toggle works.
-- **Last action:** 2026-06-09 — design parity audit complete, orphaned CSS cleaned, built and verified.
+- **Completed this session:** TASK-050 implemented on branch `codex/task-050-tasks-integration`.
+- **Decisions:**
+  - Tasks integration stays explicit and one-way: selected/current Markdown task line(s) → Reminders.
+  - No automatic import, watcher, or two-way Tasks ↔ Reminders sync until stable identity/conflict rules are specified.
+  - Existing `cal:rem:ID` refs are the duplicate-prevention marker and are skipped on export.
+- **Verification:** `node tests/tasks-integration.test.js` ✓, `node tests/notifications.test.js` ✓, `node tests/reminder-temporal.test.js` ✓, `node --check main.js` ✓, `./build-main.sh` ✓, helper compile ✓.
+- **Next:** Reload Obsidian and manually verify TASK-050 command palette export flow; also verify today/other-day reminder display after TASK-050 validation if needed.
+- **Last action:** 2026-06-09 — rebasing TASK-050 onto current main for manual validation.
