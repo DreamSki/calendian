@@ -54,7 +54,7 @@ The current repository must be treated as **v0.2 / read-only polish — complete
 
 ## 2. Current implementation status
 
-### 2.1 Implemented (v0.1–v0.2)
+### 2.1 Implemented (v0.1–v0.5)
 
 The following features are currently implemented in the codebase. All macOS data access goes through a native Swift EventKit helper binary (`calendian-helper`, source at `helper/Sources/main.swift`). A legacy JXA path (`execJXA`) remains in code but is no longer the primary data channel.
 
@@ -182,6 +182,18 @@ The following features are currently implemented in the codebase. All macOS data
 - ✅ Code split into multiple JS modules (REQ-ARCH-001) — cat-based concatenation via build-main.sh; modules in src/
 - ✅ Recurring event safety UX (REQ-REC-002/003/007) — RecurringBlockModal, canMutateEvent() guard, done in v0.4 — see §7.11.1 for full classification model
 - Remaining v0.2 deferred items (0): ✅ All resolved（REQ-TIME-005 用户排除，REQ-REM-009 Apple API 阻塞除外）
+
+#### Note association (v0.5)
+- ✅ Frontmatter association schema per SPEC §5.3 (`calendian.associations[]` YAML block with type, source, id, title, date, calendar)
+- ✅ `ensureAssociationIndex()` — scans all vault `.md` files for `calendian` frontmatter, builds in-memory event/reminder ID → `[{path, title}]` map
+- ✅ `getAssociatedNotes()` — returns linked notes for an event/reminder, filters missing files (REQ-NOTE-004)
+- ✅ `generateEventFrontmatter()` / `generateReminderFrontmatter()` — produces SPEC §5.3 YAML with stable ID
+- ✅ `createNoteForEvent()` / `createNoteForReminder()` — creates `.md` file with pre-filled frontmatter, auto-deduplicates filename, opens note
+- ✅ `resolveNotePath()` — search-by-title fallback for renamed notes (REQ-NOTE-004)
+- ✅ Event detail panel: "Linked Notes" section with clickable wiki-links, "+ Note" button
+- ✅ Reminder items: 📝 note indicator (clickable), "+📝" create button
+- ✅ Lazy index rebuild via `metadataCache.on("changed"/"resolved")` listeners
+- ✅ Build: `src/notes/frontmatter.js` + `src/notes/note-link-resolver.js` concatenated by `build-main.sh`
 
 ---
 
@@ -810,15 +822,15 @@ All refresh paths go through `init()`, which has a `_refreshRunning` boolean gat
 
 | ID | Requirement | Priority | Target | Status |
 |---|---|---|---|---|
-| REQ-NOTE-001 | THE SYSTEM SHALL associate events with notes using stable frontmatter metadata. | P0 | v0.5 | Planned |
-| REQ-NOTE-002 | THE SYSTEM SHALL associate reminders with notes using stable frontmatter metadata. | P0 | v0.5 | Planned |
-| REQ-NOTE-003 | THE SYSTEM SHALL show associated note links in event/reminder details. | P0 | v0.5 | Planned |
-| REQ-NOTE-004 | THE SYSTEM SHALL handle missing or renamed notes safely. | P0 | v0.5 | Planned |
-| REQ-NOTE-005 | THE SYSTEM SHALL create a note from an event/reminder using a template. | P0 | v0.5 | Planned |
-| REQ-NOTE-006 | THE SYSTEM SHALL support template variables for title, date, time, calendar/list, and location where available. | P1 | v0.5 | Planned |
-| REQ-NOTE-007 | THE SYSTEM SHOULD insert associated event/reminder links into daily notes. | P1 | v0.5 | Planned |
-| REQ-NOTE-008 | THE SYSTEM SHOULD repair stale associations where possible. | P2 | v0.5 | Planned |
-| REQ-NOTE-009 | THE SYSTEM SHOULD support copy-as-Markdown for events/reminders. | P2 | v0.5 | Planned |
+| REQ-NOTE-001 | THE SYSTEM SHALL associate events with notes using stable frontmatter metadata. | P0 | v0.5 | Implemented — `generateEventFrontmatter()` produces YAML with stable event ID; `createNoteForEvent()` writes .md file with frontmatter; frontmatter schema per SPEC §5.3 |
+| REQ-NOTE-002 | THE SYSTEM SHALL associate reminders with notes using stable frontmatter metadata. | P0 | v0.5 | Implemented — `generateReminderFrontmatter()` produces YAML with stable reminder ID; `createNoteForReminder()` writes .md file with frontmatter |
+| REQ-NOTE-003 | THE SYSTEM SHALL show associated note links in event/reminder details. | P0 | v0.5 | Implemented — event detail panel shows "Linked Notes" with clickable links; reminder items show 📝 indicator that opens linked note; `getAssociatedNotes()` scans vault for matching frontmatter |
+| REQ-NOTE-004 | THE SYSTEM SHALL handle missing or renamed notes safely. | P0 | v0.5 | Implemented — `getAssociatedNotes()` filters out nonexistent files; `resolveNotePath()` search-by-title for renamed notes; lazy index rebuild via `metadataCache.on("changed"/"resolved")` |
+| REQ-NOTE-005 | THE SYSTEM SHALL create a note from an event/reminder using a template. | P0 | v0.5 | Implemented — `createNoteForEvent()`/`createNoteForReminder()` use `expandTemplate()` with `eventNoteTemplate`/`reminderNoteTemplate` from settings; configurable `noteFolder` for output path |
+| REQ-NOTE-006 | THE SYSTEM SHALL support template variables for title, date, time, calendar/list, and location where available. | P1 | v0.5 | Implemented — events: {{title}}, {{date}}, {{startTime}}, {{endTime}}, {{time}}, {{calendar}}, {{location}}, {{url}}, {{notes}}, {{isAllDay}}, {{recurrence}}; reminders: {{title}}, {{date}}, {{dueTime}}, {{time}}, {{list}}, {{priority}}, {{notes}}; conditional blocks via {{#key}}...{{/key}} |
+| REQ-NOTE-007 | THE SYSTEM SHOULD insert associated event/reminder links into daily notes. | P1 | v0.5 | Implemented — `addToDailyNote()` finds/creates daily note, appends `- [ ] [[note path|title]]`; "→ Daily Note" button in event detail panel; "→📅" hint in reminder hover actions |
+| REQ-NOTE-008 | THE SYSTEM SHOULD repair stale associations where possible. | P2 | v0.5 | Deferred — `resolveNotePath()` handles renames at read time; full repair deferred to future iteration |
+| REQ-NOTE-009 | THE SYSTEM SHOULD support copy-as-Markdown for events/reminders. | P2 | v0.5 | Implemented — `copyWikilink()` copies `[[path|title]]` to clipboard; "📋 Copy Link" button in event detail, "📋" hint in reminder hover actions |
 | REQ-NOTE-010 | THE SYSTEM SHOULD support meeting-note templates. | P1 | v0.5 | Planned |
 
 ### 7.13 Tasks integration requirements

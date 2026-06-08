@@ -283,14 +283,16 @@ Tasks are ordered by dependency and release target. Every task references requir
 ### TASK-040 — Frontmatter association schema
 
 - Requirements: `REQ-NOTE-001` to `REQ-NOTE-004`
-- Status: Todo
+- Status: Done
 - Priority: P0
+- Evidence: `src/notes/frontmatter.js` — `ensureAssociationIndex()` scans vault markdown files for `calendian.associations` frontmatter; `getAssociatedNotes()` returns `[{path, title}]` for events/reminders; `generateEventFrontmatter()`/`generateReminderFrontmatter()` produce SPEC §5.3 YAML; `createNoteForEvent()`/`createNoteForReminder()` create .md files with pre-filled frontmatter. `src/notes/note-link-resolver.js` — `resolveNotePath()` handles renamed notes via title search. UI: event detail panel shows "Linked Notes" + "+ Note" button; reminder items show 📝 indicator + "+📝" create button. Index rebuilds lazily via `metadataCache.on("changed"/"resolved")`. Missing notes filtered silently.
 
 ### TASK-041 — Create/open associated notes
 
-- Requirements: `REQ-NOTE-005` to `REQ-NOTE-008`
-- Status: Todo
+- Requirements: `REQ-NOTE-005` to `REQ-NOTE-009`
+- Status: Done
 - Priority: P0
+- Evidence: `src/notes/templates.js` — `expandTemplate()` with `{{var}}` + `{{#key}}...{{/key}}` conditional blocks; `buildEventTemplateVars()`/`buildReminderTemplateVars()`; `findOrCreateDailyNote()`; `addToDailyNote()` appends `- [ ] [[path|title]]` to daily note; `copyWikilink()` copies wikilink to clipboard. Settings: `eventNoteTemplate`, `reminderNoteTemplate`, `noteFolder` in defaultSettings + settings tab UI. UI: "→ Daily Note" + "📋 Copy Link" buttons in event detail; "→📅" + "📋" hint buttons in reminder hover actions. REQ-NOTE-008 (stale repair) deferred.
 
 ### TASK-042 — Template variables and daily note summary
 

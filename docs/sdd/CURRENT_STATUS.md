@@ -27,7 +27,7 @@ This document records the actual repository state. It intentionally separates im
 | Refresh / sync | Implemented | Timer-driven refresh (configurable interval, default 5min). Manual refresh button. Window focus refresh (REQ-SYNC-004). `_refreshRunning` concurrency guard. EKEventStoreChanged notification watch (REQ-SYNC-005). Post-write refresh (REQ-SYNC-006). Watch fallback to timer (REQ-SYNC-007). See SPEC.md §7.6.1. |
 | Right-click actions | Planned | Current day/week context menu is inherited from calendar note behavior; Calendian event/reminder actions are not complete. |
 | Write operations | **Implemented (v0.4)** | Event/reminder creation, edit, and delete. Edit/delete for simple non-recurring events and all reminders. Completion toggle for reminders. Recurring event mutations blocked with Calendar.app redirect. `ConfirmActionModal` for destructive operations. Mutation safety guards (`canMutateEvent`, `canMutateReminder`). Post-write refresh. Write error handling. Default calendar/list. NL quick-create with English + Chinese regex + optional AI backend. |
-| Note association | Planned | Existing daily/weekly note integration comes from the base calendar plugin behavior; Calendian event/reminder frontmatter association is not complete. |
+| Note association | **Implemented (v0.5)** | Frontmatter schema per SPEC §5.3. `ensureAssociationIndex()` scans vault for `calendian.associations` frontmatter. Event detail panel shows "Linked Notes" + "+ Note" button. Reminder items show 📝 indicator + "+📝" create button. Renamed/missing notes handled gracefully. Templates deferred to TASK-041. |
 | Tasks integration | Planned | Current task dots for daily notes exist from base plugin behavior; macOS Reminders sync with Obsidian Tasks is not implemented. |
 | Timeline / week / statistics views | Planned | Not current behavior. |
 | Goals and focus tracking | Planned | Requires note association and frontmatter infrastructure (v0.5 dependency). |
@@ -38,7 +38,7 @@ This document records the actual repository state. It intentionally separates im
 
 ## Current release label
 
-Current repository state: **v0.4 safe edit/delete — complete**. All v0.4 requirements implemented. Event/reminder edit, delete, and completion toggle working. Recurring event mutations blocked with Calendar.app redirect. Code split via `cat` concatenation (REQ-ARCH-001). Subtask display blocked by Apple API (REQ-REM-009).
+Current repository state: **v0.5 WIP — note association foundation complete**. TASK-040 (frontmatter schema) done. Next: TASK-041 (create/open notes with templates), TASK-042 (template variables), TASK-043 (notifications).
 
 ## README policy
 
@@ -87,22 +87,13 @@ Everything else must be marked as planned, experimental, or future.
 
 > Updated by AI after every meaningful step. Next session reads this to continue without re-explaining context.
 
-- **Doing:** v0.4 safe edit/delete — complete. Docs final audit and commit.
+- **Doing:** v0.5 note association — cleaned back to user-driven model.
 - **Decisions:**
-  - writer.js Node.js code removed from concatenation entirely — only `MacOSIntegration.prototype` methods remain.
-  - Toggle checkbox uses helper-first-then-update pattern (no optimistic update, no revert flicker).
-  - Click handlers use DOM back-references (`_reminder`, `_self`, `_itemEl`) instead of IIFE closures.
-  - No-date reminder `completed` field was hardcoded `false` — fixed to read `nd.completed || false` from helper.
-  - Helper changed from `predicateForIncompleteReminders` to `predicateForReminders(in:)` to include completed reminders.
-  - `ConfirmActionModal` reused for both event and reminder delete confirmations.
-  - `RecurringBlockModal` uses `x-apple-calevent:` URL scheme for Calendar.app redirect.
-  - `_togglingReminders` flight guard prevents race on rapid checkbox clicks.
-  - No-date reminders section default expanded; arrow toggle logic corrected.
-- **v0.4 changes summary:**
-  - Helper binary: `edit-event`, `delete-event`, `edit-reminder`, `delete-reminder` commands.
-  - Writer module: 9 new `MacOSIntegration.prototype` methods (guards + edit/delete/toggle/confirm).
-  - UI modals: `EventEditModal`, `ReminderEditModal`, `RecurringBlockModal`, `ConfirmActionModal`.
-  - Event detail: Edit/Delete buttons with safety guards.
-  - Reminders: clickable ○/☑ checkbox, hover-visible Edit/Delete, completed strikethrough.
-- **Next:** v0.5 note association + notifications.
-- **Last action:** 2026-06-08 — v0.4 complete, all docs aligned.
+  - Plugin NEVER auto-modifies note files. All association is user-initiated.
+  - Compact frontmatter: `calendian: { events: [...], reminders: [...] }` (IDs only)
+  - "+ Note": creates a dedicated note with calendian frontmatter
+  - "📋 Copy": wikilink if linked note exists, plain text otherwise
+  - "Linked Notes" in event detail: shows associated notes, click to open
+  - Removed: auto-sync, daily-note insertion, all auto-modification code
+- **Next:** TASK-043 (notifications) or code block renderer for daily-note embedding.
+- **Last action:** 2026-06-08 — cleanup: removed syncDailyNoteAssociations, findOrCreateDailyNote, addToDailyNote, readExistingCalendian. 445 lines deleted. 40 prototype methods, 10032 lines.
