@@ -95,15 +95,11 @@ Everything else must be marked as planned, experimental, or future.
 
 > Updated by AI after every meaningful step. Next session reads this to continue without re-explaining context.
 
-- **Doing:** SDD document update — integrating v0.5.1 planned features into SPEC/TASKS/CURRENT_STATUS.
+- **Doing:** TASK-044 (reminder detail panel) or TASK-046 (note→calendar creation) — whichever is next.
 - **Completed this session:**
-  - Phase 1–3 code quality fixes for TASK-040/041 (committed: c86259f).
-  - Analyzed 4 user-requested features, created SPEC REQ entries and TASK entries.
-  - v0.5.1 scope defined: REQ-REM-010 (reminder detail panel), REQ-NOTE-011 (file-change live sync), REQ-WRITE-021/022 (note→calendar reverse write).
+  - TASK-045 (file-change live sync, REQ-NOTE-011) implemented. `_invalidateAssociationDebounced()` with 500ms debounce added to CalendarView. All three vault event handlers (`onFileCreated`/`onFileModified`/`onFileDeleted`) now invalidate association index on `.md` file changes. Fresh rebuild by nulling `_bodyScanIndex` ensures stale entries are cleaned.
 - **Decisions:**
-  - Reminder detail panel follows event click-to-expand pattern exactly (REQ-REM-010). Completion checkbox stays inline for fast toggle.
-  - File-change live sync hooks into existing `app.vault.on("modify"/"create")` handlers already registered in CalendarView (REQ-NOTE-011). Debounced at 500ms to avoid per-keystroke re-scan.
-  - Note→calendar creation uses new `` ```calendian-create `` code block with YAML-style fields; helper already supports `create-event`/`create-reminder` commands (REQ-WRITE-021/022).
-  - All three features targeted at v0.5.1 (not v0.5.5 self-direction).
-- **Next:** TASK-045 (file-change live sync — P0, highest impact, smallest effort) → TASK-044 (reminder detail panel) → TASK-046 (note→calendar creation).
-- **Last action:** 2026-06-08 — SDD documents updated with v0.5.1 planned features.
+  - Fresh rebuild (null `_bodyScanIndex` + `_associationIndex`) on every live-sync invalidation to ensure correct cleanup of stale frontmatter/inline refs. The body scan caps at 200 files so performance is acceptable.
+  - 60s periodic rebuild kept as safety net alongside live sync.
+- **Next:** TASK-044 (reminder detail panel) → TASK-046 (note→calendar creation).
+- **Last action:** 2026-06-08 — TASK-045 implemented (file-change live sync).

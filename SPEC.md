@@ -195,7 +195,7 @@ The following features are currently implemented in the codebase. All macOS data
 - ✅ Lazy index rebuild via `metadataCache.on("changed"/"resolved")` listeners
 - ✅ Build: `src/notes/frontmatter.js` + `src/notes/note-link-resolver.js` concatenated by `build-main.sh`
 - ⬜ Reminder expandable detail panel: click-to-expand consistent with event behavior (REQ-REM-010, v0.5.1)
-- ⬜ File-change → association index live invalidation: vault `modify`/`create` hooks trigger index rebuild + re-render within 1s (REQ-NOTE-011, v0.5.1)
+- ✅ File-change → association index live sync: vault `modify`/`create`/`delete` hooks trigger index rebuild + re-render within 500ms debounce (REQ-NOTE-011, v0.5.1)
 - ⬜ Create event/reminder from note code block: parse structured block, call helper, write back ID to note (REQ-WRITE-021/022, v0.5.1)
 
 ---
@@ -838,7 +838,7 @@ All refresh paths go through `init()`, which has a `_refreshRunning` boolean gat
 | REQ-NOTE-008 | THE SYSTEM SHOULD repair stale associations where possible. | P2 | v0.5 | Deferred — `resolveNotePath()` handles renames at read time; full repair deferred to future iteration |
 | REQ-NOTE-009 | THE SYSTEM SHOULD support copy-as-Markdown for events/reminders. | P2 | v0.5 | Implemented — `copyItemText()` copies `cal:ev:ID`/`cal:rem:ID` inline reference text to clipboard; 📋 button in event detail and reminder hover actions; renders as styled mini-table when pasted in notes |
 | REQ-NOTE-010 | THE SYSTEM SHOULD support meeting-note templates. | P1 | v0.5 | Planned |
-| REQ-NOTE-011 | WHEN a markdown file is created or modified, THE SYSTEM SHALL invalidate the association index and re-render the panel within 1 second, so that frontmatter and inline ref changes are reflected without waiting for the periodic rebuild timer. | P0 | v0.5.1 | Planned |
+| REQ-NOTE-011 | WHEN a markdown file is created or modified, THE SYSTEM SHALL invalidate the association index and re-render the panel within 1 second, so that frontmatter and inline ref changes are reflected without waiting for the periodic rebuild timer. | P0 | v0.5.1 | Implemented — `_invalidateAssociationDebounced()` (500ms debounce) added to CalendarView; `onFileCreated`/`onFileModified`/`onFileDeleted` handlers check for `.md` files and trigger fresh index rebuild + `_itemLookupCache` clear + `render()` |
 
 ### 7.13 Tasks integration requirements
 

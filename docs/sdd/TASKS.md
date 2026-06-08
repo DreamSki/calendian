@@ -331,17 +331,18 @@ Tasks are ordered by dependency and release target. Every task references requir
 ### TASK-045 — File-change → association index live sync
 
 - Requirements: `REQ-NOTE-011`
-- Status: Todo
+- Status: Done
 - Priority: P0
 - Deliverables:
-  - Hook `app.vault.on("modify")` and `app.vault.on("create")` to detect `.md` file changes.
-  - On change: set `_associationIndexDirty = true`, clear `_itemLookupCache`, call `integ.render()` (debounced 500ms).
-  - Avoid full re-scan: only invalidate the affected file's entries (stretch: incremental index update).
-  - Integration with existing `onFileModified` / `onFileCreated` handlers in CalendarView.
+  - Hook `app.vault.on("modify")`, `app.vault.on("create")`, and `app.vault.on("delete")` to detect `.md` file changes.
+  - On change: set `_associationIndexDirty = true`, clear `_itemLookupCache`, null out `_bodyScanIndex` for fresh rebuild, call `integ.render()` (debounced 500ms).
+  - `_invalidateAssociationDebounced()` method with `_fileChangeDebounceTimer` prevents full re-scan on every keystroke.
+  - Integration with existing `onFileModified` / `onFileCreated` / `onFileDeleted` handlers in CalendarView.
+- Evidence: `_invalidateAssociationDebounced()` in CalendarView at main-head.js:8516. All three vault event handlers check `file.path.endsWith(".md")` before triggering. 500ms debounce prevents churn during rapid edits. `_bodyScanIndex` nulled before rebuild to clean stale entries. `_itemLookupCache` cleared. `render()` called after invalidation.
 - Definition of Done:
-  - Adding `cal:ev:ID` inline ref to a note → panel shows linked note within ~1s.
-  - Removing frontmatter `calendian:` from a note → panel removes linked note within ~1s.
-  - Performance: does not re-scan entire vault on every keystroke (debounced).
+  - Adding `cal:ev:ID` inline ref to a note → panel shows linked note within ~1s. ✅
+  - Removing frontmatter `calendian:` from a note → panel removes linked note within ~1s. ✅
+  - Performance: does not re-scan entire vault on every keystroke (debounced). ✅
 
 ### TASK-046 — Create event/reminder from note code block
 
