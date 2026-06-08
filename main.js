@@ -7596,7 +7596,7 @@ class MacOSIntegration {
             }
 
             // REQ-CAL-008: Click to expand/collapse detail panel
-            var evtId = evt.id || (evt.title + "-" + (evt.start ? evt.start.getTime() : i));
+            let evtId = evt.id || (evt.title + "-" + (evt.start ? evt.start.getTime() : i));
             var self = this;
 
             // Calendar badge with color
