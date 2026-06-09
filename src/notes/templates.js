@@ -135,9 +135,19 @@ MacOSIntegration.prototype.buildReminderTemplateVars = function(rem) {
 MacOSIntegration.prototype.copyItemText = async function(item, itemType) {
     try {
         var itemId = item.id || "";
-        var code = itemType === "event" ? ("`cal:ev:" + itemId + "`") : ("`cal:rem:" + itemId + "`");
+        var opts = this.plugin && this.plugin.options ? this.plugin.options : {};
+        var refFormat = opts.refFormat || "inline";
+        var prefix = itemType === "event" ? "ev" : "rem";
+        var code;
+
+        if (refFormat === "block") {
+            code = "```cal\n" + prefix + ":" + itemId + "\n```";
+        } else {
+            code = "`cal:" + prefix + ":" + itemId + "`";
+        }
+
         await navigator.clipboard.writeText(code);
-        new obsidian.Notice("Copied: " + code);
+        new obsidian.Notice("Copied: " + (code.length > 50 ? code.substring(0, 50) + "..." : code));
     } catch (err) {
         console.error("[Calendian] Failed to copy:", err.message);
         new obsidian.Notice("Failed to copy: " + err.message);

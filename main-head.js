@@ -773,6 +773,8 @@ const defaultSettings = Object.freeze({
     reminderNoteTemplate: "# {{title}}\n\n- **Due:** {{date}} {{time}}\n- **List:** {{list}}\n- **Priority:** {{priority}}\n{{#notes}}\n## Notes\n{{notes}}\n{{/notes}}",
     // v0.5: Note folder for created notes
     noteFolder: "",
+    // v0.5: Reference format for event/reminder links
+    refFormat: 'inline',  // 'inline' or 'block'
 });
 function appHasPeriodicNotesPluginLoaded() {
     var _a, _b;
@@ -1552,6 +1554,19 @@ class CalendarSettingsTab extends obsidian.PluginSettingTab {
                 cmp.setValue(opts.noteFolder || "");
                 cmp.onChange(async function(value) {
                     await self.plugin.writeOptions(function() { return { noteFolder: value.trim() }; });
+                });
+            });
+
+        // Reference format for event/reminder links
+        new obsidian.Setting(this.containerEl)
+            .setName("Reference format")
+            .setDesc("Format for event/reminder references. Inline: cal:ev:123 (阅读模式渲染). Block: ```cal (Live Preview 可用).")
+            .addDropdown(function(cmp) {
+                cmp.addOption("inline", "Inline (cal:ev:123)");
+                cmp.addOption("block", "Block (```cal...```)");
+                cmp.setValue(opts.refFormat || "inline");
+                cmp.onChange(async function(value) {
+                    await self.plugin.writeOptions(function() { return { refFormat: value }; });
                 });
             });
     }
@@ -6958,6 +6973,10 @@ const nodeFS = require("fs");
 const nodePath = require("path");
 const nodeOS = require("os");
 
+// Global notification delivery tracking (shared across all MacOSIntegration instances)
+// Prevents duplicate notifications when multiple instances exist
+const _globalDeliveredNotifications = {};
+
 class MacOSIntegration {
     constructor(plugin) {
         this.plugin = plugin;
@@ -7014,7 +7033,8 @@ class MacOSIntegration {
         this._highlightTimer = null;         // auto-clear timer
         this._fileChangeDebounceTimer = null; // REQ-NOTE-011: debounce for file-change → index invalidation
         // v0.5: In-app notification de-duplication state (REQ-NOTIF-001..005)
-        this._deliveredNotifications = {};
+        // Use global shared object to prevent duplicates across multiple instances
+        this._deliveredNotifications = _globalDeliveredNotifications;
         this._notificationStatus = "not checked";
         this._lastNotificationCheckTime = null;
         this._lastNotificationError = "";
@@ -7171,11 +7191,8 @@ class MacOSIntegration {
         this.lastRefreshDurationMs = Date.now() - start;
         this._dataLoaded = true;
         if (typeof notifyScheduleChanged === "function") notifyScheduleChanged();
-        this.render();
         this.notifyDueItems();
         this.render();
-        this._dataLoaded = true;
-        if (typeof notifyScheduleChanged === "function") notifyScheduleChanged();
     }
 
     // Render syncing state (shown during first-ever load)
@@ -8458,7 +8475,7 @@ class CalendarView extends obsidian.ItemView {
             this.options = val;
             this.settings = val;
             // Refresh the calendar dots if settings change
-            if (this.calendar) {
+            if (this.calendar && typeof this.calendar.tick === 'function') {
                 this.calendar.tick();
             }
         });
@@ -8561,6 +8578,11 @@ class CalendarView extends obsidian.ItemView {
 
         this.macosIntegration.calendarComponent = this.calendar;
         this.macosIntegration._calendarSources = sources;
+
+        // Clear any existing panel before creating a new one (prevents duplicates if onOpen is called multiple times)
+        if (this.eventsPanelEl) {
+            this.eventsPanelEl.remove();
+        }
         this.eventsPanelEl = this.contentEl.createDiv("macos-events-panel");
         this.macosIntegration.eventsPanelEl = this.eventsPanelEl;
         this.macosIntegration.startAutoRefresh();
@@ -8568,14 +8590,12 @@ class CalendarView extends obsidian.ItemView {
         this.macosIntegration.init();
 
         // REQ-SYNC-004: Refresh when window gains focus
-        // Always show cached data instantly, then background-refresh from EventKit
-        // to pick up external changes (Calendar.app / Reminders.app edits).
-        // The cache freshness check is only for timer-driven refresh — focus should
-        // always re-query, since the user may have changed data in another app.
+        // Background-refresh from EventKit to pick up external changes
+        // (Calendar.app / Reminders.app edits). Current cache data is already
+        // visible from the last render, so we only need to refresh in background.
         this._handleWindowFocus = () => {
             if (this.macosIntegration) {
                 console.log("[Calendian] Window focused — refreshing from macOS...");
-                this.macosIntegration.render();
                 this.macosIntegration.refreshInBackground();
             }
         };
@@ -8844,6 +8864,10 @@ class CalendarPlugin extends obsidian.Plugin {
         };
         this.registerMarkdownCodeBlockProcessor("calendian-create", createBlockHandler);
         this.registerMarkdownCodeBlockProcessor("cc", createBlockHandler);
+        // v0.5: ```cal``` code block for single event/reminder reference (Live Preview compatible)
+        this.registerMarkdownCodeBlockProcessor("cal", function(source, el, ctx) {
+            renderCalRefBlock(self, source, el, ctx);
+        });
         await this.loadOptions();
         this.addSettingTab(new CalendarSettingsTab(this.app, this));
         if (this.app.workspace.layoutReady) {

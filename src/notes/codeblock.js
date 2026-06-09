@@ -16,8 +16,36 @@ function renderCalendianBlock(plugin, source, el, ctx) {
     }
 
     try {
-        var targetDate;
+        var integ = view.macosIntegration;
         var sourceText = (source || "").trim();
+
+        // Check if source is a single item reference (ev:ID or rem:ID)
+        if (sourceText.startsWith("ev:")) {
+            var eventId = sourceText.slice(3).trim();
+            var event = integ.allEvents.find(function(e) { return e.id === eventId; });
+            var container = el.createDiv("calendian-block");
+            if (event) {
+                _renderBlockContent(container, [event], [], integ, plugin);
+            } else {
+                container.createDiv("calendian-block-empty").textContent = "Event not found: " + eventId;
+            }
+            return;
+        }
+
+        if (sourceText.startsWith("rem:")) {
+            var remId = sourceText.slice(4).trim();
+            var reminder = integ.allReminders.find(function(r) { return r.id === remId; });
+            var container = el.createDiv("calendian-block");
+            if (reminder) {
+                _renderBlockContent(container, [], [reminder], integ, plugin);
+            } else {
+                container.createDiv("calendian-block-empty").textContent = "Reminder not found: " + remId;
+            }
+            return;
+        }
+
+        // Original behavior: show all events/reminders for a date
+        var targetDate;
         if (sourceText && sourceText !== "today") {
             var parsed = window.moment(sourceText);
             if (parsed.isValid()) targetDate = parsed;
@@ -31,7 +59,6 @@ function renderCalendianBlock(plugin, source, el, ctx) {
         }
         if (!targetDate) targetDate = window.moment();
 
-        var integ = view.macosIntegration;
         var dayEvents = integ.getEventsForDate(targetDate) || [];
         var dayReminders = integ.getRemindersForDate(targetDate) || [];
 
@@ -627,12 +654,12 @@ async function resolveListByName(integ, nameOrId) {
 }
 
 /**
- * Replace the calendian-create code block in the note with an inline ref.
+ * Replace the calendian-create code block in the note with a calendian code block.
  * Uses ctx.getSectionInfo(el) for exact line range.
  */
-async function replaceBlockWithInlineRef(plugin, ctx, el, itemId, itemType) {
-    var ref = itemType === "event" ? "cal:ev:" + itemId : "cal:rem:" + itemId;
-    var inlineRef = "`" + ref + "`";
+async function replaceBlockWithCalendianBlock(plugin, ctx, el, itemId, itemType) {
+    var ref = itemType === "event" ? "ev:" + itemId : "rem:" + itemId;
+    var codeBlock = "```cal\n" + ref + "\n```";
 
     // Try section-info based replacement
     var sectionInfo = ctx && ctx.getSectionInfo ? ctx.getSectionInfo(el) : null;
@@ -645,11 +672,11 @@ async function replaceBlockWithInlineRef(plugin, ctx, el, itemId, itemType) {
             var start = sectionInfo.lineStart;
             var end = sectionInfo.lineEnd;
 
-            // Replace the code block lines (including the ``` fences) with the inline ref
-            var newLines = lines.slice(0, start).concat([inlineRef]).concat(lines.slice(end + 1));
+            // Replace the code block lines (including the ``` fences) with the calendian block
+            var newLines = lines.slice(0, start).concat([codeBlock]).concat(lines.slice(end + 1));
             await plugin.app.vault.modify(file, newLines.join("\n"));
 
-            console.log("[Calendian] Replaced calendian-create block with " + ref);
+            console.log("[Calendian] Replaced calendian-create block with calendian block for " + ref);
             return;
         } catch (err) {
             console.warn("[Calendian] Failed to replace block in note:", err.message);
@@ -659,10 +686,10 @@ async function replaceBlockWithInlineRef(plugin, ctx, el, itemId, itemType) {
 
     // Fallback: copy to clipboard + notice
     try {
-        await navigator.clipboard.writeText(inlineRef);
-        new obsidian.Notice("Created! Inline ref copied to clipboard — paste it in your note:\n" + ref);
+        await navigator.clipboard.writeText(codeBlock);
+        new obsidian.Notice("Created! Calendian block copied to clipboard — paste it in your note:\n" + codeBlock);
     } catch (e) {
-        new obsidian.Notice("Created! Add this ref to your note: " + ref);
+        new obsidian.Notice("Created! Add this to your note: " + codeBlock);
     }
 }
 
@@ -956,7 +983,7 @@ async function createEventFromFields(integ, plugin, fields, ctx, el, btn, errorE
         integ._associationIndexDirty = true;
         // Refresh data FIRST so the item is in cache when the post-processor re-runs
         await integ.init(true);
-        await replaceBlockWithInlineRef(plugin, ctx, el, result.id, "event");
+        await replaceBlockWithCalendianBlock(plugin, ctx, el, result.id, "event");
     } else {
         errorEl.textContent = "Failed to create event.";
         errorEl.style.display = "block";
@@ -1008,7 +1035,7 @@ async function createReminderFromFields(integ, plugin, fields, ctx, el, btn, err
         integ._associationIndexDirty = true;
         // Refresh data FIRST so the item is in cache when the post-processor re-runs
         await integ.init(true);
-        await replaceBlockWithInlineRef(plugin, ctx, el, result.id, "reminder");
+        await replaceBlockWithCalendianBlock(plugin, ctx, el, result.id, "reminder");
     } else {
         errorEl.textContent = "Failed to create reminder.";
         errorEl.style.display = "block";
@@ -1016,3 +1043,129 @@ async function createReminderFromFields(integ, plugin, fields, ctx, el, btn, err
         btn.textContent = "Create Reminder";
     }
 }
+
+// ── ```cal code block renderer ────────────────────────────────────────
+
+/**
+ * Render a ```cal``` code block for single event/reminder reference.
+ * Supports: ev:ID or rem:ID
+ * Renders the same inline table as renderCalendianInline for visual consistency.
+ */
+function renderCalRefBlock(plugin, source, el, ctx) {
+    var view = plugin.view;
+    if (!view || !view.macosIntegration) {
+        el.createDiv("calendian-block-empty").textContent =
+            "Calendian panel not loaded. Open the calendar sidebar first.";
+        return;
+    }
+
+    var sourceText = (source || "").trim();
+    var match = sourceText.match(/^(ev|rem):(.+)$/);
+    if (!match) {
+        el.createDiv("calendian-block-empty").textContent =
+            "Invalid cal reference. Use: ev:ID or rem:ID";
+        return;
+    }
+
+    var itemType = match[1];
+    var itemId = match[2];
+    var integ = view.macosIntegration;
+    var item = findItemById(integ, itemType, itemId);
+
+    // Build the same inline table structure for visual consistency
+    var container = el.createDiv("calendian-block calendian-ref-block");
+
+    if (!item) {
+        // Show placeholder for not found item
+        var table = container.createEl("table", {
+            cls: "calendian-inline-table calendian-inline-notfound"
+        });
+        var colgroup = table.createEl("colgroup");
+        var cols = ["20px", "", "", "82px", "24px"];
+        for (var ci = 0; ci < cols.length; ci++) {
+            var col = colgroup.createEl("col");
+            if (cols[ci]) col.style.width = cols[ci];
+        }
+        var tbody = table.createEl("tbody");
+        var tr = tbody.createEl("tr", { cls: "calendian-inline-row calendian-inline-notfound" });
+        tr.createEl("td", { cls: "calendian-inline-type", text: "—" });
+        tr.createEl("td", { cls: "calendian-inline-date", text: "—" });
+        tr.createEl("td", { cls: "calendian-inline-title", text: (itemType === "ev" ? "Event not found: " : "Reminder not found: ") + itemId });
+        tr.createEl("td", { cls: "calendian-inline-time", text: "—" });
+        tr.createEl("td", { cls: "calendian-inline-indicators", text: "?" });
+    } else {
+        // Render the item using the same inline row builder
+        var table2 = container.createEl("table", {
+            cls: "calendian-inline-table",
+            attr: { title: "Click to navigate in Calendian" }
+        });
+        var colgroup2 = table2.createEl("colgroup");
+        var cols2 = ["20px", "", "", "82px", "24px"];
+        for (var ci2 = 0; ci2 < cols2.length; ci2++) {
+            var col2 = colgroup2.createEl("col");
+            if (cols2[ci2]) col2.style.width = cols2[ci2];
+        }
+        var tbody2 = table2.createEl("tbody");
+        var tr2 = tbody2.createEl("tr", {
+            cls: "calendian-inline-row" + (itemType === "rem" ? " calendian-inline-reminder" : "")
+        });
+        buildInlineRow(tr2, item, itemType, itemId, plugin);
+    }
+
+    // Register live-update child
+    if (ctx && typeof ctx.addChild === "function") {
+        ctx.addChild(new CalendianRefChild(container, plugin, itemType, itemId));
+    }
+}
+
+/**
+ * MarkdownRenderChild for ```cal``` reference blocks.
+ * Re-queries item on schedule change.
+ */
+var CalendianRefChild = class extends obsidian.MarkdownRenderChild {
+    constructor(containerEl, plugin, itemType, itemId) {
+        super(containerEl);
+        this.plugin = plugin;
+        this.itemType = itemType;
+        this.itemId = itemId;
+        this._handler = this._onScheduleChanged.bind(this);
+    }
+    onload() {
+        document.addEventListener("calendian:schedule-changed", this._handler);
+    }
+    onunload() {
+        document.removeEventListener("calendian:schedule-changed", this._handler);
+    }
+    _onScheduleChanged() {
+        var integ = this.plugin.view && this.plugin.view.macosIntegration;
+        if (!integ || !integ._dataLoaded) return;
+        var item = findItemById(integ, this.itemType, this.itemId);
+        this.containerEl.empty();
+
+        var table = this.containerEl.createEl("table", {
+            cls: "calendian-inline-table" + (item ? "" : " calendian-inline-notfound"),
+            attr: { title: "Click to navigate in Calendian" }
+        });
+        var colgroup = table.createEl("colgroup");
+        var cols = ["20px", "", "", "82px", "24px"];
+        for (var i = 0; i < cols.length; i++) {
+            var col = colgroup.createEl("col");
+            if (cols[i]) col.style.width = cols[i];
+        }
+        var tbody = table.createEl("tbody");
+        var tr = tbody.createEl("tr", {
+            cls: "calendian-inline-row" +
+                 (this.itemType === "rem" ? " calendian-inline-reminder" : "") +
+                 (item ? "" : " calendian-inline-notfound")
+        });
+        if (item) {
+            buildInlineRow(tr, item, this.itemType, this.itemId, this.plugin);
+        } else {
+            tr.createEl("td", { cls: "calendian-inline-type", text: "—" });
+            tr.createEl("td", { cls: "calendian-inline-date", text: "—" });
+            tr.createEl("td", { cls: "calendian-inline-title", text: (this.itemType === "ev" ? "Event not found: " : "Reminder not found: ") + this.itemId });
+            tr.createEl("td", { cls: "calendian-inline-time", text: "—" });
+            tr.createEl("td", { cls: "calendian-inline-indicators", text: "?" });
+        }
+    }
+};

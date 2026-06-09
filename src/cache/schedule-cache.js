@@ -123,7 +123,14 @@ MacOSIntegration.prototype.loadRemindersFromCache = async function() {
                 this.allReminders = reminders;
                 this._itemLookupCache = null;  // invalidate reverse index
                 this.permissionState.reminders = 'granted';
-                console.log("[Calendian] Loaded " + reminders.length + " reminders from disk cache");
+
+                // Debug: check for duplicates
+                const ids = reminders.map(r => r.id);
+                const uniqueIds = new Set(ids);
+                if (ids.length !== uniqueIds.size) {
+                    console.warn("[Calendian] WARNING: Found " + (ids.length - uniqueIds.size) + " duplicate reminder IDs in loadRemindersFromCache");
+                }
+                console.log("[Calendian] Loaded " + reminders.length + " reminders from disk cache (" + uniqueIds.size + " unique IDs)");
                 return true;
             }
         } catch (e) {
@@ -264,6 +271,15 @@ MacOSIntegration.prototype.preloadReminders = async function() {
             this.permissionState.reminders = 'granted';
             this.lastError.reminders = null;
             this.sourceCounts.reminderLists = this.countReminderLists(reminders);
+
+            // Debug: check for duplicates
+            const ids = reminders.map(r => r.id);
+            const uniqueIds = new Set(ids);
+            if (ids.length !== uniqueIds.size) {
+                console.warn("[Calendian] WARNING: Found " + (ids.length - uniqueIds.size) + " duplicate reminder IDs in preloadReminders");
+            }
+            console.log("[Calendian] Preloaded " + reminders.length + " reminders (" + uniqueIds.size + " unique IDs)");
+
             this.saveRemindersToCache();
         } catch (err) {
             console.error("[Calendian] Failed to preload reminders:", err.error?.message || err.stderr);
